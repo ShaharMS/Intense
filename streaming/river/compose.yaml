@@ -1,0 +1,107 @@
+services:
+  corpus:
+    image: curlimages/curl:8.12.1
+    user: "0:0"
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        if [ ! -s /corpus/Bretagne2.j2k ]; then
+          curl --fail --location --retry 3 --output /corpus/Bretagne2.j2k https://raw.githubusercontent.com/uclouvain/openjpeg-data/master/input/nonregression/Bretagne2.j2k
+        fi
+        echo '94a94669d839b13292340cbbdec6b96c81475eb1e1f6158c55245a7355437290  /corpus/Bretagne2.j2k' | sha256sum -c -s
+    volumes:
+      - river-corpus:/corpus
+
+  viewer:
+    image: nginx:1.27-alpine
+    ports:
+      - "127.0.0.1:8765:80"
+    volumes:
+      - ./web:/usr/share/nginx/html:ro
+      - ./deploy/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      river:
+        condition: service_started
+
+  river:
+    build: .
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      RIVER_CORPUS_ROOT: /app/corpus
+      RUST_LOG: river_server=info,tower_http=info
+    ports:
+      - "127.0.0.1:8080:8080"
+    depends_on:
+      corpus:
+        condition: service_completed_successfully
+      otel-collector:
+        condition: service_started
+    volumes:
+      - ./web:/app/web:ro
+      - river-corpus:/app/corpus:ro
+      - ./corpus/cache/sentinel-atlas:/app/sentinel-atlas:ro
+
+  minio:
+    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+    command: server /data --console-address :9001
+    environment:
+      MINIO_ROOT_USER: river
+      MINIO_ROOT_PASSWORD: river-local-only-change-me
+    ports:
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
+    volumes:
+      - river-minio:/data
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.67.0
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "127.0.0.1:16686:16686"
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.121.0
+    command: ["--config=/etc/otelcol-contrib/config.yaml"]
+    volumes:
+      - ./deploy/otel/config.yaml:/etc/otelcol-contrib/config.yaml:ro
+    depends_on:
+      jaeger:
+        condition: service_started
+
+  prometheus:
+    image: prom/prometheus:v3.2.1
+    command: ["--config.file=/etc/prometheus/prometheus.yml"]
+    ports:
+      - "127.0.0.1:9090:9090"
+    volumes:
+      - ./deploy/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+
+  loki:
+    image: grafana/loki:3.4.2
+    command: ["-config.file=/etc/loki/config.yml"]
+    ports:
+      - "127.0.0.1:3100:3100"
+    volumes:
+      - ./deploy/loki/config.yml:/etc/loki/config.yml:ro
+
+  grafana:
+    image: grafana/grafana:11.6.0
+    environment:
+      GF_SECURITY_ADMIN_USER: river
+      GF_SECURITY_ADMIN_PASSWORD: river-local-only-change-me
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - ./deploy/grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      jaeger:
+        condition: service_started
+      prometheus:
+        condition: service_started
+      loki:
+        condition: service_started
+
+volumes:
+  river-corpus:
+  river-minio:

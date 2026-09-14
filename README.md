@@ -47,7 +47,9 @@ An unsuccessful approach is still part of the playground’s history. Archive it
 
 ## Project catalog
 
-No codenames have been added yet.
+### streaming
+
+- [River](streaming/river/) — **Active** — browser-first, raster-only streaming of selected JPEG 2000 regions with measurable progressive delivery.
 
 When the first project exists, list it under the relevant goal with a link to its project directory and a concise project card. Keep this catalog focused on orientation; the project itself should hold deeper implementation and experiment details.
 

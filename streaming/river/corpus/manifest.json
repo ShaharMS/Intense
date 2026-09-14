@@ -1,0 +1,24 @@
+{
+  "source": "OpenJPEG test data repository",
+  "retrievedAt": "2026-09-10",
+  "assets": [
+    {
+      "name": "Bretagne2.j2k",
+      "url": "https://raw.githubusercontent.com/uclouvain/openjpeg-data/master/input/nonregression/Bretagne2.j2k",
+      "bytes": 5386631,
+      "sha256": "94a94669d839b13292340cbbdec6b96c81475eb1e1f6158c55245a7355437290"
+    },
+    {
+      "name": "small_world_non_consecutive_tilepart_tlm.jp2",
+      "url": "https://raw.githubusercontent.com/uclouvain/openjpeg-data/master/input/nonregression/small_world_non_consecutive_tilepart_tlm.jp2",
+      "bytes": 62215,
+      "sha256": "10fe0f7951b786e76b62c9bf20b078a9d34a5a601ab174409fe9d93c084345e6"
+    },
+    {
+      "name": "issue559-eci-090-CIELab.jp2",
+      "url": "https://raw.githubusercontent.com/uclouvain/openjpeg-data/master/input/nonregression/issue559-eci-090-CIELab.jp2",
+      "bytes": 121364,
+      "sha256": "f4443b3de1b73c17ce9ea2edc9035152606a25c190f82a3e586106d013790b67"
+    }
+  ]
+}

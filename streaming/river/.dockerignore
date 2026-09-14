@@ -1,0 +1,13 @@
+# Rust build outputs are host-specific and needlessly inflate Docker contexts.
+target/
+
+# Downloaded benchmark corpus is runtime input, not application source.
+corpus/cache/
+
+# Generated reports and local VCS metadata do not belong in the image.
+reports/
+.git/
+
+# Never copy local configuration secrets into an image.
+.env
+.env.*

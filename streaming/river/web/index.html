@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>River protocol viewer</title>
+    <style>
+      :root { color-scheme: dark; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; background: #101214; color: #e4e7eb; }
+      body { margin: 0; display: grid; grid-template-columns: 1fr 320px; height: 100vh; }
+      main { position: relative; min-width: 0; overflow: hidden; background: #171a1f; touch-action: none; cursor: grab; }
+      main.is-dragging { cursor: grabbing; }
+      #overview { position: absolute; display: block; max-width: none; max-height: none; transform-origin: 0 0; pointer-events: none; user-select: none; }
+      canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; opacity: 0; pointer-events: none; }
+      canvas.is-rendering { opacity: 1; }
+      aside { border-left: 1px solid #363b43; padding: 16px; overflow: auto; background: #121519; }
+      label { display: grid; gap: 4px; margin: 10px 0; color: #abb4c1; font-size: 12px; }
+      input { background: #20252c; border: 1px solid #404752; border-radius: 4px; color: inherit; padding: 7px; font: inherit; }
+      button { margin-top: 12px; padding: 8px 10px; color: #fff; background: #2667b8; border: 0; border-radius: 4px; cursor: pointer; }
+      details { margin-top: 16px; border-top: 1px solid #363b43; padding-top: 12px; }
+      summary { cursor: pointer; color: #abb4c1; font-size: 12px; }
+      #status { color: #82d6a7; }
+      #trace { font-size: 12px; line-height: 1.5; white-space: pre-wrap; color: #b9c4d1; }
+      .note { color: #8994a4; font-size: 12px; line-height: 1.45; }
+    </style>
+  </head>
+  <body>
+    <main id="stage" aria-label="Image viewport: drag to pan and use the mouse wheel to zoom">
+      <img id="overview" src="/default-preview.webp" alt="Default overview from the PLISM whole-slide scan" />
+      <canvas id="viewport" aria-label="River WebGL viewport"></canvas>
+    </main>
+    <aside>
+      <h1>River</h1>
+      <p id="status">connecting to River…</p>
+      <p class="note">API: <code id="api-origin">http://127.0.0.1:8080</code></p>
+      <p class="note">Drag the image to pan. Scroll over it to zoom toward the pointer. Coordinates below are for automation and precise requests.</p>
+      <button id="fit">Fit image</button>
+      <details>
+        <summary>Request controls (automation / precise view)</summary>
+        <label>Asset SHA-256<input id="asset" value="94a94669d839b13292340cbbdec6b96c81475eb1e1f6158c55245a7355437290" /></label>
+        <label>X<input id="x" type="number" value="0" min="0" /></label>
+        <label>Y<input id="y" type="number" value="0" min="0" /></label>
+        <label>Width<input id="width" type="number" value="1920" min="1" readonly /></label>
+        <label>Height<input id="height" type="number" value="1080" min="1" readonly /></label>
+        <label>Zoom<input id="zoom" type="number" value="0" min="0" max="7" /></label>
+        <button id="request">Request precise viewport</button>
+      </details>
+      <h2>Trace overlay</h2>
+      <pre id="trace">Waiting for a viewport request.</pre>
+      <p class="note">Default: Bretagne2, an immutable 2,592 × 1,944 JPEG 2000 codestream decoded through linked OpenJPEG into streamed WebP raster tiles. The overview disappears as decoded tiles arrive.</p>
+    </aside>
+    <script>
+      // The Compose viewer is static on :8765; raster/API traffic stays on River :8080.
+      window.RIVER_API_ORIGIN = 'http://127.0.0.1:8080';
+    </script>
+    <script type="module" src="/viewer.js"></script>
+  </body>
+</html>

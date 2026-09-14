@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "assetId": "dc749c5f796438cd2602cabbb0dee94cb3780150ef50cc564f5e89bcd2276e68",
+  "identity": "SHA-256 of the newline-joined tile SHA-256 values in row-major order",
+  "source": {
+    "dataset": "PLISM original whole-slide images",
+    "originalTiff": "cache/PLISM-MY-P.tiff",
+    "originalTiffSha256": "77b48fafaabe33eaf27c8badc125a0171e5694bebbdff4f785a20ec9fc71716ea"
+  },
+  "raster": {
+    "width": 60928,
+    "height": 44032,
+    "components": 4,
+    "bitDepth": 8,
+    "colorSpace": "sRGB",
+    "compression": "lossless JPEG 2000"
+  },
+  "tiles": [
+    { "path": "cache/PLISM-MY-P-level1-lossless-jp2/tile-x0-y0.jp2", "x": 0, "y": 0, "width": 30464, "height": 22016, "sha256": "3628e9dccf54c3b3af4a327a954c441866f0d9ae18eb8673e01705de5bb4b357" },
+    { "path": "cache/PLISM-MY-P-level1-lossless-jp2/tile-x30464-y0.jp2", "x": 30464, "y": 0, "width": 30464, "height": 22016, "sha256": "cf8102df86ed7c622a46c503a10914473a2b4b3734d487c9a344c2be5c2ce2c8" },
+    { "path": "cache/PLISM-MY-P-level1-lossless-jp2/tile-x0-y22016.jp2", "x": 0, "y": 22016, "width": 30464, "height": 22016, "sha256": "e8c0221c5ebafdbfb11bd9d694733f8e51c552be0ff160cf3a4c2c719aed5b2b" },
+    { "path": "cache/PLISM-MY-P-level1-lossless-jp2/tile-x30464-y22016.jp2", "x": 30464, "y": 22016, "width": 30464, "height": 22016, "sha256": "e35d44308ed8ab7dcfeb9a9d043639e94c710d2815a10e5c3141bb1202092e46" }
+  ]
+}
