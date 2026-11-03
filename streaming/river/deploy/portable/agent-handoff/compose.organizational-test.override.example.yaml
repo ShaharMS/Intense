@@ -1,0 +1,6 @@
+# OPTIONAL TEMPORARY LOGGING ONLY. Retain the existing project, mounts and settings.
+# docker compose -f compose.yaml -f compose.organizational-test.override.example.yaml up -d
+services:
+  river:
+    environment:
+      RUST_LOG: river_server=debug,tower_http=info

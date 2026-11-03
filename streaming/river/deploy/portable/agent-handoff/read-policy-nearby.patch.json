@@ -1,0 +1,8 @@
+{
+  "mode": "adaptive",
+  "minimumSamples": 8,
+  "maxSourceRequests": 8,
+  "maxOverfetchRatio": 2,
+  "serialTransport": "sdk",
+  "refreshPayloadCosts": false
+}

@@ -1,0 +1,105 @@
+{
+  "schemaVersion": 1,
+  "manifest": "reports/fixed-gate-v2/manifest.json",
+  "profiles": {
+    "near-origin": {
+      "responseDelayMs": 0,
+      "description": "Existing qualified native Docker bridge origin; OS cache warm."
+    },
+    "response-delay-20ms": {
+      "responseDelayMs": 20,
+      "bandwidthLimit": null,
+      "description": "20ms delay before each source response header. Test emulation, not organizational S3 or physical RTT. Exact unchanged three-size suite; source registration remains IO-free.",
+      "firstPreOptimizationEvidence": "reports/fixed-gate-v2/source-read-trace-delay20.json",
+      "runnerSha256": "350b43dbf208c8b98ae94bd9fc10a53d8971178f4b129589f53cc41a831fd016"
+    },
+    "startup-pulse-v1": {
+      "profileVersion": 1,
+      "manifest": "reports/fixed-gate-v2/manifest.json",
+      "manifestSha256": "286381a215a3d2e95ef8e0c464a437dc8dd9cbcbfc7b004361b64c546a67ce69",
+      "startupDelayMs": 5,
+      "startupDelayGets": 3,
+      "tcpNoDelay": true,
+      "listenBacklog": 256,
+      "description": "Delay only the first3 objectGETs per new source by5ms, then remove the delay. Actual timed responses, not injected latency observations. OS cache not explicitly flushed or warmed. Not production S3 or a physical RTT benchmark. Both294 and295 rerun on all six unchanged requests. New profile is not an existing historical LTS timing condition.",
+      "comparisonEvidence": [
+        "reports/transport-m295/linux-calibration-pulse.json",
+        "reports/transport-m295/linux-calibration-pulse-confirm.json"
+      ]
+    },
+    "org-shaped-300MBps": {
+      "targetRttMs": [
+        7,
+        14,
+        16
+      ],
+      "sharedBodyBytesPerSecond": 300000000,
+      "addedDelayMs": [
+        5.5,
+        12.5,
+        14.5
+      ],
+      "calibration": "reports/kakadu-io-m303/org-network-m780/calibration-final-m793.json",
+      "description": "Native read-only Linux origin with bounded pacing;warm OS cache, not physicaldiskcold or actual organizationalS3.",
+      "qualification": "reports/kakadu-io-m303/source-refresh-release-m839.json",
+      "ltsQualification": "reports/kakadu-io-m303/learned-seeds-release-m821.json"
+    },
+    "org-shaped-300MBps-active-body-v2": {
+      "profileVersion": 2,
+      "manifest": "reports/fixed-gate-v2/manifest.json",
+      "manifestSha256": "286381a215a3d2e95ef8e0c464a437dc8dd9cbcbfc7b004361b64c546a67ce69",
+      "targetRttMs": [
+        7,
+        14,
+        16
+      ],
+      "addedDelayMs": [
+        5.5,
+        12.5,
+        14.5
+      ],
+      "sharedBodyBytesPerSecond": 300000000,
+      "pacerModel": "activeBodyBoundedVirtualTime",
+      "pacingCatchupBytes": 1048576,
+      "runner": "reports/kakadu-io-m303/paced-origin-compose-m894/serve.py",
+      "runnerSha256": "6263669386d39ac76cd657d4642fa883072157c1ed0ac8e0cd1eb5cd4d381295",
+      "calibrationEvidence": [
+        "reports/kakadu-io-m303/origin16ms-combined-m917.json",
+        "reports/kakadu-io-m303/origin-14ms-combined-m916.json",
+        "reports/kakadu-io-m303/origin-7ms-combined-m916.json"
+      ],
+      "description": "Read-only native Linux source with shared300MBps body pacing. No token credit accrues while bodies are idle or waiting for headers; scheduling catch-up is bounded1MiB during active streaming. Four independent forked client processes stream and hash ranges; all calibrations retain every repetition. Warm source OS cache, no actual organizationalS3/TLS or physicaldiskcold claim. Both current Stable830 and LTS811 rerun against907 under the same source condition.",
+      "qualification": "reports\\kakadu-io-m303\\refinement-age-release-m956.json",
+      "ltsQualification": "reports\\kakadu-io-m303\\refinement-age-release-m956.json"
+    },
+    "org-shaped-300MBps-active-body-v3": {
+      "profileVersion": 3,
+      "manifest": "reports/fixed-gate-v2/manifest.json",
+      "manifestSha256": "286381a215a3d2e95ef8e0c464a437dc8dd9cbcbfc7b004361b64c546a67ce69",
+      "targetRttMs": [
+        7,
+        14,
+        16
+      ],
+      "addedDelayMs": [
+        5.5,
+        12.5,
+        14.5
+      ],
+      "sharedBodyBytesPerSecond": 300000000,
+      "pacerModel": "activeBodyBoundedVirtualTime",
+      "pacingCatchupBytes": 1048576,
+      "runner": "reports/kakadu-io-m303/paced-origin-chunk256-m977/serve.py",
+      "runnerSha256": "809f9cd5ba15a6dfa1b400f54a3ad6ae017bddd6f4b20a432e2c03bf89b8bae1",
+      "calibrationEvidence": [
+        "reports\\kakadu-io-m303\\chunk256-source-calibration-m977-0.json",
+        "reports\\kakadu-io-m303\\chunk256-source-calibration-m977-1.json",
+        "reports\\kakadu-io-m303\\chunk256-source-calibration-m977-2.json"
+      ],
+      "description": "Same frozen sourcebytes, shared300MBps active-body virtual-time pacing and1MiBcatch-up bound;256KiBbulkchunks reduce fixture timer/GILoverhead. Shortresponses and64KiBpilots retain their response-size granularity. Explicitcalibration-range warmup; all3fullcalibrations retained. Newcomparison condition; rerun both current934andcandidate972, do not reuse prior965timings as qualification.",
+      "bodyChunkBytes": 262144
+    }
+  },
+  "currentQualifiedProfile": "org-shaped-300MBps-active-body-v2",
+  "currentCandidateProfile": "org-shaped-300MBps-active-body-v3"
+}

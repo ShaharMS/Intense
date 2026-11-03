@@ -13,14 +13,14 @@ pub enum FrameError {
     InvalidHeader(#[from] serde_json::Error),
 }
 
-/// Binary WebSocket frame layout: `RIVR | u32le header length | JSON header | WebP`.
-pub fn encode_tile_frame(header: &TileFrameHeader, webp: &[u8]) -> Result<Vec<u8>, FrameError> {
+/// Binary WebSocket frame layout: `RIVR | u32le header length | JSON header | encoded raster`.
+pub fn encode_tile_frame(header: &TileFrameHeader, raster: &[u8]) -> Result<Vec<u8>, FrameError> {
     let header_bytes = serde_json::to_vec(header)?;
-    let mut frame = Vec::with_capacity(MAGIC.len() + 4 + header_bytes.len() + webp.len());
+    let mut frame = Vec::with_capacity(MAGIC.len() + 4 + header_bytes.len() + raster.len());
     frame.extend_from_slice(MAGIC);
     frame.extend_from_slice(&(header_bytes.len() as u32).to_le_bytes());
     frame.extend_from_slice(&header_bytes);
-    frame.extend_from_slice(webp);
+    frame.extend_from_slice(raster);
     Ok(frame)
 }
 

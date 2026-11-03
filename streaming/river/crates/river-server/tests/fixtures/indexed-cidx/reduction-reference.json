@@ -1,0 +1,23 @@
+{
+  "scope": "Independent Pillow/OpenJPEG reduction3quality references from original generated indexed fixture.",
+  "references": [
+    {
+      "file": "r3-l1.gray",
+      "size": [
+        64,
+        64
+      ],
+      "layers": 1,
+      "sha256": "6c04e41d18724031b157024bf856b24aef4cc00b5ff4c2febbb632cd461320e1"
+    },
+    {
+      "file": "r3-all.gray",
+      "size": [
+        64,
+        64
+      ],
+      "layers": 0,
+      "sha256": "2cc097a29a0be07592aabda3ea8032e3331554e4819f3d6ef6055866c364f082"
+    }
+  ]
+}

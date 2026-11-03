@@ -1,0 +1,117 @@
+# Build-only CUDA image: only two small shared libraries enter the runtime.
+FROM nvidia/cuda:13.3.0-base-ubuntu24.04 AS nvidia
+RUN apt-get update && apt-get install -y --no-install-recommends python3 python3-pip \
+    && python3 -m pip install --break-system-packages --no-cache-dir --no-deps nvidia-nvjpeg2k-cu13==0.11.0.51
+
+FROM rust:1.88.0-bookworm AS openht
+RUN apt-get update && apt-get install -y --no-install-recommends cmake git g++ libtiff-dev \
+    && rm -rf /var/lib/apt/lists/*
+RUN git init /tmp/openht && git -C /tmp/openht remote add origin https://github.com/osamu620/OpenHTJ2K.git \
+    && git -C /tmp/openht fetch --depth 1 origin dacb452ecb21f50e88a74bf860c60f4aafa8a602 \
+    && git -C /tmp/openht checkout --detach FETCH_HEAD \
+    && test "$(git -C /tmp/openht rev-parse HEAD)" = dacb452ecb21f50e88a74bf860c60f4aafa8a602
+COPY crates/river-server/src/decoder/openht-portable.patch /tmp/openht-portable.patch
+RUN git -C /tmp/openht apply /tmp/openht-portable.patch \
+    && cmake -S /tmp/openht -B /tmp/openht/build -DCMAKE_BUILD_TYPE=Release \
+       -DBUILD_SHARED_LIBS=OFF -DENABLE_AVX2=OFF -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+    && cmake --build /tmp/openht/build --target open_htj2k --parallel 2
+COPY crates/river-server/src/decoder/openht_worker.cpp /tmp/openht_worker.cpp
+COPY crates/river-server/src/decoder/openht_direct.hpp /tmp/openht_direct.hpp
+RUN mkdir -p /out && c++ -std=c++17 -O3 -march=x86-64 -mtune=generic -pthread \
+      -DOPENHTJ2K_THREAD -DOPENHTJ2K_TIFF_SUPPORT -I/tmp/openht/source/core/interface -I/tmp/openht/source/core/common -I/tmp/openht/source/core/coding -I/tmp/openht/source/core/codestream /tmp/openht_worker.cpp \
+      /tmp/openht/build/libopenhtj2k.a -Wl,--exclude-libs,ALL -ltiff -o /out/river-openht-worker \
+    && strip /out/river-openht-worker && /out/river-openht-worker --self-test
+
+FROM rust:1.88.0-bookworm AS build
+WORKDIR /app
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      build-essential cmake git libclang-dev libpng-dev libtiff-dev pkg-config \
+    && rm -rf /var/lib/apt/lists/*
+RUN git clone --depth 1 --branch v20.4.15 --recurse-submodules \
+      https://github.com/GrokImageCompression/grok.git /tmp/grok \
+    && cmake -S /tmp/grok -B /tmp/grok/build \
+      -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/local \
+      -DBUILD_TESTING=OFF -DGRK_BUILD_CODEC=ON -DGRK_BUILD_DOC=OFF \
+      -DGRK_BUILD_LIBPNG=OFF -DGRK_BUILD_LIBTIFF=OFF -DGRK_BUILD_JPEG=OFF \
+    && cmake --build /tmp/grok/build --parallel 2 \
+    && cmake --install /tmp/grok/build && ldconfig
+RUN mkdir -p /out/corpus && curl --fail --location --retry 3 \
+    https://raw.githubusercontent.com/uclouvain/openjpeg-data/master/input/nonregression/Bretagne2.j2k \
+    -o /out/corpus/Bretagne2.j2k \
+    && echo '94a94669d839b13292340cbbdec6b96c81475eb1e1f6158c55245a7355437290  /out/corpus/Bretagne2.j2k' | sha256sum --check --status
+COPY Cargo.toml Cargo.lock ./
+COPY crates ./crates
+RUN pkg-config --exists libcurl || (apt-get update && apt-get install -y --no-install-recommends libcurl4-openssl-dev && rm -rf /var/lib/apt/lists/*)
+RUN mkdir -p /out && c++ -std=c++17 -O3 -fPIC -shared \
+      crates/river-server/src/remote_source/curl_bridge.cpp -lcurl -o /out/libriver_curl.so
+RUN mkdir -p /out && c++ -std=c++17 -O2 -fPIC -shared \
+      -I$(dirname "$(find /usr/local/include -name grok.h -print -quit)") \
+      crates/river-server/src/decoder/grok_bridge.cpp \
+      -L/usr/local/lib -lgrokj2k -o /out/libriver_grok.so
+COPY deploy/openapi.json ./deploy/openapi.json
+COPY deploy/swagger/index.html ./deploy/swagger/index.html
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/usr/local/cargo/git \
+    --mount=type=cache,target=/app/target \
+    find crates -type f -name '*.rs' -exec touch {} + \
+    && CMAKE_BUILD_PARALLEL_LEVEL=2 cargo build --locked --release --jobs 2 --package river-server --features grok,jxl,nvjpeg2000 \
+    && install -D target/release/river-server /out/river-server \
+    && strip /out/river-server /usr/local/bin/grk_compress /usr/local/bin/grk_decompress /usr/local/lib/libgrok*.so.20.4.15
+
+
+FROM debian:bookworm-slim AS runtime
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates libcurl4 libstdc++6 libpng16-16 libtiff6 liblz4-1 libmimalloc2.0 python3 python3-numpy tini \
+    && rm -rf /var/lib/apt/lists/*
+WORKDIR /opt/river
+COPY --from=build /out/river-server /usr/local/bin/river-server
+COPY --from=openht /out/river-openht-worker /usr/local/bin/river-openht-worker
+COPY --from=build /usr/local/bin/grk_compress /usr/local/bin/grk_decompress /usr/local/bin/
+COPY --from=build /usr/local/lib/libgrok*.so* /usr/local/lib/
+COPY --from=build /out/libriver_grok.so /usr/local/lib/
+COPY --from=build /out/libriver_curl.so /usr/local/lib/
+COPY --from=build /out/corpus /opt/river/corpus
+COPY --from=nvidia /usr/local/lib/python3.12/dist-packages/nvidia/nvjpeg2k/lib/libnvjpeg2k.so.0 /usr/local/lib/libnvjpeg2k.so.0
+COPY --from=nvidia /usr/local/cuda-13.3/targets/x86_64-linux/lib/libcudart.so.13.3.29 /usr/local/lib/libcudart.so.13
+COPY --from=nvidia /usr/local/lib/python3.12/dist-packages/nvidia_nvjpeg2k_cu13-0.11.0.51.dist-info/licenses/LICENSE.txt /usr/share/doc/river/licenses/NVJPEG2000.txt
+COPY --from=nvidia /NGC-DL-CONTAINER-LICENSE /usr/share/doc/river/licenses/NVIDIA-CONTAINER.txt
+COPY licenses /usr/share/doc/river/licenses
+COPY Cargo.lock /usr/share/doc/river/Cargo.lock
+COPY nvjpeg2000-sidecar/*.py /opt/river/nvidia/
+COPY deploy/backend/entrypoint.py /opt/river/entrypoint.py
+COPY deploy/backend/river_profiles.py /opt/river/river_profiles.py
+COPY deploy/backend/build_warmup.py /opt/river/build_warmup.py
+COPY deploy/swagger /opt/river/swagger
+COPY web /opt/river/web
+RUN ldconfig && mkdir -p /data /var/lib/river/s3-cache \
+    && python3 /opt/river/build_warmup.py /opt/river/corpus/river-warmup
+ENV RIVER_BIND=0.0.0.0:8080 \
+    RIVER_GROK_PACKED_VIEWS=true \
+    RIVER_S3_MULTIPART_PLT=true \
+    RIVER_S3_MULTIPART_PREFIX=true \
+    RIVER_S3_SINGLE_PREFIX=true \
+    RIVER_S3_INDEX_ONLY_PREFIX=true \
+    RIVER_S3_STREAMED_PLT_ROI=true \
+    RIVER_S3_PRECINCT_ROI=true \
+    RIVER_S3_EXACT_SUPPORT=true \
+    RIVER_CORPUS_ROOT=/opt/river/corpus \
+    RIVER_MOSAIC_ROOT=/data \
+    RIVER_ASSET_CATALOG="" \
+    RIVER_S3_CACHE_ROOT=/var/lib/river/s3-cache \
+    RIVER_S3_CONNECTIONS_FILE=/var/lib/river/config/s3-connections.json \
+    RIVER_LOCAL_SOURCE_CACHE_ROOT=/var/lib/river/s3-cache/local-sources \
+    RIVER_LOCAL_SOURCE_CACHE_BYTES=2147483648 \
+    RIVER_HT_CACHE_ROOT=/var/lib/river/s3-cache/ht-tiles \
+    RIVER_HT_CACHE_BYTES=0 \
+    RIVER_SWAGGER_ASSETS=/opt/river/swagger \
+    RIVER_NVJPEG2000_LIBRARY=/usr/local/lib/libnvjpeg2k.so.0 \
+    RIVER_CUDART_LIBRARY=/usr/local/lib/libcudart.so.13 \
+    RIVER_NVJPEG2000_ALLOWED_ROOTS=/opt/river/corpus:/data:/var/lib/river/s3-cache \
+    RIVER_ENABLE_NVIDIA=auto \
+    RIVER_OTEL_ENABLED=false \
+    NVIDIA_VISIBLE_DEVICES=all NVIDIA_DRIVER_CAPABILITIES=compute,utility \
+    PYTHONUNBUFFERED=1
+EXPOSE 8080
+HEALTHCHECK --interval=10s --timeout=5s --start-period=180s --retries=6 CMD python3 -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=4)"
+ENTRYPOINT ["/usr/bin/tini", "--", "python3", "/opt/river/entrypoint.py"]
+

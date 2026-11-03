@@ -1,0 +1,16 @@
+[package]
+name = "range-sdk-replay"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[workspace]
+
+[dependencies]
+anyhow = "1.0"
+futures-util = "0.3"
+libc = "0.2"
+object_store = { version = "=0.13.2", default-features = false, features = ["aws", "fs"] }
+serde_json = "1.0"
+sha2 = "0.10.9"
+tokio = { version = "1.44.2", features = ["full"] }

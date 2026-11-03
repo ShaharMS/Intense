@@ -1,0 +1,29 @@
+{
+  "passed": true,
+  "scope": "Independent OpenJPEG1.5.2reference encoder; modern Pillow/OpenJPEG pixel oracle. Generated512square gray8 fixture,64native64square tiles,4resolutions,3quality layers,RPCL,resolution tile-parts. No frozen/source imagery modified.",
+  "fileBytes": 254809,
+  "sha256": "54d416d2fa29e052a8f9a4ad340ca0d55f4cc10168eaa900993e99b1ddbd53ad",
+  "sourcePixelsSha256": "75481f8d6ba79c1a0aed44eaed41a0e219533837105b82956846f396b7b115eb",
+  "faixVersion": 2,
+  "tileRows": 64,
+  "partsPerRow": 4,
+  "validatedSotEntries": 256,
+  "offsetBase": "SOCabsolute file offset; FAIX offsets are relative to SOC",
+  "allPartsContiguous": true,
+  "pixelsExact": true,
+  "encoderOptions": [
+    "-n",
+    "4",
+    "-t",
+    "64,64",
+    "-r",
+    "8,4,0",
+    "-p",
+    "RPCL",
+    "-TP",
+    "R",
+    "-jpip"
+  ],
+  "buildCompatibilityPatch": "Only suppress obsolete lrintf replacement for MSVC>=1800; current compiler supplies intrinsic.",
+  "initialRateOneCandidate": "indexed.jp2 retained for diagnostics but not qualified as lossless:7368pixels differed by1. Zero final rate matches every source pixel."
+}

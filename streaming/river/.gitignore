@@ -2,3 +2,7 @@
 /.env
 /reports/
 /corpus/cache/
+
+deploy/local-state/
+deploy/local-stack.json
+reports/container-consolidation/

@@ -1,0 +1,15 @@
+# Optional CPU-only tuning example, measured on an 8 CPU / 8 GiB instance.
+# Six cold object URLs aliasing the frozen 50 MB, 979 MB and 11 GB fixtures:
+# four admitted decodes, four-worker limit: 1,138 ms batch median;
+# two admitted decodes, four-worker limit: 881 ms. Six trials; exact pixels.
+# This is a mixed-workload result, not a universal per-image speedup.
+# The test capped concurrent source operations at four; retain the existing
+# persisted read policy, S3 connections, cache/config volumes and credentials.
+# Validate locally before applying. This is not a 4 CPU or 16 CPU preset.
+# docker compose -f compose.yaml -f compose.cpu-capacity.override.example.yaml up -d
+services:
+  river:
+    environment:
+      RIVER_DECODE_CONCURRENCY: "2"
+      RIVER_OPENJPEG_THREADS_PER_DECODE: "4"
+      RIVER_SOURCE_IO_CONCURRENCY: "8"

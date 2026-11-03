@@ -1,9 +1,9 @@
 const viewers = Number.parseInt(process.env.RIVER_VIEWERS ?? "10", 10);
 const viewportWidth = Number.parseInt(process.env.RIVER_VIEWPORT_WIDTH ?? "1920", 10);
 const viewportHeight = Number.parseInt(process.env.RIVER_VIEWPORT_HEIGHT ?? "1080", 10);
-const server = process.env.RIVER_WS_URL ?? "ws://127.0.0.1:8080/ws";
+const server = process.env.RIVER_WS_URL ?? "ws://127.0.0.1:18080/ws";
 const assetId = process.env.RIVER_ASSET_ID ?? "94a94669d839b13292340cbbdec6b96c81475eb1e1f6158c55245a7355437290";
-const previewFrames = Math.ceil(viewportWidth / 256) * Math.ceil(viewportHeight / 256);
+const previewFrames = Math.ceil(viewportWidth / 512) * Math.ceil(viewportHeight / 512);
 
 const samples = [];
 const jobs = Array.from({ length: viewers }, (_, index) => new Promise((resolve, reject) => {

@@ -1,0 +1,7 @@
+{
+  "mode": "adaptive",
+  "minimumSamples": 8,
+  "maxOverfetchRatio": 2,
+  "maxSourceRequests": 16,
+  "serialTransport": "auto"
+}

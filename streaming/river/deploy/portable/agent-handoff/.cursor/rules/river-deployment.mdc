@@ -1,0 +1,20 @@
+---
+description: Preserve existing River configuration when deploying this bundle
+alwaysApply: true
+---
+
+# River bundle deployment
+
+This rule applies only to handling this extracted River deployment bundle.
+Read AGENTS.md and ORGANIZATIONAL-DEPLOYMENT.txt before deployment.
+For upgrades preserve the existing S3 connections and IDs, credentials/providers,
+config/cache volumes and paths, custom environment, WebP/read/retry settings,
+service-account/Secret/TLS references, routing and resource configuration.
+Do not replace existing .env/configuration with examples, recreate connections,
+import an empty sources array, delete volumes, or modify source imagery.
+Enable adaptation by GET/merge/PUT of the existing read-policy settings; change
+only mode to adaptive initially, retaining its existing limits and transport.
+The included tuning presets are examples for fresh installations, not replacements.
+Verify settings and a known existing S3 image after upgrade; keep rollback state.
+Keep credential-bearing backups private and out of the shared bundle/results.
+Report intentional changes and distinguish cache state and timing boundaries.

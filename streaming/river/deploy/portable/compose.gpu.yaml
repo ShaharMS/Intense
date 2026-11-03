@@ -1,0 +1,5 @@
+services:
+  river:
+    gpus: all
+    environment:
+      RIVER_ENABLE_NVIDIA: "true"

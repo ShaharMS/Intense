@@ -1,0 +1,123 @@
+{
+  "stable": "river:2026.11.02-refinement-age-combo-m934-trial",
+  "lts": "river:2026.11.02-refinement-age-combo-m934-trial",
+  "checkpoint": 934,
+  "ltsCheckpoint": 934,
+  "imageId": "sha256:b78a083ab52f38120255b974bb4093bc72f96f4150234b9ba98668ad6beff974",
+  "ltsImageId": "sha256:b78a083ab52f38120255b974bb4093bc72f96f4150234b9ba98668ad6beff974",
+  "promotedAt": "2026-11-02T23:46:54.410106+02:00",
+  "previousStable": "river:2026.11.02-streamer-pyramid-combo-m907-trial",
+  "previousLts": "river:2026.11.02-streamer-pyramid-combo-m907-trial",
+  "channelPolicy": {
+    "ltsMinimumImprovementPercent": 10,
+    "stable": "Any verified improvement that is stable",
+    "latest": "Current experiment; qualification status explicit",
+    "sharedContract": "Every retained backend image supports pixel-pyramid-v1; channels may overlap on one image"
+  },
+  "qualification": {
+    "evidence": "reports\\kakadu-io-m303\\refinement-age-release-m956.json",
+    "baselineCheckpoint": 907,
+    "metric": "Cold55MBwhole-view progressive all-final frame arrival at14ms/300MBps",
+    "improvementPercent": 13.325756672168886,
+    "latencySpeedupEstablished": true,
+    "scope": "One refinement quiet-period accounting fix on frozen907. Twelve balancedcold55MBwholeviewpairs on measured14ms/300MBps source; currentStableandLTS share907image and serve as same matched baseline. Same150mssetting,verified1job/viewport,16CPU8GiB/Adaptive8/sourcecap8/SDK/64MiBsourcecache. Sourcebytes,geometry,driver,encoders andpixel references unchanged."
+  },
+  "validation": {
+    "unitTestsPassed": 313,
+    "unitTestsFailed": 0,
+    "unitTestsIgnored": 14,
+    "primaryFreshColdResponses": 84,
+    "qualifyingColdProgressiveResponses": 24,
+    "progressiveExactFinalComposites": 12,
+    "defaultWebpBaselineComposites": 12,
+    "originalUrlContractChecks": 15,
+    "allPixelsExact": true,
+    "allExactRepeatsSourceIoZero": true,
+    "viewportSupersessionQuietPeriodPassed": true,
+    "upgradePreservesSettingsSourcesAndCache": true,
+    "deployedChannelContractChecks": 60,
+    "allSixBackendApisHealthy": true
+  },
+  "upgradeEvidence": "reports/kakadu-io-m303/refinement-upgrade-m955.json",
+  "knownLimitations": [
+    "Lab nativeHTTPRange source: calibrated13.7msheader wave and299-301MBpsaggregate long-body transfers; calibration ranges explicitly warmed. No actualorganizationalS3/TLS/auth, physicaldiskcold or browserpaint claim.",
+    "Qualifying operation is complete cold55MBwhole-view progressive PNG delivery, unchanged1024x1024final pixels.12paired repeats of the experiment (fresh process/source each) were allfaster with identicalphysicalIO; firstpreview timings were mixed. This is not a universalfirstframe or decoder speedup.",
+    "The11GBcoarsest preview already caches everyfinaltile and bypasses the changed refinement gate. Initial parallel4job timing was worse and noisy;12pair confirmation reduced the geometricdifference to+3.9percent,p0.474. Startup-verified1job diagnostics had near-equalmedians692.5vs686.4ms. No11GBgain is claimed; all rawdata,CPUcounters and contrasting same-binary controls remain.",
+    "Benchmark sizing audit found an ignored RIVER_PER_VIEWPORT_DECODE_CONCURRENCY setting. Historical matched runs actually used4jobs; they were not relabeled. New qualifying14msrun uses the correct RIVER_VIEWPORT_DECODE_CONCURRENCY=1 and records startup-resolved sizing for every sample. Controlled runners now reject the misspelling.",
+    "An ungated14mscalibration missed300MBps and was retained asdiagnostic only. The qualifying12pairrun passed explicit warmed source-capacity checks before measurement; no nominalcap was substituted for measured capacity.",
+    "Quietperiod is still150msfromthecurrentrequest: time spent inmetadata,previewIOanddecode now counts toward it. Anewviewport gets a newquietperiod;600mssupersession tests verified independent pixels,no supersededfinal afternewAccepted andzeroIOcache repeats. Cachedfinals still bypass thewait.",
+    "Root unrelated experiments remain preserved. Qualified source is frozen934; sharedCrystal URL/tile-info/default256pixel,explicitgeometry,WMTS andCORS contract remain. Allretained backend images must carry that sharedcontract.",
+    "Current tests used16CPU8GiB/64MiBsourcecache/OpenJPEG/Adaptive8/sourcecap8/SDK. Factorylocalsettings are separate; networklearning remains process-local andsourceIDscoped. Standardstartupfallback remainsObserve; savedAPIsettings arepreserved."
+  ],
+  "frozenSource": "reports\\image-builds\\2026.11.02-refinement-age-combo-m934-trial\\source",
+  "frozenSourceManifest": "reports/image-builds/2026.11.02-refinement-age-combo-m934-trial/manifest.json",
+  "frozenSourceManifestSha256": "3177b5744d10630274b1cb1c833ebaf8717536315ac6767b47b5171e4fa9d2c1",
+  "ltsQualification": {
+    "evidence": "reports\\kakadu-io-m303\\refinement-age-release-m956.json",
+    "baselineCheckpoint": 907,
+    "metric": "Cold55MBwhole-view progressive all-final frame arrival at14ms/300MBps",
+    "improvementPercent": 13.325756672168886,
+    "latencySpeedupEstablished": true,
+    "scope": "One refinement quiet-period accounting fix on frozen907. Twelve balancedcold55MBwholeviewpairs on measured14ms/300MBps source; currentStableandLTS share907image and serve as same matched baseline. Same150mssetting,verified1job/viewport,16CPU8GiB/Adaptive8/sourcecap8/SDK/64MiBsourcecache. Sourcebytes,geometry,driver,encoders andpixel references unchanged."
+  },
+  "ltsValidation": {
+    "unitTestsPassed": 313,
+    "unitTestsFailed": 0,
+    "unitTestsIgnored": 14,
+    "primaryFreshColdResponses": 84,
+    "qualifyingColdProgressiveResponses": 24,
+    "progressiveExactFinalComposites": 12,
+    "defaultWebpBaselineComposites": 12,
+    "originalUrlContractChecks": 15,
+    "allPixelsExact": true,
+    "allExactRepeatsSourceIoZero": true,
+    "viewportSupersessionQuietPeriodPassed": true,
+    "upgradePreservesSettingsSourcesAndCache": true,
+    "deployedChannelContractChecks": 60,
+    "allSixBackendApisHealthy": true
+  },
+  "ltsPromotedAt": "2026-11-02T23:46:54.410106+02:00",
+  "compatibilityContract": {
+    "version": "pixel-pyramid-v1",
+    "tileInfo": "/api/tiles/{percent-encoded-original-image-url}",
+    "tiles": "/streamer/v1/{z}/{x}/{y}/tile.png|tile.webp?image={percent-encoded-original-image-url}&edge=transparent",
+    "tileSize": 256,
+    "tilePixelRatio": 1,
+    "maxzoom": "max(0,ceil(log2(max(width,height)/256)))",
+    "minzoom": 0,
+    "wmtsUnchanged": true,
+    "explicitGeometryPreserved": true
+  },
+  "minimumSupportedCheckpoint": 907,
+  "deployment": {
+    "status": "complete",
+    "composeProject": "river",
+    "maximumExistingBackends": 6,
+    "defaultBackend": "replica-1",
+    "viewer": "http://127.0.0.1:18765",
+    "evidence": "reports/channel-rollout-m957/rollout.json",
+    "allSixBackendApisHealthy": true,
+    "allChannelsSharedImage": true,
+    "compatibleRollbackCheckpoint": 907,
+    "crystalContractUnchanged": true,
+    "priorAuthorizedNotification": "reports/channel-rollout-m926/crystal-notification.json"
+  },
+  "bundle": {
+    "path": "dist\\river-deploy-2026.11.02-refinement-age-combo-m934-trial-qualified.zip",
+    "bytes": 94928078,
+    "sha256": "6ef2cf16cc6e89b00b0a265bd6a370edca471941d37878bfd6455b95b3b3a3d6",
+    "qualification": "reports/kakadu-io-m303/refinement-age-release-m956.json"
+  },
+  "lastRejectedExperiment": {
+    "checkpoint": 972,
+    "evidence": "reports/kakadu-io-m303/indexed-first-preview-decision-m985.json",
+    "reason": "No reproducible gain aftercrossover"
+  },
+  "latest": "river:2026.11.03-whole-probe-envelope-combo-m1010-trial",
+  "latestImageId": "sha256:264ab1962791baff5d76eb5ba2e00344480f7c85f6f35633aa7999d61a5f4b27",
+  "latestVerified": false,
+  "latestQualificationEvidence": "reports/image-builds/2026.11.03-whole-probe-envelope-combo-m1010-trial/status.json",
+  "latestQualificationStatus": "Experimental build; runtime correctness and performance qualification pending.",
+  "latestCheckpoint": 1010,
+  "latestUpdatedAt": "2026-11-02T23:44:58.8320232+00:00"
+}

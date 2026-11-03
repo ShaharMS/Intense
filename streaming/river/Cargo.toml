@@ -1,6 +1,10 @@
 [workspace]
 members = ["crates/river-core", "crates/river-server"]
 resolver = "2"
+exclude = ["crates/river-jpeg2k", "crates/river-openjpeg-sys"]
+
+[patch.crates-io]
+openjpeg-sys = { path = "crates/river-openjpeg-sys" }
 
 [workspace.package]
 edition = "2024"
@@ -12,15 +16,24 @@ anyhow = "1.0.97"
 axum = { version = "0.8.9", features = ["ws"] }
 base64 = "0.22.1"
 futures-util = "0.3.31"
-jpeg2k = "0.10.1"
+# The wrapper's `threads` feature forces ALL CPUs for every generic ROI decode.
+# River leases bounded per-request CPU workers; the local wrapper patch also
+# applies that budget to generic ROI decoding.
+jpeg2k = { path = "crates/river-jpeg2k", version = "0.10.1", default-features = false, features = ["image", "file-io", "openjpeg-sys"] }
 hex = "0.4.3"
+image = { version = "0.25.10", default-features = false, features = ["avif", "png", "pnm"] }
+jxl-sys = "0.1.12"
 opentelemetry = "0.32.0"
 opentelemetry-otlp = { version = "0.32.0", features = ["grpc-tonic"] }
 opentelemetry_sdk = { version = "0.32.0", features = ["rt-tokio"] }
+png = "0.18.0"
+reqwest = { version = "0.13.5", default-features = false, features = ["blocking", "json"] }
+object_store = { version = "=0.13.2", default-features = false, features = ["aws", "fs"] }
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.140"
 sha2 = "0.10.9"
 thiserror = "2.0.12"
+tempfile = "3.17.1"
 tokio = { version = "1.44.2", features = ["full"] }
 tower-http = { version = "0.6.2", features = ["cors", "fs", "trace"] }
 tracing = "0.1.41"

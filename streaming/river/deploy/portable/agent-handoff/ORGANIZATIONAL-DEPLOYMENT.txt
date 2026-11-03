@@ -1,0 +1,204 @@
+RIVER ORGANIZATIONAL DEPLOYMENT AND TEST HANDOFF
+
+Purpose and release identity
+----------------------------
+This bundle contains the combined River UI and backend, Linux/amd64.
+Use BUILD-MANIFEST.json for the exact image tag, immutable image ID and archive SHA256.
+Use release.json, when present, for the recorded checkpoint and release channels.
+Verify SHA256SUMS before loading river-image.tar.gz. Do not fetch a floating latest tag.
+See performance-report.json or PERFORMANCE.json for measured conditions and limits.
+The layered-prefix build adds selective multilayer RLCP/RPCL previews using TLM and
+PLT or stateful inline packet headers. See the included release/performance report
+for the qualified checkpoint, baseline and timings; do not infer organizational parity.
+It is not a promise that arbitrary unindexed JP2 files need only2-5 GETs.
+Original images must remain unchanged. Technical caches and temporary subsets are allowed.
+
+MULTIPART PREVIEW UPGRADE CHECK
+------------------------------
+The image defaults RIVER_S3_MULTIPART_PLT=true and RIVER_S3_MULTIPART_PREFIX=true.
+An existing explicit false overrides those defaults; report it before intentionally
+changing it. Compose settings do not automatically become Kubernetes pod settings.
+The inline multilayer path supports classic non-HT coding styles (including BYPASS and per-pass termination), optional
+explicit precinct dimensions, no SOP/EPH, and all requested quality layers in
+resolution-first order. Other layouts retain existing selective/fallback behavior.
+Intermediate views can still hit budgets. Do not increase whole-file compatibility
+limits as a performance fix. TLM locates tile-parts; it is not a packet-length index.
+maxSourceRequests is concurrent reads per connected source per instance, not the
+total GET allowance. Explicit RIVER_S3_REQUEST_RANGES remains a strict cap per read
+context; header opening and render preparation have separate contexts. Use the
+physical-attempt trace or source counters for the entire HTTP request total.
+For the first organizational validation, capture one cold preview and its trace,
+route, bytes/GETs and full error body. Compare the same request against the previous
+image using separate empty test caches, preserving production caches and settings.
+
+EXISTING DEPLOYMENT: PRESERVATION IS THE DEFAULT
+------------------------------------------------
+1. Inspect the current workload before changing it. Record its image/ID, service and
+   Compose project names or Kubernetes workload, environment, resource requests/limits,
+   mounts/PVCs, volume subpaths, routes, service account, Secret references and TLS trust.
+2. Privately back up the actual configuration and deployment definition. If supported,
+   GET /api/settings/configuration exports a complete credential-bearing document.
+   Save it with restricted access outside this bundle and outside shared logs/results.
+   GET /api/s3/sources omits credentials and is NOT a restorable backup.
+   Older releases may need a backup of their existing legacy configuration files instead.
+3. Preserve all existing S3 source IDs, names, endpoints, buckets, regions, key prefixes,
+   addressing/HTTP choices, static or temporary credentials, provider/role mechanisms,
+   service-account tokens, Secret references, CA mounts and relevant proxy settings.
+   Never replace them with fixture credentials or recreate connections just for tuning.
+4. Preserve config and cache volume/PVC names and paths. Retain any custom
+   RIVER_CONFIGURATION_FILE, RIVER_S3_CONNECTIONS_FILE or legacy encoding-settings path.
+   Default paths are /var/lib/river/config and /var/lib/river/s3-cache. With the image's
+   default S3 file path, unified settings are saved as /var/lib/river/config/configuration.json.
+   Both mounted locations must remain writable by the workload's existing UID/security context.
+   Keep image-data mounts unchanged and read-only. Do not wipe volumes or run down -v,
+   volume prune, destructive Helm uninstall, or equivalent cleanup.
+5. Update the existing River workload to the image identified in BUILD-MANIFEST.json, retaining
+   its existing environment, bindings and state. The included start scripts are fresh-install
+   conveniences; do not run them blindly against a differently named existing installation.
+   Preserve the old image/deployment/configuration for rollback; no data deletion is required.
+6. Before tuning, verify that the same connections/IDs and effective settings are present,
+   and load one known image from an existing connected S3. Compare credentials/providers
+   privately where necessary; never print secrets. Check WebP/read/retry settings and cache
+   persistence. Leave unrelated custom settings in place. Do not mass-register/scan a bucket.
+
+ENABLE ADAPTATION WITHOUT RESETTING SETTINGS
+-------------------------------------------
+For an existing installation:
+  GET /api/settings/read-policy
+  Take the returned settings object, preserve its fields, change only mode to adaptive,
+  and PUT that settings object to /api/settings/read-policy.
+Do not PUT the entire GET response: sources/measurements are not settings fields.
+Do not import a whole configuration merely to change adaptation. Import resets measured
+observations and replaces source definitions; a document with sources: [] removes them.
+Preserve existing maxSourceRequests, minimumSamples, maxOverfetchRatio and serialTransport
+initially. Additional tuning changes should be explicit, recorded and compared separately.
+The PUT persists effective settings, which then override environment defaults.
+A successful write is required; persistence errors must be resolved at the existing config
+mount rather than bypassed with a fresh empty configuration directory.
+
+For a genuinely new installation, read-policy-adaptive.example.json is a suggested preset:
+  adaptive mode;8 successful-read samples;2x adaptive candidate overfetch allowance;
+  max16 admitted range operations per source/instance; automatic eligible serial transport.
+It contains no S3 connections or credentials and is ONLY a read-policy request body.
+Do NOT send it to /api/settings/configuration. Start at8 concurrent source operations instead
+of16 when source pressure warrants it; keep an existing lower limit during upgrades.
+The cap is per configured source per River instance, not cluster-wide and not an RPS limit.
+Replicas multiply aggregate source pressure. Keep maxRetries choices on existing S3 sources.
+The fresh-install fallback is2 retries after the first attempt; do not overwrite custom values.
+Keep overfetch at2 initially. A separate controlled run may compare4 if additional bytes are
+acceptable. The allowance applies to eligible adaptive plans, not a global2x traffic guarantee.
+Learning requires real successful reads and at least3 bulk reads of32KiB or more for the
+throughput-based planner. It is not synthetic training and does not scan sources to calibrate.
+insufficientSamples and insufficientThroughputSamples distinguish the two requirements.
+GET read-policy exposes the thresholds under learning. Multipart resolution-prefix batches
+use this planner too; observe reports proposals without changing their ranges. Inspect the
+planned GETs and bytes together: fewer GETs can cost additional source bandwidth.
+The last decision's sampleCountAtDecision and throughputSamplesAtDecision describe
+its readiness before that batch; completed transfers can raise the current totals.
+The learned-prefix upgrade does not make an unmeasured connection automatically
+fast. Use the same connection ID across real image requests. Do not generate
+calibration traffic. Compare a fresh connection separately from an unseen image
+on a learned connection. Keep maxOverfetchRatio=2 initially;4 explicitly permits
+more bytes to save GETs. The included small structural benchmark may read nearly
+its whole16MB object at4x; that is not proof of an11GB organizational speedup.
+Merged gap bytes are excluded from request-local prefix leases so a disabled or
+small shared range cache does not force the useful prefix blocks to be refetched.
+Learned multipart-prefix plans can group bytes into ranges up to8MiB; ordinary
+packet plans keep their1MiB limit. GET read-policy exposes this bound. The total
+byte allowance, source concurrency cap and explicit request limits still apply.
+The planner shrinks merged prefix ranges when the measured rate predicts more
+than8seconds per transfer. Source admission uses the remaining operation deadline;
+the10second network timeout begins after admission, so time queued for a permit
+does not consume the network allowance. Cancellation and the overall deadline remain.
+Observations are process-local and reset on restart, connection replacement or full config import.
+Managed settings and disposable on-disk indexes can persist; these are different kinds of state.
+Keep the same S3 connection ID while testing different unseen images so source learning is shared.
+
+RAW IMAGE VERSUS BUNDLED COMPOSE
+--------------------------------
+The bundled Compose file enables selective-read fast paths that are not all raw-image defaults.
+For a NEW raw-image pod, translate organizational-test.env.example into container environment
+entries, retaining writable config/cache mounts. For an existing pod, diff those values against
+its real configuration; do not replace its environment wholesale or remove custom limits silently.
+Keep CPU/decoder sizing auto initially. Do not force an old2-CPU quota or a four-range override
+and then assume automatic scheduling is active. For fresh deployments leave range concurrency,
+index shard count and index lane depth unset; existing explicit values remain intentional until
+changed and recorded. Keep source byte/request/deadline safeguards and paging controls enabled.
+Auto serial transport selects eligible SDK/native-curl paths, not the JPEG2000 decoder.
+Use OpenJPEG as the first controlled decoder baseline, then compare alternatives separately.
+
+LOGGING AND A SINGLE READ TRACE
+--------------------------------
+Normal startup logs default to river_server=info,tower_http=info.
+For temporary River debug logs, the example override sets:
+  RUST_LOG=river_server=debug,tower_http=info
+A RUST_LOG line in .env alone is NOT forwarded by this bundle's Compose file.
+Add it under the service's environment, or use the example override explicitly:
+  docker compose -f compose.yaml -f compose.organizational-test.override.example.yaml up -d
+Keep the existing project name, .env and volume bindings when using any override.
+Starter scripts specify -f compose.yaml and do not automatically include this override.
+For OpenShift set RUST_LOG in the existing pod template/container environment instead.
+Use equivalent logging on both sides of timing comparisons; verbose tracing has overhead.
+
+Use Swagger or the following API sequence before selecting/opening the target image:
+  PUT /api/diagnostics/source-reads   body: {"enabled":true}
+  DELETE /api/diagnostics/source-reads
+  Perform exactly one selected preview/tile operation.
+  GET /api/diagnostics/source-reads   save as source-reads.json
+  GET /api/settings/read-policy     save as read-policy.json
+  PUT /api/diagnostics/source-reads   body: {"enabled":false}
+DELETE clears diagnostic records, NOT caches or learned source observations.
+The bounded ring holds4096 records. If evicted>0 or summary.partial=true, totals are incomplete.
+summary.physicalAttempts counts captured range-transport sends, including retries; it is not
+proof every attempt reached S3 and does not cover all listing/credential-provider HTTP traffic.
+Do not add logical rangeRead records to wireAttempt/nativeAttempt records: that double-counts.
+sdkSerialReads alone is not a total GET count. Metadata/index entries are not extra GETs.
+Diagnostics retain opaque IDs/ranges/callsites rather than object URLs/keys or credentials.
+Whole configuration exports DO contain credentials; do not attach them to shared results.
+
+REPRESENTATIVE TEST AND RESULTS TO RETURN
+-----------------------------------------
+Run River near S3, using the intended organizational network path and a known resource budget.
+Initially use one instance; preserve private config/cache directories per concurrently running
+instance. Do not share the same private cache directory between live test instances.
+For controlled A/B testing, use separate test state/cache volumes and match effective policy,
+resource budget, file bytes, driver, region, output dimensions/format and timing boundary.
+For approximately50MB,900-1000MB and10-15GB images, measure a preview, a nonblank deep tile,
+and an exact repeat. Use images not previously requested to study cold-object loads with an
+already learned source. A restart alone is not cold because disk indexes/raster caches persist.
+For a strict empty-cache comparison use a separate empty TEST cache, not deletion of existing data.
+Restarting also loses learned measurements, so label process-cold and learned-source tests separately.
+Keep source registration/metadata IO in accounting. Capture complete HTTP body time and server
+phase headers separately. For WebSockets distinguish first correct frame, complete preview,
+complete final delivery and browser paint; frame arrival is not paint. Keep fresh and reused
+HTTP connection measurements separate. A 1500ms refinement idle delay may be intentional.
+Return: checkpoint/image ID, CPU/memory limits, effective read policy, approximate image size,
+request geometry/driver/format, cold and repeated times, decoder route, source-reads.json,
+read-policy.json and relevant sanitized container logs. S3-side GET/byte metrics are helpful
+when available. Do not send original images, signed URLs, credentials or raw config exports.
+A s3-disk-compatibility decoder route is a disk-backed fallback; identify it separately.
+Forward /api/, /streamer/, /wmts, /docs and /ws routes through any external proxy, including
+WebSocket upgrades. Use one correctly encoded image query value for full S3 object URLs.
+When troubleshooting404s, compare edge response and River logs before blaming the decoder.
+
+ROLLBACK AND HANDOFF
+--------------------
+Verify UI/API access, a known existing S3 image, effective persisted settings, diagnostics,
+and required routes after rollout. Report preserved settings separately from deliberate changes.
+On a failed rollout restore the previous image/deployment and its backed-up settings as needed,
+reusing preserved state. Do not attempt repair by dropping connections, caches or PVCs.
+Keep about3-4 distinct River image versions: newest, previous, verified LTS and at most a needed
+candidate/rollback. Inspect container references first; no force-removal and no other-project
+cleanup. Preserve deployment exports, evidence, build cache and all data/configuration volumes.
+
+OPTIONAL STRUCTURE DIAGNOSTIC
+-----------------------------
+After opening an image, GET /api/assets/{assetId}/manifest?includeStructure=true.
+Return codestreamStructure with the performance report. It uses parsed metadata
+without new source reads, and does not expose credentials or object URLs. Native
+tiles, layers, resolutions, codeblock style and wavelet are separate fields.
+Metadata eviction is unknown, not proof an index was absent. TLM is a tile-part
+index, not packet lengths. Normal manifests omit these opt-in diagnostics.
+Large one-tile PLT inputs now have streamed intermediate-preview support within
+the bounded preview area. Full-resolution ROI/deep requests on those giant packet
+tables remain limited; do not report an error as a successful timing sample.

@@ -1,0 +1,10 @@
+{
+  "sourceSha256": "54d416d2fa29e052a8f9a4ad340ca0d55f4cc10168eaa900993e99b1ddbd53ad",
+  "referenceSha256": "0b3e9652f6259997778e7e43efd0cf6f2eeb5c079871e54674ee0b3783ca7dcb",
+  "reduction": 2,
+  "size": [
+    128,
+    128
+  ],
+  "decoder": "Independent Pillow/OpenJPEG2.5.4"
+}

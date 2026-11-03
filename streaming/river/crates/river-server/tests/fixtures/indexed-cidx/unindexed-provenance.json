@@ -1,0 +1,17 @@
+{
+  "scope": "Additional diagnostic containers; original indexed fixture and frozen/source imagery unchanged. Same encoded tile-part bytes; indexes removed,per-tile ordinals preserved.",
+  "files": [
+    {
+      "file": "unindexed-tile-major.jp2",
+      "sha256": "ee5c4124761416c90c2d6e6ea728c21d6c35225b075738c5cc5db7224d75ed86",
+      "size": 235769,
+      "independentReducedPixelsExact": true
+    },
+    {
+      "file": "unindexed-resolution-major.jp2",
+      "sha256": "8a232a3345a6e375b68d85ab05c875d344228520bbd8d8682d24f088f553280a",
+      "size": 235769,
+      "independentReducedPixelsExact": true
+    }
+  ]
+}

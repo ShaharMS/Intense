@@ -1,0 +1,88 @@
+{
+  "scope": "Generated clipped509x251diagnostics,native32x32grid128tiles,4res,2qualitylayers,RPCL,5/3. OpenJPEG1.5.2encoder; independent Kakadu8.4.1demo reference decoder, never linked into River or redistributed. Reference planes retain unsigned16bit samples. Small fixtures are correctness evidence only.",
+  "decoderSha256": "64f44e319848d67054e62b248ce8be3f4aeb0e1261020d79fa443253da77c735",
+  "cases": [
+    {
+      "file": "gray16.jp2",
+      "sha256": "6264861bfb0cfb647b33a5b2dba371e77fe22253e7979018377e6c52725e3448",
+      "sourcePixelsSha256": "ab1a4a4647efea92796d615ddd8df18556c61b648aa8453baebd5026de91751d",
+      "components": 1,
+      "precision": 16,
+      "references": [
+        {
+          "file": "gray16-r2-l0-0.u16be",
+          "sha256": "05fa8672d031aba041df47e196bebbcd49024d3d189dd58caf399ace2851ffa8",
+          "layers": 0,
+          "component": 0,
+          "width": 128,
+          "height": 63
+        },
+        {
+          "file": "gray16-r2-l1-0.u16be",
+          "sha256": "9af6d1dac7467088d1e7b54acfe4a548254530ef85994962617290851de6f72d",
+          "layers": 1,
+          "component": 0,
+          "width": 128,
+          "height": 63
+        }
+      ]
+    },
+    {
+      "file": "rgb16.jp2",
+      "sha256": "86ef164a656d64ed1d47bdf95bd3b85c15f74b65bcb7542d03be918ef9cb974b",
+      "sourcePixelsSha256": "a8a112da66022c6a5d0ede49a354d10cf613a139f897de296a3e20ee8a40235a",
+      "components": 3,
+      "precision": 16,
+      "references": [
+        {
+          "file": "rgb16-r2-l0-0.u16be",
+          "sha256": "05fa8672d031aba041df47e196bebbcd49024d3d189dd58caf399ace2851ffa8",
+          "layers": 0,
+          "component": 0,
+          "width": 128,
+          "height": 63
+        },
+        {
+          "file": "rgb16-r2-l0-1.u16be",
+          "sha256": "cea8546d0196a900bb11693ce4cb528f90a070ec2a33d77b8f4d359f41e21cc0",
+          "layers": 0,
+          "component": 1,
+          "width": 128,
+          "height": 63
+        },
+        {
+          "file": "rgb16-r2-l0-2.u16be",
+          "sha256": "92a16248dcd4b325a016f39f99c9a6adb3c0257530213a0ad9ccc563f2821132",
+          "layers": 0,
+          "component": 2,
+          "width": 128,
+          "height": 63
+        },
+        {
+          "file": "rgb16-r2-l1-0.u16be",
+          "sha256": "56da70b87713635ad471f44ba4240ec2c2d58ff26ea7f468b46b41ba6eee6d96",
+          "layers": 1,
+          "component": 0,
+          "width": 128,
+          "height": 63
+        },
+        {
+          "file": "rgb16-r2-l1-1.u16be",
+          "sha256": "5f2df7d842459e5fc5263b802602d8a78373d30edf348544653a216d63eb86e7",
+          "layers": 1,
+          "component": 1,
+          "width": 128,
+          "height": 63
+        },
+        {
+          "file": "rgb16-r2-l1-2.u16be",
+          "sha256": "e754b5d174935535f734b8d26cf44e2c31de0ae8cf03117e15d399eacc28880e",
+          "layers": 1,
+          "component": 2,
+          "width": 128,
+          "height": 63
+        }
+      ]
+    }
+  ]
+}

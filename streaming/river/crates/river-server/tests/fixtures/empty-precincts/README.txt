@@ -1,0 +1,2 @@
+Generated diagnostic codestreams only; no Kakadu executables or SDK are included. Quadrants are16x16losslessRGB with8x8precincts,zeroDWT,10quality layers,and MCT0/1. Palette: black,mid-gray,white,color(30,100,200)for8bit or(4096,20000,60000)for16bit. view-r14is the1x1compact prefix of the independently decoded sparse diagnostic. Kakadu8.4.1,Grok20.4.15and upstreamOpenJPEG2.5.0agree on its128gray pixel. Provenance/logs: reports/kakadu-io-m303/empty-fine-m356.
+The dwt2variant adds two reversible decomposition levels to exercise multiple coefficient-band rectangles.

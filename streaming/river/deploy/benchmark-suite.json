@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 2,
+  "manifest": "reports/fixed-gate-v2/manifest.json",
+  "manifestSha256": "286381a215a3d2e95ef8e0c464a437dc8dd9cbcbfc7b004361b64c546a67ce69",
+  "baselineRelease": 934,
+  "baselineEvidence": "reports\\kakadu-io-m303\\refinement-age-release-m956.json",
+  "requiredSizeClasses": [
+    "50MB",
+    "900-1000MB",
+    "10-15GB"
+  ],
+  "requiredOperations": [
+    "preview",
+    "deep-tile",
+    "exact-repeat"
+  ],
+  "rounds": 4,
+  "primary": "gb11-preview",
+  "externalReference": {
+    "source": "User observation, 2026-10-21; modified TiTiler with Kakadu",
+    "sourceSizeApproxGB": 11,
+    "storage": "Organizational S3 on same premises as server",
+    "tileApproxMs": 350,
+    "previewApproxMs": 800,
+    "previewIsUserInference": true,
+    "timingBoundary": "Unknown: tile timing may be decode-only or complete request",
+    "sameFileComparison": false,
+    "parityEstablished": false
+  },
+  "previousSuite": {
+    "manifest": "reports/fixed-gate-v1/manifest.json",
+    "manifestSha256": "f567cd6b2a5f649a1d0d83919dab27dd4e72e66a250565a4398db5abdc69dc06",
+    "qualification": {
+      "sameBuildControl": "reports/fixed-gate-v1/same-build-control.json",
+      "stableComparison": "reports/fixed-gate-v1/stable228-vs258.json",
+      "confirmation": "reports/fixed-gate-v1/stable228-vs258-confirmation.json",
+      "latestRelease": "reports/fixed-gate-v1/performance-m263.json"
+    }
+  },
+  "initialBaselineRelease": 263,
+  "initialBaselineEvidence": "reports/fixed-gate-v2/baseline-263.json",
+  "ltsRelease": 934,
+  "networkProfiles": "deploy/benchmark-network-profiles.json",
+  "ltsMinimumImprovementPercent": 10,
+  "minimumSupportedRelease": 907,
+  "latestRelease": 1010,
+  "latestVerified": false,
+  "latestReleaseEvidence": "reports/image-builds/2026.11.03-whole-probe-envelope-combo-m1010-trial/status.json",
+  "currentVerdict": "Stable 934, LTS 934; Latest 1010 is unqualified. See deploy/releases.json for current qualification; prior reports remain historical evidence."
+}

@@ -1,0 +1,9 @@
+{
+  "repository": "river",
+  "keepNewest": 2,
+  "maxVersions": 4,
+  "pinnedTags": [],
+  "ownedTestContainerPrefix": "river-goal-",
+  "channelPolicy": "Keep current shared-contract Latest/Stable/LTS and immediate compatible previous/candidate, at most4distinctversions. Featureless versions below907 are retired; volumes,buildcache,exports and evidence remain.",
+  "minimumSupportedCheckpoint": 907
+}

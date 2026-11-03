@@ -4,17 +4,36 @@ version = "0.1.0"
 edition.workspace = true
 license.workspace = true
 
+[features]
+default = []
+grok = ["dep:libloading"]
+jxl = ["dep:jxl-sys"]
+nvjpeg2000 = ["dep:reqwest", "dep:lz4_flex", "dep:libloading"]
+
 [dependencies]
+async-trait = "0.1.89"
 anyhow.workspace = true
 axum.workspace = true
 base64.workspace = true
 futures-util.workspace = true
+hex.workspace = true
+image.workspace = true
 jpeg2k.workspace = true
+jxl-sys = { workspace = true, optional = true }
 opentelemetry.workspace = true
 opentelemetry-otlp.workspace = true
 opentelemetry_sdk.workspace = true
+object_store.workspace = true
+openjpeg-sys = "1.0.12"
+png.workspace = true
+reqwest = { workspace = true, optional = true }
+lz4_flex = { version = "0.11", optional = true }
+libloading = { version = "0.8", optional = true }
 river-core = { path = "../river-core" }
+serde.workspace = true
 serde_json.workspace = true
+sha2.workspace = true
+tempfile.workspace = true
 tokio.workspace = true
 tower-http.workspace = true
 tracing.workspace = true

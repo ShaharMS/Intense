@@ -6,37 +6,147 @@
     <title>River protocol viewer</title>
     <style>
       :root { color-scheme: dark; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; background: #101214; color: #e4e7eb; }
-      body { margin: 0; display: grid; grid-template-columns: 1fr 320px; height: 100vh; }
+      * { box-sizing: border-box; }
+      body { margin: 0; display: grid; grid-template-columns: 260px minmax(0, 1fr) 340px; height: 100dvh; overflow: hidden; }
       main { position: relative; min-width: 0; overflow: hidden; background: #171a1f; touch-action: none; cursor: grab; }
       main.is-dragging { cursor: grabbing; }
-      #overview { position: absolute; display: block; max-width: none; max-height: none; transform-origin: 0 0; pointer-events: none; user-select: none; }
       canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; opacity: 0; pointer-events: none; }
       canvas.is-rendering { opacity: 1; }
-      aside { border-left: 1px solid #363b43; padding: 16px; overflow: auto; background: #121519; }
+      #tile-boundaries { z-index: 2; opacity: 1; }
+      aside { min-height: 0; min-width: 0; background: #121519; }
+      #catalog-sidebar { display: flex; flex-direction: column; border-right: 1px solid #363b43; }
+      .catalog-controls { padding: 16px; border-bottom: 1px solid #363b43; }
+      h1 { margin: 0 0 8px; font-size: 22px; } h2 { margin: 0 0 12px; font-size: 15px; }
+      #catalog-list { flex: 1; min-height: 0; overflow-y: auto; padding: 8px; overscroll-behavior: contain; }
+      .catalog-item { display: grid; gap: 6px; width: 100%; text-align: left; margin: 0 0 6px; padding: 12px; background: transparent; border: 1px solid #363b43; }
+      .catalog-item:hover { background: #20252c; } .catalog-item[aria-current="true"] { background: #1b304a; border-color: #61afef; }
+      .catalog-name { overflow-wrap: anywhere; font-size: 13px; font-weight: 600; } .catalog-metrics { color: #abb4c1; font-size: 11px; line-height: 1.5; }
+      #right-sidebar { border-left: 1px solid #363b43; display: grid; grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); }
+      .sidebar-section { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 16px; }
+      #settings-section { border-bottom: 1px solid #363b43; }
+      .section-title { position: sticky; top: -16px; margin: -16px -16px 12px; padding: 16px; background: #121519; z-index: 3; border-bottom: 1px solid #363b43; }
+      .catalog-sort { display: grid; grid-template-columns: minmax(0, 1fr) 38px; gap: 6px; } .catalog-sort button { margin: 0; background: #3a4554; }
+      input[type="checkbox"] { accent-color: #61afef; } input[type="color"] { width: 100%; height: 38px; padding: 3px; }
+      #catalog-count { margin-bottom: 0; } #trace { overflow-wrap: anywhere; }
+      @media (max-width: 1000px) { body { grid-template-columns: 210px minmax(0, 1fr) 290px; } }
+      @media (max-width: 700px) { body { grid-template-columns: 160px minmax(160px, 1fr) 240px; overflow-x: auto; } }
       label { display: grid; gap: 4px; margin: 10px 0; color: #abb4c1; font-size: 12px; }
-      input { background: #20252c; border: 1px solid #404752; border-radius: 4px; color: inherit; padding: 7px; font: inherit; }
+      input, select { background: #20252c; border: 1px solid #404752; border-radius: 4px; color: inherit; padding: 7px; font: inherit; }
       button { margin-top: 12px; padding: 8px 10px; color: #fff; background: #2667b8; border: 0; border-radius: 4px; cursor: pointer; }
+      .view-actions { display: flex; align-items: center; gap: 8px; } .view-actions button { margin-top: 0; } .view-actions #random { padding: 6px 8px; background: #3a4554; font-size: 12px; }
       details { margin-top: 16px; border-top: 1px solid #363b43; padding-top: 12px; }
       summary { cursor: pointer; color: #abb4c1; font-size: 12px; }
       #status { color: #82d6a7; }
       #trace { font-size: 12px; line-height: 1.5; white-space: pre-wrap; color: #b9c4d1; }
+      .latency-header { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-top: 22px; }
+      .latency-header h2 { margin: 0; }
+      #latency-total { color: #82d6a7; font-size: 12px; white-space: nowrap; }
+      #latency-trace { display: grid; gap: 7px; margin-top: 10px; }
+      .trace-request h3 { font-size: 12px; margin: 8px 0; }
+      .trace-request { content-visibility: auto; contain-intrinsic-size: auto 200px; }
+      .request-latencies { display: grid; gap: 7px; }
+      .trace-detail { font-size: 12px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; color: #b9c4d1; }
+      #latency-trace hr { width: 100%; border: 0; border-top: 1px solid #363b43; margin: 12px 0; }
+      .latency-row { display: grid; grid-template-columns: 46px minmax(0, 1fr) 50px; align-items: center; gap: 6px; font-size: 10px; color: #8994a4; }
+      .latency-bar { display: flex; height: 9px; overflow: hidden; border-radius: 999px; background: #242a32; }
+      .latency-segment { min-width: 1px; }
+      .latency-queue { background: #d9a441; } .latency-decode { background: #e06c75; } .latency-encode { background: #c678dd; }
+      .latency-server { background: #8b97a8; } .latency-wire { background: #56b6c2; } .latency-browser { background: #61afef; } .latency-gl { background: #82d6a7; }
+      .latency-cache { background: #bda878; }
+      .latency-client { background: #bd965c; } .latency-paint { background: #86a3ce; }
+      .latency-legend { display: flex; flex-wrap: wrap; gap: 5px 9px; margin: 9px 0 0; color: #8994a4; font-size: 10px; }
+      .latency-key { display: inline-flex; align-items: center; gap: 4px; } .latency-key::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--swatch); }
       .note { color: #8994a4; font-size: 12px; line-height: 1.45; }
     </style>
   </head>
   <body>
+    <aside id="catalog-sidebar" aria-label="Image catalog">
+      <div class="catalog-controls">
+        <h1>River</h1>
+        <p class="note">Image catalog</p>
+        <label>Data source<select id="catalog-source"><option value="all">All connected S3 sources</option><option value="">Local assets</option></select></label>
+        <label>Search images<input id="catalog-search" type="search" placeholder="Name or asset ID" /></label>
+        <label>S3 search mode<select id="catalog-search-mode"><option value="contains">Name contains</option><option value="prefix">Key starts with</option></select></label>
+        <label for="catalog-sort">Sort by</label><div class="catalog-sort"><select id="catalog-sort"><option value="name">Name</option><option value="pixels">Pixel count</option><option value="bytes">Source size</option><option value="width">Width</option><option value="height">Height</option><option value="bitDepth">Bit depth</option><option value="resolutionLevels">Resolution levels</option></select><button id="catalog-direction" aria-label="Sort descending" title="Sort descending">↑</button></div>
+        <button id="catalog-refresh">Refresh catalog</button>
+        <div class="view-actions"><button id="catalog-previous" disabled>Previous page</button><button id="catalog-next" disabled>Next page</button></div>
+        <p id="catalog-count" class="note" aria-live="polite">Loading images…</p>
+      </div>
+      <div id="catalog-list" aria-label="Available images" tabindex="0"></div>
+    </aside>
     <main id="stage" aria-label="Image viewport: drag to pan and use the mouse wheel to zoom">
-      <img id="overview" src="/default-preview.webp" alt="Default overview from the PLISM whole-slide scan" />
       <canvas id="viewport" aria-label="River WebGL viewport"></canvas>
+      <canvas id="tile-boundaries" aria-label="Tile boundary overlay"></canvas>
     </main>
-    <aside>
-      <h1>River</h1>
+    <aside id="right-sidebar" aria-label="Settings and traces">
+      <section id="settings-section" class="sidebar-section" aria-labelledby="settings-title" tabindex="0">
+      <h2 id="settings-title" class="section-title">Settings</h2>
       <p id="status">connecting to River…</p>
-      <p class="note">API: <code id="api-origin">http://127.0.0.1:8080</code></p>
+      <p class="note">API: <code id="api-origin">http://127.0.0.1:18080</code></p>
+      <form id="api-url-form"><label>API URL<input id="api-url" type="url" placeholder="http://localhost:18080" required /></label><button type="submit">Connect to API</button><button id="api-url-reset" type="button">Use this server</button></form>
       <p class="note">Drag the image to pan. Scroll over it to zoom toward the pointer. Coordinates below are for automation and precise requests.</p>
-      <button id="fit">Fit image</button>
+      <div class="view-actions"><button id="fit">Fit image</button><button id="random" title="Choose a random viewport and zoom">Random view</button></div>
+      <label>Target decoder<select id="decoder-driver"><option value="openjpeg">OpenJPEG</option><option value="jp2grok">JP2Grok</option><option value="openhtj2k">OpenHTJ2K + Grok fallback</option><option value="nvjpeg2000">nvJPEG2000 (CUDA)</option></select></label>
+      <label>Request method<select id="delivery-method"><option value="progressive">Progressive WebSocket</option><option value="wmts">WMTS GetTile</option></select></label>
+      <label>Output format<select id="raster-format"><option value="webp">WebP</option><option value="png">PNG</option><option value="avif">AVIF</option><option value="jxl">JPEG XL</option></select></label>
+      <details open>
+        <summary>Tile outlines</summary>
+        <label><span><input id="boundary-enabled" type="checkbox" checked /> Show tile outlines</span></label>
+        <label>Outline color<input id="boundary-color" type="color" value="#ff0000" /></label>
+        <label>Outline width (screen pixels)<input id="boundary-width" type="range" min="1" max="8" step="1" value="3" /><output id="boundary-width-value">3 px</output></label>
+      </details>
+      <details>
+        <summary>Runtime S3 / MinIO sources</summary>
+        <p class="note">Connections are saved on the server. Configuration exports include credentials. Headers are read on selection; compressed viewport data is fetched on demand.</p>
+        <label>Source ID<input id="s3-id" value="local-minio" /></label>
+        <label>Display name<input id="s3-name" value="Local MinIO" /></label>
+        <label>Endpoint URL (reachable by River)<input id="s3-endpoint" value="http://minio:9000" /></label>
+        <label>Bucket<input id="s3-bucket" value="jp2" /></label>
+        <label>Region<input id="s3-region" value="us-east-1" /></label>
+        <label>Key prefix<input id="s3-prefix" /></label>
+        <label>Access key ID<input id="s3-access-key" autocomplete="off" /></label>
+        <label>Secret access key<input id="s3-secret-key" type="password" autocomplete="new-password" /></label>
+        <label>Session token (optional)<input id="s3-session-token" type="password" autocomplete="new-password" /></label>
+        <label><span><input id="s3-allow-http" type="checkbox" checked /> Allow plain HTTP (local/self-hosted)</span></label>
+        <label><span><input id="s3-path-style" type="checkbox" checked /> Path-style bucket addressing</span></label>
+        <label>Retries after first attempt<input id="s3-max-retries" type="number" min="0" max="10" value="2" /></label>
+        <button id="s3-add-source">Add / update source</button>
+        <label>Configured source<select id="s3-source-list"></select></label>
+        <button id="s3-remove-source">Remove source</button>
+        <button id="s3-refresh-objects">Browse objects</button>
+        <label>JP2 / J2K object<select id="s3-object-list"></select></label>
+        <button id="s3-next-objects" disabled>Next page</button>
+        <p class="note">Image dimensions and bit depth are detected automatically.</p>
+        <button id="s3-load-object">Load into viewer</button>
+        <p id="s3-status" class="note" aria-live="polite"></p>
+      </details>
+      <details id="encoding-controls">
+        <summary>Server encoding</summary>
+        <label>WebP encoding method<select id="encoding-webp-method">
+          <option value="0">0 — fastest encoding</option><option value="1">1</option><option value="2">2</option>
+          <option value="3">3</option><option value="4">4 — smaller files</option><option value="5">5</option><option value="6">6 — most compression effort</option>
+        </select></label>
+        <p class="note">This server setting persists across restarts and applies to new renders.</p>
+        <button id="encoding-save">Save encoding setting</button>
+        <p id="encoding-status" class="note" aria-live="polite"></p>
+      </details>
+      <details id="configuration-controls">
+        <summary>Server configuration</summary>
+        <label>Read adaptation<select id="read-policy-mode"><option value="disabled">Disabled</option><option value="observe">Observe only</option><option value="adaptive">Adaptive</option></select></label>
+        <label>Serial range transport<select id="read-policy-transport"><option value="sdk">SDK (default)</option><option value="auto">Automatic (experimental)</option><option value="curl">Force native libcurl (experimental)</option></select></label>
+        <label>Maximum concurrent reads per source<input id="read-policy-source-limit" type="number" min="1" max="64" value="16"></label>
+        <button id="read-policy-refresh">Refresh source measurements</button>
+        <button id="read-policy-save">Save read policy</button>
+        <pre id="read-policy-observations" style="max-height:220px;overflow:auto;white-space:pre-wrap"></pre>
+        <p class="note">Exports include saved S3 credentials. Applying JSON replaces sources, encoding settings and read policy.</p>
+        <button id="configuration-export">Export configuration</button>
+        <label>Configuration JSON<textarea id="configuration-json" rows="8" spellcheck="false" style="width:100%;box-sizing:border-box"></textarea></label>
+        <button id="configuration-import">Apply JSON</button>
+        <p id="configuration-status" class="note" aria-live="polite"></p>
+      </details>
       <details>
         <summary>Request controls (automation / precise view)</summary>
-        <label>Asset SHA-256<input id="asset" value="94a94669d839b13292340cbbdec6b96c81475eb1e1f6158c55245a7355437290" /></label>
+        <label>Asset ID<input id="asset" value="94a94669d839b13292340cbbdec6b96c81475eb1e1f6158c55245a7355437290" /></label>
         <label>X<input id="x" type="number" value="0" min="0" /></label>
         <label>Y<input id="y" type="number" value="0" min="0" /></label>
         <label>Width<input id="width" type="number" value="1920" min="1" readonly /></label>
@@ -44,14 +154,22 @@
         <label>Zoom<input id="zoom" type="number" value="0" min="0" max="7" /></label>
         <button id="request">Request precise viewport</button>
       </details>
-      <h2>Trace overlay</h2>
+      </section>
+      <section id="traces-section" class="sidebar-section" aria-labelledby="traces-title" tabindex="0">
+      <h2 id="traces-title" class="section-title">Traces</h2>
+      <div class="latency-header"><h2>Latency trace</h2><span id="latency-total">waiting</span></div>
+      <div id="latency-trace" aria-live="polite" aria-label="Recent frame latency trace"></div>
+      <p class="latency-legend" aria-label="Latency trace legend">
+        <span class="latency-key" style="--swatch:#bd965c">client queue</span><span class="latency-key" style="--swatch:#d9a441">server queue</span><span class="latency-key" style="--swatch:#bda878">cache lookup</span><span class="latency-key" style="--swatch:#e06c75">J2K</span><span class="latency-key" style="--swatch:#c678dd">encode</span><span class="latency-key" style="--swatch:#8b97a8">server other</span><span class="latency-key" style="--swatch:#56b6c2">transport / dispatch ≈</span><span class="latency-key" style="--swatch:#61afef">browser decode</span><span class="latency-key" style="--swatch:#82d6a7">upload</span><span class="latency-key" style="--swatch:#86a3ce">frame wait</span>
+      </p>
+      <h2>Trace detail</h2>
       <pre id="trace">Waiting for a viewport request.</pre>
-      <p class="note">Default: Bretagne2, an immutable 2,592 × 1,944 JPEG 2000 codestream decoded through linked OpenJPEG into streamed WebP raster tiles. The overview disappears as decoded tiles arrive.</p>
+      </section>
     </aside>
     <script>
-      // The Compose viewer is static on :8765; raster/API traffic stays on River :8080.
-      window.RIVER_API_ORIGIN = 'http://127.0.0.1:8080';
+      // The Compose viewer proxies API, WMTS and WebSocket on this origin.
+      window.RIVER_API_ORIGIN = location.origin;
     </script>
-    <script type="module" src="/viewer.js"></script>
+    <script type="module" src="/viewer.js?v=eager-history-20261012-3"></script>
   </body>
 </html>

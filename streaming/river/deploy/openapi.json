@@ -1,0 +1,2961 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "River raster streaming API",
+    "version": "2026.10.15-compatibility-m77",
+    "description": "River development API. No administrator privileges or bearer token required. Versioned configuration exports include S3 credentials; imports atomically replace all managed sources, encoding settings and read policy. Deployment environment settings remain startup-only."
+  },
+  "servers": [
+    {
+      "url": "/",
+      "description": "Same origin as the API or UI reverse proxy"
+    }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "summary": "API liveness",
+        "tags": [
+          "Operations"
+        ],
+        "responses": {
+          "200": {
+            "description": "Process is serving requests",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "example": "ok"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Image, source, tile or route unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid body or image data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Operation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Driver or scheduler unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/assets": {
+      "get": {
+        "summary": "List registered images",
+        "tags": [
+          "Catalog"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Asset"
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "objects": {
+                          "type": "array",
+                          "items": {
+                            "type": "object"
+                          }
+                        },
+                        "nextCursor": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "sourceId": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            "headers": {
+              "X-River-Next-Cursor": {
+                "description": "Continuation asset ID for the next local page.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Image, source, tile or route unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid body or image data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Operation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Driver or scheduler unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "refresh",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "Legacy parameter; list requests never crawl storage."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Continuation from the previous page; keep source and prefix unchanged."
+          },
+          {
+            "name": "source",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Configured S3 source ID, or all to search every connected S3 source. Returns objects and an opaque nextCursor. Omit for local manifest-array listings."
+          },
+          {
+            "name": "keyPrefix",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Case-sensitive object-key prefix relative to the configured source and optional folder prefix. Applied by S3; no object bodies are read."
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Case-insensitive key substring. Collects matching images using at most 10 bounded provider pages or two seconds per request. Continue with nextCursor and unchanged query to complete the requested match page; never reads object bodies."
+          }
+        ]
+      }
+    },
+    "/api/assets/{asset_id}/manifest": {
+      "get": {
+        "summary": "Read image capability and resolution metadata",
+        "tags": [
+          "Catalog"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Manifest"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "invalid_manifest_query: includeStructure must be true or false."
+          },
+          "404": {
+            "description": "Image, source, tile or route unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid body or image data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Operation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Driver or scheduler unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "asset_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^((s3v-|filev-)?[a-fA-F0-9]{64}|s3-[a-fA-F0-9]+)$",
+              "description": "Content SHA-256, filev/S3 version identity, or opaque S3 locator for lazy selection. Version identities do not hash the complete source."
+            },
+            "description": ""
+          },
+          {
+            "name": "includeStructure",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            },
+            "description": "Opt in to codestreamStructure from parsed metadata only. Does not fetch source bytes beyond normal manifest resolution. Reports raw COD fixed fields, native tile geometry, selective main-header checks and resident usable TLM counts. Evicted metadata and packet-index presence remain explicitly unknown."
+          }
+        ]
+      }
+    },
+    "/api/drivers": {
+      "get": {
+        "summary": "List compiled drivers and current availability",
+        "tags": [
+          "Operations"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Driver"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Image, source, tile or route unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid body or image data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Operation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Driver or scheduler unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/formats": {
+      "get": {
+        "summary": "List output encoders",
+        "tags": [
+          "Operations"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Format"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Image, source, tile or route unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid body or image data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Operation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Driver or scheduler unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cache/ht": {
+      "get": {
+        "summary": "Inspect the lossless compressed derivative cache",
+        "tags": [
+          "Operations"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HtCache"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Image, source, tile or route unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid body or image data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Operation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Driver or scheduler unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/s3/sources": {
+      "get": {
+        "summary": "List runtime S3/MinIO connections without secrets",
+        "tags": [
+          "Storage"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Image, source, tile or route unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Driver or scheduler unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid body or image data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Operation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Add or replace an in-memory S3 connection",
+        "tags": [
+          "Storage"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Image, source, tile or route unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Driver or scheduler unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid body or image data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Operation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/S3SourceInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/s3/sources/{source_id}": {
+      "delete": {
+        "summary": "Remove runtime S3 connection; does not delete objects",
+        "tags": [
+          "Storage"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Image, source, tile or route unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Driver or scheduler unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid body or image data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Operation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "source_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": ""
+          }
+        ]
+      }
+    },
+    "/api/s3/sources/{source_id}/objects": {
+      "get": {
+        "summary": "List objects in the configured prefix",
+        "tags": [
+          "Storage"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Image, source, tile or route unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid body or image data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Operation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Driver or scheduler unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "source_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": ""
+          },
+          {
+            "name": "prefix",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": ""
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Continuation from the previous page; keep source and prefix unchanged."
+          },
+          {
+            "name": "keyPrefix",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Case-sensitive object-key prefix relative to the configured source and optional folder prefix. Applied by S3; no object bodies are read."
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Case-insensitive key substring filtered on one provider page. An empty result can still have nextCursor; continue explicitly with unchanged search parameters."
+          }
+        ],
+        "description": "Browse one provider page at a time. Selecting an object reads metadata and headers only; viewport requests fetch bounded, version-pinned compressed ranges."
+      }
+    },
+    "/api/s3/sources/{source_id}/assets": {
+      "post": {
+        "summary": "Open a version-pinned S3 asset with header-only metadata detection",
+        "tags": [
+          "Storage"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Image, source, tile or route unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid body or image data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Operation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Driver or scheduler unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "source_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": ""
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/S3AssetInput"
+              }
+            }
+          }
+        },
+        "description": "Browse one provider page at a time. Selecting an object reads metadata and headers only; viewport requests fetch bounded, version-pinned compressed ranges."
+      }
+    },
+    "/wmts": {
+      "get": {
+        "summary": "WMTS capabilities or image-local raster tile",
+        "tags": [
+          "Tiles"
+        ],
+        "description": "Asset-local pixel matrices, not geographic slippy-map coordinates. Each output tile is at most 512 pixels per edge. GetTile requires LAYER, TILEMATRIXSET, TILEMATRIX, TILEROW and TILECOL. DRIVER selects source decoder; FORMAT selects output encoder. Response timing headers are milliseconds. Cache hits may use lossless HTJ2K; original file identity is unchanged.",
+        "parameters": [
+          {
+            "name": "SERVICE",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "WMTS"
+            },
+            "description": ""
+          },
+          {
+            "name": "REQUEST",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "GetCapabilities",
+                "GetTile"
+              ]
+            },
+            "description": ""
+          },
+          {
+            "name": "VERSION",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "1.0.0"
+            },
+            "description": ""
+          },
+          {
+            "name": "LAYER",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^((s3v-|filev-)?[a-fA-F0-9]{64}|s3-[a-fA-F0-9]+)$",
+              "description": "Canonical asset identity; GetCapabilities also accepts an opaque S3 locator for lazy selection."
+            },
+            "description": "Required canonical identity for GetTile. Optional GetCapabilities selector for one image with actual header metadata."
+          },
+          {
+            "name": "LIMIT",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            },
+            "description": "GetCapabilities page size when LAYER is omitted; bounded to 1-100 registered assets."
+          },
+          {
+            "name": "CURSOR",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "GetCapabilities continuation from X-River-Next-Cursor. Provider object listings are not crawled."
+          },
+          {
+            "name": "STYLE",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "default"
+            },
+            "description": ""
+          },
+          {
+            "name": "FORMAT",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "image/png",
+                "image/webp",
+                "image/avif",
+                "image/jxl"
+              ],
+              "default": "image/webp"
+            },
+            "description": ""
+          },
+          {
+            "name": "LAYERS",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535,
+              "default": 0
+            },
+            "description": "Optional OpenJPEG/JP2Grok quality-layer limit. Zero or omission means full quality; the count must not exceed the source layers. NVIDIA layer selection is unsupported."
+          },
+          {
+            "name": "DRIVER",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "openjpeg",
+                "jp2grok",
+                "openhtj2k",
+                "nvjpeg2000"
+              ],
+              "default": "openjpeg"
+            },
+            "description": ""
+          },
+          {
+            "name": "TILEMATRIXSET",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "GetTile: RiverPixel-<asset identity>."
+          },
+          {
+            "name": "TILEMATRIX",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "description": "GetTile: 0 is coarsest; resolutionLevels-1 is full resolution."
+          },
+          {
+            "name": "TILEROW",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "description": ""
+          },
+          {
+            "name": "TILECOL",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "description": ""
+          },
+          {
+            "name": "EDGE",
+            "in": "query",
+            "required": false,
+            "description": "Edge tile shape: crop returns natural dimensions; black and transparent pad to the nominal tile dimensions. WebSocket previews use their native preview tile size; final tiles use 512 pixels. WMTS also accepts lowercase edge.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "crop",
+                "black",
+                "transparent"
+              ],
+              "default": "crop"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "XML capabilities or encoded raster",
+            "headers": {
+              "X-River-Trace-Id": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Distributed trace identifier"
+              },
+              "X-River-Decoder-Route": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Actual decoder/cache route"
+              },
+              "X-River-Queue-Ms": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Scheduler waiting time"
+              },
+              "X-River-Decode-Ms": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Decode milliseconds"
+              },
+              "X-River-Encode-Ms": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Encode milliseconds"
+              },
+              "X-River-Server-Ms": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Server milliseconds"
+              },
+              "X-River-Source-Cache": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Original byte-cache status"
+              },
+              "X-River-Source-Cache-Ms": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Byte-cache foreground lookup milliseconds"
+              }
+            },
+            "content": {
+              "application/xml": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "image/png": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/webp": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/avif": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/jxl": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Image, source, tile or route unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Operation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid body or image data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Driver or scheduler unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ws": {
+      "get": {
+        "summary": "WebSocket viewport and explicit-tile streaming",
+        "tags": [
+          "Streaming"
+        ],
+        "description": "Upgrade to ws:// or wss://. Swagger Try-it-out cannot exercise WebSockets. Send JSON type=viewport with viewport, format and driver, or type=tiles with batch, format and driver. A newer sequence cancels older work. Server sends accepted/error JSON control messages and binary frames: ASCII RIVR | uint32 little-endian JSON-header byte length | UTF-8 JSON TileFrameHeader | encoded image. z/zoom are raster reductions, not geographic zoom. Full protocol source: river-core model.rs and protocol.rs.",
+        "responses": {
+          "101": {
+            "description": "WebSocket upgrade"
+          },
+          "400": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Image, source, tile or route unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid body or image data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Operation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Driver or scheduler unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "x-client-messages": [
+          {
+            "type": "viewport",
+            "viewport": {
+              "assetId": "94a94669d839b13292340cbbdec6b96c81475eb1e1f6158c55245a7355437290",
+              "sequence": 1,
+              "x": 0,
+              "y": 0,
+              "width": 1024,
+              "height": 1024,
+              "zoom": 0
+            },
+            "format": "webp",
+            "driver": "openjpeg"
+          },
+          {
+            "type": "tiles",
+            "batch": {
+              "assetId": "94a94669d839b13292340cbbdec6b96c81475eb1e1f6158c55245a7355437290",
+              "sequence": 2,
+              "tiles": [
+                {
+                  "x": 0,
+                  "y": 0,
+                  "z": 0
+                }
+              ]
+            },
+            "format": "png",
+            "driver": "nvjpeg2000"
+          }
+        ],
+        "parameters": [
+          {
+            "name": "edge",
+            "in": "query",
+            "required": false,
+            "description": "Edge tile shape: crop returns natural dimensions; black and transparent pad to the nominal tile dimensions. WebSocket previews use their native preview tile size; final tiles use 512 pixels. WMTS also accepts lowercase edge.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "crop",
+                "black",
+                "transparent"
+              ],
+              "default": "crop"
+            }
+          }
+        ]
+      }
+    },
+    "/ws/tiles": {
+      "get": {
+        "summary": "WebSocket viewport and explicit-tile streaming",
+        "tags": [
+          "Streaming"
+        ],
+        "description": "Upgrade to ws:// or wss://. Swagger Try-it-out cannot exercise WebSockets. Send JSON type=viewport with viewport, format and driver, or type=tiles with batch, format and driver. A newer sequence cancels older work. Server sends accepted/error JSON control messages and binary frames: ASCII RIVR | uint32 little-endian JSON-header byte length | UTF-8 JSON TileFrameHeader | encoded image. z/zoom are raster reductions, not geographic zoom. Full protocol source: river-core model.rs and protocol.rs.",
+        "responses": {
+          "101": {
+            "description": "WebSocket upgrade"
+          },
+          "400": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Image, source, tile or route unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid body or image data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Operation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Driver or scheduler unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "x-client-messages": [
+          {
+            "type": "viewport",
+            "viewport": {
+              "assetId": "94a94669d839b13292340cbbdec6b96c81475eb1e1f6158c55245a7355437290",
+              "sequence": 1,
+              "x": 0,
+              "y": 0,
+              "width": 1024,
+              "height": 1024,
+              "zoom": 0
+            },
+            "format": "webp",
+            "driver": "openjpeg"
+          },
+          {
+            "type": "tiles",
+            "batch": {
+              "assetId": "94a94669d839b13292340cbbdec6b96c81475eb1e1f6158c55245a7355437290",
+              "sequence": 2,
+              "tiles": [
+                {
+                  "x": 0,
+                  "y": 0,
+                  "z": 0
+                }
+              ]
+            },
+            "format": "png",
+            "driver": "nvjpeg2000"
+          }
+        ],
+        "parameters": [
+          {
+            "name": "edge",
+            "in": "query",
+            "required": false,
+            "description": "Edge tile shape: crop returns natural dimensions; black and transparent pad to the nominal tile dimensions. WebSocket previews use their native preview tile size; final tiles use 512 pixels. WMTS also accepts lowercase edge.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "crop",
+                "black",
+                "transparent"
+              ],
+              "default": "crop"
+            }
+          }
+        ]
+      }
+    },
+    "/api/settings/encoding": {
+      "get": {
+        "summary": "Get the active persisted encoding setting",
+        "responses": {
+          "200": {
+            "description": "Active WebP encoding method"
+          },
+          "400": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Image, source, tile or route unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid body or image data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Operation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Driver or scheduler unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Persist and apply WebP encoding method",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "webpMethod"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "webpMethod": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 6
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Saved and active; applies to new renders"
+          },
+          "400": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Operation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Image, source, tile or route unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid body or image data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Driver or scheduler unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/streamer/v1/{z}/{x}/{y}/tile.{ext}": {
+      "get": {
+        "tags": [
+          "Compatibility"
+        ],
+        "summary": "WMTS tiles using a streamer URL template",
+        "description": "Connected S3 object URLs, locators and asset IDs are accepted without manifest requests. URL-encode the complete image value once as an outer query value. Without geometry parameters, uses existing River 512-pixel WMTS matrix semantics. Explicit geometry requires tileSize and maxZoom together: sourceSpan = tileSize * 2^(maxZoom-z), bitmapEdge = round(tileSize * tilePixelRatio). minZoom defaults to 0 and tilePixelRatio to 1. Rows increase downward. Native JP2 reductions only optimize decoding; output is resampled as needed. Black/transparent padding follows scaling; crop clips to image bounds. Existing WMTS/WebSocket semantics are unchanged. When no geometry overrides are supplied, tiles are256pixels at ratio1; maxzoom=max(0,ceil(log2(max(width,height)/256))) and minzoom=0, exactly matching /api/tiles/{image}. Use that tile-info endpoint or an external service with the identical policy. Explicit geometry overrides and WMTS remain unchanged. edge=transparent returns fixed-size tiles with transparent padding.",
+        "parameters": [
+          {
+            "name": "z",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 30
+            },
+            "description": "Zoom increases toward full resolution. With no geometry overrides, use minzoom/maxzoom from /api/tiles/{image}; otherwise use the explicit minZoom/maxZoom."
+          },
+          {
+            "name": "x",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "description": "Tile column."
+          },
+          {
+            "name": "y",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "description": "Tile row."
+          },
+          {
+            "name": "ext",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "png",
+                "webp",
+                "avif",
+                "jxl"
+              ]
+            }
+          },
+          {
+            "name": "image",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "URL-encoded S3 URI or HTTP object URL on exactly one connected S3 source, or an existing River asset ID/S3 locator. Headers are opened lazily; source images are unchanged.",
+            "example": "s3://my-bucket/folder/image.jp2"
+          },
+          {
+            "name": "driver",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "openjpeg",
+                "jp2grok",
+                "openhtj2k",
+                "nvjpeg2000"
+              ],
+              "default": "openjpeg"
+            }
+          },
+          {
+            "name": "layers",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "description": "Optional source quality-layer limit, as for WMTS."
+          },
+          {
+            "name": "edge",
+            "in": "query",
+            "required": false,
+            "description": "crop keeps visible dimensions; black and transparent pad to the nominal bitmap edge. Default compatibility tiles are256pixels. Explicit geometry sets round(tileSize*tilePixelRatio). WMTS and WebSocket geometry are unchanged.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "crop",
+                "black",
+                "transparent"
+              ],
+              "default": "black"
+            }
+          },
+          {
+            "name": "tileSize",
+            "in": "query",
+            "required": false,
+            "description": "Full-resolution source tile footprint. Required with maxZoom.",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 4096
+            }
+          },
+          {
+            "name": "maxZoom",
+            "in": "query",
+            "required": false,
+            "description": "Client full-resolution zoom, independent of native JP2 resolution count. Required with tileSize.",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 30
+            }
+          },
+          {
+            "name": "minZoom",
+            "in": "query",
+            "required": false,
+            "description": "Lowest accepted zoom; must not exceed maxZoom.",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 30,
+              "default": 0
+            }
+          },
+          {
+            "name": "tilePixelRatio",
+            "in": "query",
+            "required": false,
+            "description": "Bitmap density, independent of source coverage. Rounded bitmap edge must be 1..4096.",
+            "schema": {
+              "type": "number",
+              "exclusiveMinimum": true,
+              "minimum": 0,
+              "default": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Encoded tile, with the same timing and cache headers as WMTS.",
+            "content": {
+              "image/png": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/webp": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/avif": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/jxl": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Image, source, tile or route unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid body or image data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Driver or scheduler unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Operation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/configuration": {
+      "get": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Export complete managed configuration, including credentials",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RiverConfiguration"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Validate, atomically persist and replace complete managed configuration",
+        "description": "Replaces all sources, encoding and read policy. Failed validation/persistence leaves active settings unchanged. Clears remote asset registrations and learned observations after successful replacement. Does not change startup-only deployment environment.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RiverConfiguration"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid configuration or source; nothing changed"
+          },
+          "500": {
+            "description": "Persistence failed; nothing changed"
+          }
+        }
+      }
+    },
+    "/api/settings/read-policy": {
+      "get": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Read policy, learned per-source latency and last planning decisions",
+        "description": "Actual successful source GET samples only. Process-local EWMA; reset on restart or connection replacement. Cache hits do not generate samples. Observe mode plans without applying changes.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Persist and apply adaptive read policy",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReadPolicy"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadPolicy"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid policy"
+          },
+          "500": {
+            "description": "Persistence failed"
+          }
+        }
+      }
+    },
+    "/api/diagnostics/source-reads": {
+      "get": {
+        "tags": [
+          "Diagnostics"
+        ],
+        "summary": "Read the process-local source range trace",
+        "responses": {
+          "200": {
+            "description": "Bounded source-read trace with exclusive byte offsets, block/index positions, callsites, outcomes and timings. SDK internal physical attempts are explicitly unknown."
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Diagnostics"
+        ],
+        "summary": "Enable or disable source range tracing",
+        "responses": {
+          "200": {
+            "description": "Bounded source-read trace with exclusive byte offsets, block/index positions, callsites, outcomes and timings. SDK internal physical attempts are explicitly unknown."
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "enabled"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Diagnostics"
+        ],
+        "summary": "Clear retained source range diagnostics",
+        "responses": {
+          "200": {
+            "description": "Bounded source-read trace with exclusive byte offsets, block/index positions, callsites, outcomes and timings. SDK internal physical attempts are explicitly unknown."
+          }
+        }
+      }
+    },
+    "/api/tiles/{image}": {
+      "get": {
+        "summary": "Pixel pyramid metadata for a connected original image URL",
+        "description": "Percent-encode the entire original image URL as one path segment. No client-side asset registration or bucket listing. bounds=[0,height,width,0], minzoom=0, maxzoom=ceil(log2(max(width,height)/256)) clamped below at0; dimensions above2^31 pixels require explicit multi-root geometry. Default streamer tiles use this same256px pyramid at pixel ratio1. This is a pixel grid, not geographic metadata.",
+        "parameters": [
+          {
+            "name": "image",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Percent-encoded original s3:// or HTTP object URL matching exactly one configured source; registered asset IDs and River locators also work."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Image pixel bounds and matching compatibility zoom range",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "bounds",
+                    "minzoom",
+                    "maxzoom"
+                  ],
+                  "properties": {
+                    "bounds": {
+                      "type": "array",
+                      "minItems": 4,
+                      "maxItems": 4,
+                      "items": {
+                        "type": "integer",
+                        "minimum": 0
+                      }
+                    },
+                    "minzoom": {
+                      "type": "integer",
+                      "enum": [
+                        0
+                      ]
+                    },
+                    "maxzoom": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 23
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Unresolved or ambiguous connected source"
+          },
+          "404": {
+            "description": "Image unavailable"
+          },
+          "422": {
+            "description": "Image header or pixel pyramid unavailable"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {},
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "required": [
+          "code",
+          "message",
+          "status",
+          "path",
+          "method",
+          "requestId",
+          "details"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Machine-readable failure reason."
+          },
+          "message": {
+            "type": "string",
+            "description": "Specific explanation and corrective action."
+          },
+          "status": {
+            "type": "integer"
+          },
+          "path": {
+            "type": "string"
+          },
+          "method": {
+            "type": "string"
+          },
+          "requestId": {
+            "type": "string",
+            "description": "Matches X-River-Request-Id and server logs."
+          },
+          "details": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Failure context. Out-of-bounds tiles include matrix, row, column, rows, columns, maxRow and maxColumn."
+          }
+        }
+      },
+      "Viewport": {
+        "type": "object",
+        "properties": {
+          "assetId": {
+            "type": "string",
+            "pattern": "^(s3v-|filev-)?[a-fA-F0-9]{64}$",
+            "description": "Content SHA-256 or explicit filev/S3 version identity; version selection does not hash the complete source."
+          },
+          "sequence": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "x": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "y": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "width": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "height": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "zoom": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Power-of-two reduction; source pixels per screen pixel = 2^zoom."
+          }
+        },
+        "required": [
+          "assetId",
+          "sequence",
+          "x",
+          "y",
+          "width",
+          "height",
+          "zoom"
+        ]
+      },
+      "TileXyz": {
+        "type": "object",
+        "properties": {
+          "x": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "y": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "z": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "x",
+          "y",
+          "z"
+        ]
+      },
+      "TileBatch": {
+        "type": "object",
+        "properties": {
+          "assetId": {
+            "type": "string",
+            "pattern": "^(s3v-|filev-)?[a-fA-F0-9]{64}$",
+            "description": "Content SHA-256 or explicit filev/S3 version identity; version selection does not hash the complete source."
+          },
+          "sequence": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "tiles": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 256,
+            "items": {
+              "$ref": "#/components/schemas/TileXyz"
+            }
+          }
+        },
+        "required": [
+          "assetId",
+          "sequence",
+          "tiles"
+        ]
+      },
+      "Manifest": {
+        "type": "object",
+        "properties": {
+          "tilesAvailable": {
+            "type": "boolean",
+            "description": "A renderable source is present. A limited capability notice may describe layout/IO bounds without disabling tile delivery."
+          },
+          "codestreamCoding": {
+            "type": "string",
+            "enum": [
+              "jpeg2000",
+              "htj2k"
+            ],
+            "description": "Codestream family detected from bounded source headers; independent of the filename."
+          },
+          "supportedDecoderDrivers": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "openjpeg",
+                "jp2grok",
+                "openhtj2k",
+                "nvjpeg2000"
+              ]
+            },
+            "description": "Coding-compatible driver IDs for a probed asset. Runtime availability is reported by /api/drivers; source-layout limits still apply."
+          },
+          "assetId": {
+            "type": "string",
+            "pattern": "^(s3v-|filev-)?[a-fA-F0-9]{64}$",
+            "description": "Content SHA-256 or explicit filev/S3 version identity; version selection does not hash the complete source."
+          },
+          "width": {
+            "type": "integer"
+          },
+          "height": {
+            "type": "integer"
+          },
+          "components": {
+            "type": "integer"
+          },
+          "bitDepth": {
+            "type": "integer"
+          },
+          "resolutionLevels": {
+            "type": "integer"
+          },
+          "quality": {
+            "type": "object",
+            "properties": {
+              "cumulativeLayerBytes": {
+                "type": "array",
+                "items": {
+                  "type": "integer"
+                }
+              }
+            },
+            "required": []
+          },
+          "color": {
+            "type": "object",
+            "properties": {
+              "output": {
+                "type": "string"
+              },
+              "sourceProfile": {
+                "type": "string",
+                "enum": [
+                  "embedded",
+                  "assumedSrgb"
+                ]
+              },
+              "assumptionRecorded": {
+                "type": "boolean"
+              }
+            },
+            "required": []
+          },
+          "capability": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "fastPath",
+                  "limited"
+                ]
+              },
+              "reasons": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": []
+          },
+          "referenceOrigin": {
+            "type": "object",
+            "description": "JPEG 2000 codestream canvas origin. All River viewport/tile coordinates remain relative to the image, independent of this origin.",
+            "properties": {
+              "x": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "y": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "x",
+              "y"
+            ]
+          }
+        },
+        "required": [
+          "assetId",
+          "width",
+          "height",
+          "components",
+          "bitDepth",
+          "resolutionLevels",
+          "quality",
+          "color",
+          "capability"
+        ]
+      },
+      "Asset": {
+        "type": "object",
+        "properties": {
+          "assetId": {
+            "type": "string",
+            "pattern": "^(s3v-)?[a-fA-F0-9]{64}$",
+            "description": "Local content SHA-256 or s3v-prefixed S3 object-version identity; S3 selection does not hash the complete source."
+          },
+          "width": {
+            "type": "integer"
+          },
+          "height": {
+            "type": "integer"
+          },
+          "bitDepth": {
+            "type": "integer"
+          },
+          "resolutionLevels": {
+            "type": "integer"
+          },
+          "sourceBytes": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": []
+      },
+      "Driver": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "enum": [
+              "openjpeg",
+              "jp2grok",
+              "openhtj2k",
+              "nvjpeg2000"
+            ]
+          },
+          "available": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "progressiveQuality": {
+            "type": "boolean"
+          }
+        },
+        "required": []
+      },
+      "Format": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "enum": [
+              "webp",
+              "png",
+              "avif",
+              "jxl"
+            ]
+          },
+          "available": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": []
+      },
+      "HtCache": {
+        "type": "object",
+        "properties": {
+          "budgetBytes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "usedBytes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "entries": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "pending": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "hits": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "misses": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "failures": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "preparationMs": {
+            "type": "number"
+          },
+          "lastError": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": []
+      },
+      "S3SourceInput": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "endpoint": {
+            "type": "string",
+            "nullable": true
+          },
+          "bucket": {
+            "type": "string"
+          },
+          "region": {
+            "type": "string",
+            "default": "us-east-1"
+          },
+          "prefix": {
+            "type": "string",
+            "default": ""
+          },
+          "accessKeyId": {
+            "type": "string"
+          },
+          "secretAccessKey": {
+            "type": "string",
+            "format": "password",
+            "writeOnly": true
+          },
+          "sessionToken": {
+            "type": "string",
+            "nullable": true,
+            "writeOnly": true
+          },
+          "allowHttp": {
+            "type": "boolean",
+            "default": false
+          },
+          "virtualHostedStyle": {
+            "type": "boolean",
+            "default": false
+          },
+          "maxRetries": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10,
+            "default": 2,
+            "description": "Retries after the initial request;0 disables retries. Applies to SDK and native range reads, persists with the source. Omission uses RIVER_S3_MAX_RETRIES or2. Retry windows remain bounded by operation deadlines."
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "bucket",
+          "accessKeyId",
+          "secretAccessKey"
+        ]
+      },
+      "S3AssetInput": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "width": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200000
+          },
+          "height": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200000
+          },
+          "bitDepth": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 16,
+            "default": 8
+          }
+        },
+        "required": [
+          "key"
+        ]
+      },
+      "ServerTiming": {
+        "type": "object",
+        "properties": {
+          "decoderRoute": {
+            "type": "string"
+          },
+          "workerQueueMs": {
+            "type": "number",
+            "minimum": 0
+          },
+          "decodeMs": {
+            "type": "number",
+            "minimum": 0
+          },
+          "encodeMs": {
+            "type": "number",
+            "minimum": 0
+          },
+          "sourceCacheMs": {
+            "type": "number",
+            "minimum": 0
+          },
+          "elapsedMs": {
+            "type": "number",
+            "minimum": 0
+          },
+          "sourceCacheStatus": {
+            "type": "string"
+          }
+        },
+        "description": "Per-frame timings. elapsedMs includes previous work within this request; nested durations must not be added blindly."
+      },
+      "TileFrameHeader": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "traceId": {
+            "type": "string"
+          },
+          "assetId": {
+            "type": "string",
+            "pattern": "^(s3v-)?[a-fA-F0-9]{64}$"
+          },
+          "sequence": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "zoom": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "tileX": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "tileY": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "sourceLayers": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "sourceBytes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "outputWidth": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "outputHeight": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "pass": {
+            "type": "string",
+            "enum": [
+              "preview",
+              "gain",
+              "final"
+            ]
+          },
+          "contentType": {
+            "type": "string",
+            "enum": [
+              "image/webp",
+              "image/png",
+              "image/avif",
+              "image/jxl"
+            ]
+          },
+          "serverTiming": {
+            "$ref": "#/components/schemas/ServerTiming"
+          }
+        },
+        "description": "UTF-8 JSON header in every RIVR binary WebSocket frame."
+      },
+      "ClientMessage": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "type",
+              "viewport"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "viewport"
+                ]
+              },
+              "viewport": {
+                "$ref": "#/components/schemas/Viewport"
+              },
+              "format": {
+                "type": "string",
+                "enum": [
+                  "webp",
+                  "png",
+                  "avif",
+                  "jxl"
+                ],
+                "default": "webp"
+              },
+              "driver": {
+                "type": "string",
+                "enum": [
+                  "openjpeg",
+                  "jp2grok",
+                  "openhtj2k",
+                  "nvjpeg2000"
+                ],
+                "default": "openjpeg"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "type",
+              "batch"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "tiles"
+                ]
+              },
+              "batch": {
+                "$ref": "#/components/schemas/TileBatch"
+              },
+              "format": {
+                "type": "string",
+                "enum": [
+                  "webp",
+                  "png",
+                  "avif",
+                  "jxl"
+                ],
+                "default": "webp"
+              },
+              "driver": {
+                "type": "string",
+                "enum": [
+                  "openjpeg",
+                  "jp2grok",
+                  "openhtj2k",
+                  "nvjpeg2000"
+                ],
+                "default": "openjpeg"
+              }
+            }
+          }
+        ]
+      },
+      "ServerMessage": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "accepted"
+                ]
+              },
+              "sessionId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "traceId": {
+                "type": "string"
+              },
+              "sequence": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "limited"
+                ]
+              },
+              "sequence": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "reasons": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "error"
+                ]
+              },
+              "sequence": {
+                "type": "integer",
+                "nullable": true
+              },
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              }
+            }
+          }
+        ]
+      },
+      "ReadPolicy": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "mode",
+          "minimumSamples",
+          "maxOverfetchRatio"
+        ],
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "disabled",
+              "observe",
+              "adaptive"
+            ],
+            "default": "observe"
+          },
+          "minimumSamples": {
+            "type": "integer",
+            "minimum": 8,
+            "maximum": 10000,
+            "default": 16
+          },
+          "maxOverfetchRatio": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4,
+            "default": 2
+          },
+          "serialTransport": {
+            "type": "string",
+            "enum": [
+              "sdk",
+              "curl",
+              "auto"
+            ],
+            "default": "sdk",
+            "description": "Persisted serial range transport. Auto uses native only after sustained isolated unindexed discovery on a fast source and retains SDK under contention; force curl explicitly bypasses this selection policy. Batched payloads retain SDK."
+          },
+          "maxSourceRequests": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 64,
+            "default": 16,
+            "description": "Shared in-flight range operation limit across images on each connected source. API setting persists; otherwise RIVER_S3_SOURCE_MAX_REQUESTS or 16. SDK retries remain within the acquired operation slot."
+          },
+          "refreshPayloadCosts": {
+            "type": "boolean",
+            "description": "Optional adaptive-mode mature-profile refresh before predicted overfetch. Uses a small already-required payload range to measure current throughput. Default false; RIVER_S3_REFRESH_PAYLOAD_COSTS supplies the environment default. API values persist and override it. Trades steady fast-source latency for protection against sudden bandwidth drops."
+          }
+        }
+      },
+      "RiverConfiguration": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "schemaVersion",
+          "encoding",
+          "readPolicy",
+          "sources"
+        ],
+        "properties": {
+          "schemaVersion": {
+            "type": "integer",
+            "enum": [
+              1
+            ]
+          },
+          "encoding": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "webpMethod"
+            ],
+            "properties": {
+              "webpMethod": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 6
+              }
+            }
+          },
+          "readPolicy": {
+            "$ref": "#/components/schemas/ReadPolicy"
+          },
+          "sources": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "$ref": "#/components/schemas/S3SourceInput"
+            }
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Compatibility",
+      "description": "Alternative URL templates for existing tile clients, backed by the shared WMTS decoder and caches."
+    }
+  ]
+}

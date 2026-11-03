@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import vm from 'node:vm';
+const source=fs.readFileSync(new URL('../web/viewer.js',import.meta.url),'utf8');
+const saved=[];let reloads=0;
+const context=vm.createContext({URL,localStorage:{setItem:(...args)=>saved.push(args)},location:{reload(){reloads++;}},status:{textContent:''}});
+vm.runInContext(source.slice(source.indexOf('function switchApi('),source.indexOf("document.querySelector('#api-url-form')")),context);
+context.switchApi('https://example.test/river/');
+assert.deepEqual(saved,[['river.apiUrl','https://example.test/river']]);assert.equal(reloads,1);
+for(const url of ['file:///tmp','https://user:secret@example.test','https://example.test?secret=value','not a URL']) context.switchApi(url);
+assert.equal(reloads,1);assert.match(context.status.textContent,/Cannot switch API/);
+console.log('PASS: API URL persistence, reload isolation and invalid URL handling');
