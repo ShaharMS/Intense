@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "River raster streaming API",
-    "version": "2026.10.15-compatibility-m77",
+    "version": "0.1.0-dev",
     "description": "River development API. No administrator privileges or bearer token required. Versioned configuration exports include S3 credentials; imports atomically replace all managed sources, encoding settings and read policy. Deployment environment settings remain startup-only."
   },
   "servers": [
@@ -901,6 +901,7 @@
     "/api/s3/sources/{source_id}/assets": {
       "post": {
         "summary": "Open a version-pinned S3 asset with header-only metadata detection",
+        "description": "When present, serverRegistrationMs measures the handler through response construction. headerProbeMs measures I/O admission and the bounded header fetch. Cached asset responses report zero headerProbeMs.",
         "tags": [
           "Storage"
         ],
@@ -1961,13 +1962,131 @@
         }
       }
     },
+    "/api/settings/drivers": {
+      "get": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Read the active driver allowlist",
+        "responses": {
+          "200": {
+            "description": "Active driver settings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "enabledDrivers": {
+                      "type": [
+                        "array",
+                        "null"
+                      ],
+                      "minItems": 1,
+                      "uniqueItems": true,
+                      "items": {
+                        "enum": [
+                          "openjpeg",
+                          "jp2grok",
+                          "openhtj2k",
+                          "nvjpeg2000"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "enabledDrivers"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Change the active driver allowlist",
+        "description": "Applies immediately to new requests. Null enables every available decoder.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "enabledDrivers": {
+                    "type": [
+                      "array",
+                      "null"
+                    ],
+                    "minItems": 1,
+                    "uniqueItems": true,
+                    "items": {
+                      "enum": [
+                        "openjpeg",
+                        "jp2grok",
+                        "openhtj2k",
+                        "nvjpeg2000"
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "enabledDrivers"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Applied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "enabledDrivers": {
+                      "type": [
+                        "array",
+                        "null"
+                      ],
+                      "minItems": 1,
+                      "uniqueItems": true,
+                      "items": {
+                        "enum": [
+                          "openjpeg",
+                          "jp2grok",
+                          "openhtj2k",
+                          "nvjpeg2000"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "enabledDrivers"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid driver allowlist"
+          }
+        }
+      }
+    },
     "/api/settings/read-policy": {
       "get": {
         "tags": [
           "Settings"
         ],
         "summary": "Read policy, learned per-source latency and last planning decisions",
-        "description": "Actual successful source GET samples only. Process-local EWMA; reset on restart or connection replacement. Cache hits do not generate samples. Observe mode plans without applying changes.",
+        "description": "Actual successful source GET samples only. Process-local EWMA; reset on restart or connection replacement. Cache hits do not generate samples. Observe mode plans without applying changes. The settings field reports effective values. When present, configuredSettings reports the stored policy without materializing optional defaults. Use configuredSettings to snapshot and restore policy overrides.",
         "responses": {
           "200": {
             "description": "Success",
@@ -2134,6 +2253,16 @@
           }
         }
       }
+    },
+    "/api/diagnostics/resources": {
+      "get": {
+        "summary": "Effective container resources, coordinated cache budgets, occupancy and memory-pressure decisions",
+        "responses": {
+          "200": {
+            "description": "Process-local resources and persistent cache diagnostics; no bucket enumeration or expensive tracing"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -2147,8 +2276,7 @@
           "status",
           "path",
           "method",
-          "requestId",
-          "details"
+          "requestId"
         ],
         "properties": {
           "code": {
@@ -2612,6 +2740,10 @@
           "decoderRoute": {
             "type": "string"
           },
+          "decoderBackend": {
+            "type": "string",
+            "description": "Decoder or cache that actually produced the frame, including fallback."
+          },
           "workerQueueMs": {
             "type": "number",
             "minimum": 0
@@ -2918,6 +3050,67 @@
           "sources"
         ],
         "properties": {
+          "tls": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "description": "Native HTTPS listener settings applied at startup. ENV overrides the stored fields.",
+            "additionalProperties": false,
+            "properties": {
+              "bind": {
+                "type": "string",
+                "default": "0.0.0.0:8443"
+              },
+              "certFile": {
+                "type": "string"
+              },
+              "keyFile": {
+                "type": "string"
+              },
+              "pfxFile": {
+                "type": "string"
+              },
+              "pfxPasswordFile": {
+                "type": "string"
+              },
+              "protocols": {
+                "type": "array",
+                "items": {
+                  "enum": [
+                    "http/1.1",
+                    "h2",
+                    "h3"
+                  ]
+                },
+                "default": [
+                  "http/1.1",
+                  "h2"
+                ]
+              },
+              "http3PublicPort": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 65535
+              }
+            }
+          },
+          "enabledDrivers": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "enum": [
+                "openjpeg",
+                "jp2grok",
+                "openhtj2k",
+                "nvjpeg2000"
+              ]
+            }
+          },
           "schemaVersion": {
             "type": "integer",
             "enum": [

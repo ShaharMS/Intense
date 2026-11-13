@@ -17,6 +17,10 @@ impl RemoteSource {
   let scale=1u32<<reduction;
   let (width,height)=(h.width.div_ceil(scale),h.height.div_ceil(scale));
   if u64::from(width)*u64::from(height)>4*1024*1024 {return Ok(None);}
+  // An explicitly single-part SOT belongs to the single-prefix parser.
+  // Let that parser validate EOC alongside its first slab fetch.
+  let sot=self.read(h.first_part..h.first_part+12,context)?;
+  if sot[..4]==[0xff,0x90,0,10] && sot[11]==1 {return Ok(None);}
   let first=self.part_at(h.first_part,context)?;
   if first.tile!=0 || first.ordinal!=0 || first.total==1
    || (first.total==0 && first.offset+first.length>=h.codestream_end.saturating_sub(2)) {return Ok(None);}
@@ -95,7 +99,15 @@ impl RemoteSource {
   if wanted_resolution>0 && total<=MAX_PACKETS {return Ok(None);}
   let view_reduction=reduction-retained;let view_scale=1u32<<view_reduction;
   let width=h.width.div_ceil(view_scale);let height=h.height.div_ceil(view_scale);
-  let part=self.part_at(h.first_part,context)?;
+  let mut sot=self.read(h.first_part..h.first_part+12,context)?;
+  let mut pending_eoc=be32(&sot,6)?==0;
+  // Keep a zero-length SOT provisional in this local parser until its tail
+  // marker has been validated. No shared tile-header entries are published here.
+  let part=if pending_eoc {
+   ensure!(sot[..4]==[0xff,0x90,0,10],"invalid JPEG 2000 SOT marker");
+   TilePart { tile:be16(&sot,4)?,offset:h.first_part,
+    length:resolved_part_length(0,h.first_part,h.codestream_end)?,ordinal:sot[10],total:sot[11] }
+  }else{self.part_at(h.first_part,context)?};
   if part.tile!=0 || part.ordinal!=0 || part.total>1 {return Ok(None);}
   if wanted>524288 {return Ok(None);}
   let (view_packets,_)=multipart_prefix::counts(h,0,wanted_resolution+retained)?;
@@ -103,7 +115,6 @@ impl RemoteSource {
   let slab_bytes=(u64::try_from(total)?.saturating_mul(5).saturating_add(16*1024)).next_power_of_two().clamp(64*1024,4*1024*1024);
   let mut at=part.offset+12;let mut headers=vec![];let mut expected=0u16;
   let (mut count,mut sum,mut prefix,mut value)=(0usize,0u64,0u64,0u64);let mut pending=false;let mut slab_end=0;
-  let mut sot=self.read(part.offset..part.offset+12,context)?;
   for markers in 0..4096 {
    context.check()?;ensure!(markers<4095,"too many single-prefix header markers");
    if slab_end>0 && at+4>slab_end {
@@ -120,8 +131,15 @@ impl RemoteSource {
      // Large PLT series otherwise cause one dependent GET per64KiB marker.
      // One bounded slab covers their lengths and often the first LL bodies.
      slab_end=(at/self.block_size*self.block_size+slab_bytes).min(part.offset+part.length);
-     let leases=self.prefetch_ranges(&[(true,at..slab_end)],context,usize::MAX)?;
+     let mut spans=vec![(true,at..slab_end)];
+     if pending_eoc {spans.push((true,h.codestream_end-2..h.codestream_end));}
+     let leases=self.prefetch_ranges(&spans,context,usize::MAX)?;
      context.pinned.clear();context.pin_packet_blocks(leases);
+     if pending_eoc {
+      ensure!(self.read(h.codestream_end-2..h.codestream_end,context)?==[0xff,0xd9],
+       "unspecified final tile-part length requires a bounded codestream ending in EOC");
+      pending_eoc=false;
+     }
     }
     let bytes=self.read(at+4..at+length+2,context)?;
     ensure!(expected<256 && bytes.first().copied()==Some(expected as u8),"invalid single-prefix PLT sequence");expected+=1;
@@ -156,6 +174,10 @@ impl RemoteSource {
   let Some(headers)=lowest_header_segments(&headers,h,reduction,false)? else{return Ok(None);};
   // Use the payload planner's bounded contiguous ranges. The generic reader
   // otherwise serializes a multi-megabyte LL prefix into 1 MiB GETs.
+  if pending_eoc {
+   ensure!(self.read(h.codestream_end-2..h.codestream_end,context)?==[0xff,0xd9],
+    "unspecified final tile-part length requires a bounded codestream ending in EOC");
+  }
   let mut bytes=self.selected_payload(&[(true,at..at+prefix)],context)?;
   for ordinal in wanted..view_packets {append_empty_packet(&mut bytes,h.cod[0],ordinal);}
   sot[10]=0;sot[11]=1;
@@ -280,7 +302,7 @@ pub(super) fn lowest_header_segments(bytes:&[u8],h:&Header,reduce:u8,main:bool)-
   }
  }
  #[test] fn intermediate_projection_keeps_needed_bands_precincts_and_end_header_markers() {
-  let h=Header {image_origin:(0,0),width:4096,height:4096,components:3,bit_depth:8,levels:7,layers:1,
+  let h=Header {image_origin:(0,0),width:4096,height:4096,components:3,display_rgb_only:false,bit_depth:8,levels:7,layers:1,
    layout:NativeTileLayoutHint {origin_x:0,origin_y:0,width:4096,height:4096,columns:1,rows:1},
    progression:2,is_ht:false,cod:vec![5,2,0,1,1,6,4,4,0,1,0x22,0x33,0x44,0x55,0x66,0x77,0x88],
    first_part:0,codestream_end:100,packet_compatible:true,prefix_compatible:true,payload_digest:[0;32]};
@@ -294,7 +316,7 @@ pub(super) fn lowest_header_segments(bytes:&[u8],h:&Header,reduce:u8,main:bool)-
   let at=n+2;assert_eq!(be16(&projected,at).unwrap(),0xff5c);assert_eq!(be16(&projected,at+2).unwrap(),16);
  }
  #[test] fn projection_preserves_source_and_component_quantization() {
-  let h=Header {image_origin:(0,0),width:4096,height:4096,components:3,bit_depth:8,levels:7,layers:1,
+  let h=Header {image_origin:(0,0),width:4096,height:4096,components:3,display_rgb_only:false,bit_depth:8,levels:7,layers:1,
    layout:NativeTileLayoutHint {origin_x:0,origin_y:0,width:4096,height:4096,columns:1,rows:1},progression:2,is_ht:false,
    cod:vec![1,2,0,1,0,6,4,4,0,1,0x22,0x33,0x44,0x55,0x66,0x77,0x88],first_part:0,codestream_end:100,packet_compatible:true,prefix_compatible:true,payload_digest:[0;32]};
   let mut siz=vec![0,0];for n in [4096u32,4096,0,0,4096,4096,0,0] {siz.extend(n.to_be_bytes());}siz.extend([0,3,7,1,1,7,1,1,7,1,1]);

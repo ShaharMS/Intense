@@ -13,7 +13,13 @@ def save(s):STATE.write_text(json.dumps(s,indent=2)+'\n')
 def docker(*args):return subprocess.check_output(['docker',*args],cwd=ROOT,text=True,stderr=subprocess.STDOUT)
 def compose(*args):return docker('compose','-p','river','-f',str(ROOT/'compose.yaml'),*args)
 def audit():
- ids=docker('ps','-aq').split();cs=json.loads(docker('inspect',*ids)) if ids else []
+ for attempt in range(3):
+  ids=docker('ps','-aq').split()
+  try:
+   cs=json.loads(docker('inspect',*ids)) if ids else []
+   break
+  except subprocess.CalledProcessError as error:
+   if attempt==2 or 'no such object' not in error.output.lower():raise
  slots=[];strays=[]
  for c in cs:
   name=c['Name'].lstrip('/');labels=c['Config'].get('Labels') or {};service=labels.get('com.docker.compose.service')
@@ -29,15 +35,25 @@ def generate():
  for slot in SLOTS:
   key=slot.upper().replace('-','_');spec=cfg.get('slots',{}).get(slot,{})
   image=spec.get('image','river:'+({'stable':'stable','lts':'lts'}.get(slot,'latest')))
-  env=dict(RIVER_PROFILE='auto',RIVER_ENABLE_NVIDIA='${RIVER_ENABLE_NVIDIA:-false}',RIVER_S3_CONNECTIONS_FILE='/var/lib/river/config/s3-connections.json',RIVER_S3_CACHE_ROOT='/var/lib/river/s3-cache',RIVER_CORPUS_ROOT='/opt/river/corpus',RIVER_MOSAIC_ROOT='/app/sentinel-date-mosaics',RIVER_ASSET_CATALOG='/app/sentinel-date-mosaics/river-assets.json',RIVER_S3_ADAPTIVE_READS='${RIVER_S3_ADAPTIVE_READS:-observe}',RIVER_S3_SOURCE_MAX_REQUESTS='${RIVER_S3_SOURCE_MAX_REQUESTS:-8}',RIVER_S3_MAX_RETRIES='${RIVER_S3_MAX_RETRIES:-2}',RIVER_TRACE_SOURCE_READS='0',OTEL_EXPORTER_OTLP_ENDPOINT='http://otel-collector:4317',OTEL_SERVICE_NAME='river-server',RIVER_CORS_ORIGINS='${RIVER_'+key+'_CORS_ORIGINS:-http://127.0.0.1:18765,http://127.0.0.1:19074,http://localhost:19074}',RIVER_OTEL_ENABLED='${RIVER_'+key+'_OTEL_ENABLED:-'+('true' if slot==target else 'false')+'}')
+  env=dict(RIVER_PROFILE='auto',RIVER_ENABLE_NVIDIA='${RIVER_ENABLE_NVIDIA:-false}',RIVER_S3_CONNECTIONS_FILE='/var/lib/river/config/s3-connections.json',RIVER_S3_CACHE_ROOT='/var/lib/river/s3-cache',RIVER_CORPUS_ROOT='/opt/river/corpus',RIVER_MOSAIC_ROOT='/app/sentinel-date-mosaics',RIVER_ASSET_CATALOG='/app/sentinel-date-mosaics/river-assets.json',RIVER_S3_ADAPTIVE_READS='${RIVER_S3_ADAPTIVE_READS:-observe}',RIVER_S3_SOURCE_MAX_REQUESTS='${RIVER_S3_SOURCE_MAX_REQUESTS:-16}',RIVER_S3_MAX_RETRIES='${RIVER_S3_MAX_RETRIES:-2}',RIVER_TRACE_SOURCE_READS='0',OTEL_EXPORTER_OTLP_ENDPOINT='http://otel-collector:4317',OTEL_SERVICE_NAME='river-server',RIVER_CORS_ORIGINS='${RIVER_'+key+'_CORS_ORIGINS:-${RIVER_CORS_ORIGINS:-*}}',RIVER_OTEL_ENABLED='${RIVER_'+key+'_OTEL_ENABLED:-'+('true' if slot==target else 'false')+'}')
   env.update(spec.get('environment',{}))
   mounts=['river-corpus:/opt/river/corpus:ro','river-corpus:/app/corpus:ro','./corpus/cache/sentinel-date-mosaics:/app/sentinel-date-mosaics:ro','./deploy/local-state/'+slot+'/config:/var/lib/river/config']
   cache='river-s3-cache' if slot=='replica-1' else slot+'-cache';volumes.setdefault(cache,{})
-  mounts.append(cache+':/var/lib/river/s3-cache')
+  if spec.get('cache_volume',True):mounts.append(cache+':/var/lib/river/s3-cache')
   if slot.startswith('replica-'):mounts.append('.:/workspace:ro')
   service=dict(image='${RIVER_'+key+'_IMAGE:-'+image+'}',pull_policy='never',container_name=NAMES[slot],cpus=spec.get('cpus','${RIVER_'+key+'_CPUS:-4}'),mem_limit=spec.get('memory','${RIVER_'+key+'_MEMORY:-2g}'),environment=env,ports=['127.0.0.1:${RIVER_'+key+'_PORT:-'+str(PORTS[slot])+'}:8080'],volumes=mounts,labels={'river.backend-slot':slot},logging=dict(driver='json-file',options={'max-size':'10m','max-file':'2'}))
   if slot=='replica-1':service['networks']={'default':{'aliases':['river']}}
   if spec.get('cpuset'):service['cpuset']=spec['cpuset']
+  if spec.get('read_only'):service['read_only']=True
+  if spec.get('shm_size'):service['shm_size']=spec['shm_size']
+  if spec.get('gpus'):service['gpus']=spec['gpus']
+  if spec.get('tls_directory'):
+   service['volumes'].append(dict(type='bind',source=spec['tls_directory'],target='/run/river-tls',read_only=True))
+   service['ports'].append('127.0.0.1:'+str(spec['tls_port'])+':8443')
+   if spec.get('tls_udp'):service['ports'].append('127.0.0.1:'+str(spec['tls_port'])+':8443/udp')
+   if 'RIVER_TLS_PFX_FILE' not in env and spec.get('tls_pem_defaults',True):
+    service['environment'].setdefault('RIVER_TLS_CERT_FILE','/run/river-tls/tls.crt')
+    service['environment'].setdefault('RIVER_TLS_KEY_FILE','/run/river-tls/tls.key')
   if spec.get('origin') or spec.get('lab'):
    assert slot.startswith('replica-')
    volumes['benchmark-data']=dict(external=True,name='river-goal-fixed-native-data')
@@ -52,6 +68,18 @@ def generate():
     service['volumes']+=['./reports/compose-lab/'+slot+':/work','.:/repo:ro']
     service['entrypoint']=['/bin/sh','-c'];service['command']=['sleep infinity']
    service['healthcheck']={'disable':True}
+  if spec.get('kv'):
+   assert slot.startswith('replica-') and slot != target
+   executable = {'redis':'redis-server', 'valkey':'valkey-server'}[spec['kv']]
+   service = dict(image=image, pull_policy='never', container_name=NAMES[slot],
+    labels={'river.backend-slot':slot}, entrypoint=[executable],
+    command=['--save','','--appendonly','no','--maxmemory','64mb','--maxmemory-policy','allkeys-lfu'],
+    tmpfs=['/data:size=32m'], mem_limit='256m')
+  if spec.get('telemetry_fixture'):
+   assert slot.startswith('replica-') and slot != target
+   service = dict(image=image, pull_policy='never', container_name=NAMES[slot],
+    labels={'river.backend-slot':slot}, command=['--config=/fixture.yaml'],
+    volumes=[spec['telemetry_fixture']+':/fixture.yaml:ro'], mem_limit='256m')
   services[slot]=service
   (ROOT/'deploy/local-state'/slot/'config').mkdir(parents=True,exist_ok=True)
  viewer=services['viewer'];viewer['depends_on']={target:{'condition':'service_started'}}

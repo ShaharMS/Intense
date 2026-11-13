@@ -33,6 +33,9 @@ if release_path.exists():
             keep.add(tags[tag])
             alias='river:'+channel
             if alias in tags:assert tags[alias]==tags[tag],f'{alias} differs from deploy/releases.json; update channels before cleanup'
+    rollback = tags.get(release.get('previousStable'))
+    if rollback and orders[rollback] >= minimum_supported and len(keep) < policy['maxVersions']:
+        keep.add(rollback)
 assert len(keep)<=policy['maxVersions'],'Release channels and retention pins exceed maximum versions'
 containers=docker('ps','-aq').splitlines();refs=[]
 if containers:

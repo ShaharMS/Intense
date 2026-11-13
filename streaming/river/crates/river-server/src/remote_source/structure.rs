@@ -15,7 +15,7 @@ impl Header {
   let enabled=|name:&str|std::env::var(name).is_ok_and(|v|v=="true" || v=="1");
   json!({"schemaVersion":1,"inspectionDoesNotFetchSource":true,"scope":"Already parsed main header. Tile headers and packet lengths are not inspected; candidate eligibility is not a guarantee of successful selective serving.",
    "width":self.width,"height":self.height,"imageOrigin":{"x":self.image_origin.0,"y":self.image_origin.1},
-   "components":self.components,"maximumComponentPrecisionBits":self.bit_depth,
+   "components":self.components,"displayComponents":if self.display_rgb_only{3}else{self.components},"extraBandsAreAlpha":!self.display_rgb_only,"maximumComponentPrecisionBits":self.bit_depth,
    "nativeTiles":{"width":self.layout.width,"height":self.layout.height,"columns":self.layout.columns,"rows":self.layout.rows,
     "count":u64::from(self.layout.columns)*u64::from(self.layout.rows)},
    "resolutionLevels":self.levels,"qualityLayers":self.layers,
@@ -52,7 +52,7 @@ impl RemoteSource {
 }
 #[cfg(test)] mod tests {
  use super::*;
- fn header()->Header {Header {image_origin:(0,0),width:2048,height:2048,components:3,bit_depth:12,levels:7,layers:10,
+ fn header()->Header {Header {image_origin:(0,0),width:2048,height:2048,components:3,display_rgb_only:false,bit_depth:12,levels:7,layers:10,
   layout:NativeTileLayoutHint {origin_x:0,origin_y:0,width:128,height:128,columns:16,rows:16},progression:2,is_ht:false,
   cod:vec![1,2,0,10,1,6,4,2,4,1,0x11,0x22,0x33,0x44,0x55,0x66,0x77],first_part:120000,codestream_end:1000000,
   packet_compatible:true,prefix_compatible:false,payload_digest:[0;32]}}

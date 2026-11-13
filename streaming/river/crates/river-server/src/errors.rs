@@ -32,11 +32,18 @@ fn explanation(code:&str,status:StatusCode)->&str {
 }
 
 pub async fn normalize(request:Request,next:Next)->Response {
-    let path=request.uri().path().to_owned(); // Never echo query strings, bearer tokens or signed URLs.
+    use tracing::Instrument;
+    let started = std::time::Instant::now();
+    let route = request.extensions().get::<axum::extract::MatchedPath>().map_or("unmatched route", |path| path.as_str()).to_owned();
+    let path=request.uri().path().to_owned(); // Used only in the existing error response.
     let method=request.method().to_string();
     let request_id=uuid::Uuid::new_v4().to_string();
-    let response=next.run(request).await;
-    if !response.status().is_client_error() && !response.status().is_server_error() {return response;}
+    let span = tracing::error_span!(crate::console_log::REQUEST_SPAN, %request_id, %route);
+    let response=next.run(request).instrument(span).await;
+    if !response.status().is_client_error() && !response.status().is_server_error() {
+        crate::console_log::summarize(&response, &request_id, &route, &method, "", started);
+        return response;
+    }
     let (mut parts,body)=response.into_parts();
     let bytes=to_bytes(body,1024*1024).await.unwrap_or_default();
     let mut payload=serde_json::from_slice::<Value>(&bytes).ok().filter(Value::is_object).unwrap_or_else(||json!({}));
@@ -47,13 +54,14 @@ pub async fn normalize(request:Request,next:Next)->Response {
         .unwrap_or_else(||explanation(&code,parts.status).to_owned());
     payload["code"]=json!(code);payload["message"]=json!(message);
     payload["status"]=json!(parts.status.as_u16());payload["path"]=json!(path);payload["method"]=json!(method);payload["requestId"]=json!(request_id);
-    if payload.get("details").is_none() {payload["details"]=json!({});}
-    tracing::warn!(%request_id,status=parts.status.as_u16(),code=%code,path=%path,method=%method,"HTTP request failed");
+    if payload.get("details").is_some_and(|v|v.as_object().is_some_and(|d|d.is_empty())) {payload.as_object_mut().unwrap().remove("details");}
     parts.headers.remove(header::CONTENT_LENGTH);parts.headers.remove(header::CONTENT_ENCODING);
     parts.headers.insert(header::CONTENT_TYPE,header::HeaderValue::from_static("application/json"));
     parts.headers.insert(header::CACHE_CONTROL,header::HeaderValue::from_static("no-store"));
     parts.headers.insert("x-river-request-id",header::HeaderValue::from_str(&request_id).unwrap());
-    Response::from_parts(parts,Body::from(serde_json::to_vec(&payload).unwrap()))
+    let response = Response::from_parts(parts,Body::from(serde_json::to_vec(&payload).unwrap()));
+    crate::console_log::summarize(&response, &request_id, &route, &method, &code, started);
+    response
 }
 
 #[cfg(test)]
@@ -64,4 +72,14 @@ mod tests {
             assert!(explanation(code,StatusCode::BAD_REQUEST).len()>40);
         }
     }
+}
+
+pub fn scratch_reply(error: &anyhow::Error) -> Option<Response> {
+    let scratch = error.chain().find_map(|cause| {
+        cause.downcast_ref::<crate::storage_mode::Unavailable>().or_else(|| {
+            cause.downcast_ref::<std::io::Error>()?.get_ref()?.downcast_ref()
+        })
+    })?;
+    Some(reply(StatusCode::SERVICE_UNAVAILABLE, "decoder_ram_scratch_unavailable",
+        scratch.to_string(), serde_json::json!({"diskFallbackAllowed":false})))
 }

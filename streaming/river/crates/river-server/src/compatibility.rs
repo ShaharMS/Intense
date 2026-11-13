@@ -69,7 +69,12 @@ async fn resolve_image(state:&AppState,image:&str)->std::result::Result<Register
 }
 
 fn source_key(image:&str,bucket:&str,region:&str,endpoint:Option<&str>)->Option<String> {
-    let uri:axum::http::Uri=image.parse().ok()?;
+    // Outer URL decoding may leave literal spaces or UTF8 in the object path.
+    // Escape those before URI parsing; preserve encoded separators until after
+    // the configured authority/bucket have matched.
+    let mut escaped=String::with_capacity(image.len());
+    for byte in image.bytes() {if byte==b' '||byte>=128 {escaped.push_str(&format!("%{byte:02X}"));}else if byte.is_ascii_control(){return None;}else{escaped.push(byte as char);}}
+    let uri:axum::http::Uri=escaped.parse().ok()?;
     let scheme=uri.scheme_str()?;let authority=uri.authority()?.as_str();
     let key=if scheme=="s3" && authority==bucket {uri.path().trim_start_matches('/').to_owned()}
     else {
@@ -107,7 +112,7 @@ mod tests {
     use super::*;
     #[test]
     fn maps_connected_object_urls_without_arbitrary_url_fetches() {
-        for url in ["s3://bucket/folder/a%20b+%D7%90.jp2","https://bucket.s3.eu-west-1.amazonaws.com/folder/a%20b+%D7%90.jp2?X-Amz-Signature=ignored",
+        for url in ["s3://bucket/folder/a b+א.jp2","https://s3.eu-west-1.amazonaws.com/bucket/folder/a b+א.jp2","s3://bucket/folder/a%20b+%D7%90.jp2","https://bucket.s3.eu-west-1.amazonaws.com/folder/a%20b+%D7%90.jp2?X-Amz-Signature=ignored",
             "https://s3.eu-west-1.amazonaws.com/bucket/folder/a%20b+%D7%90.jp2"] {
             assert_eq!(source_key(url,"bucket","eu-west-1",None).as_deref(),Some("folder/a b+א.jp2"));
         }

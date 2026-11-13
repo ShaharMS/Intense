@@ -14,6 +14,13 @@ nvjpeg2000 = ["dep:reqwest", "dep:lz4_flex", "dep:libloading"]
 async-trait = "0.1.89"
 anyhow.workspace = true
 axum.workspace = true
+bytes = "1"
+h3 = "=0.0.8"
+h3-quinn = "=0.0.10"
+quinn = { version = "0.11", default-features = false, features = ["runtime-tokio", "rustls-ring"] }
+tower = { version = "0.5", features = ["util"] }
+axum-server = { version = "=0.8.0", features = ["tls-rustls-no-provider"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std"] }
 base64.workspace = true
 futures-util.workspace = true
 hex.workspace = true
@@ -34,6 +41,7 @@ serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
 tempfile.workspace = true
+libc = "0.2"
 tokio.workspace = true
 tower-http.workspace = true
 tracing.workspace = true
@@ -41,3 +49,4 @@ tracing-opentelemetry.workspace = true
 tracing-subscriber.workspace = true
 uuid.workspace = true
 webp.workspace = true
+redis = { version = "0.32.7", default-features = false, features = ["tls-rustls", "tls-rustls-webpki-roots"] }

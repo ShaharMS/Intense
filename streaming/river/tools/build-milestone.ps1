@@ -3,7 +3,9 @@ param(
     [ValidatePattern('^[a-z0-9][a-z0-9.-]{0,63}$')]
     [string] $Milestone,
     # Build a previously benchmarked snapshot without mixing in other trials.
-    [string] $SourceRoot
+    [string] $SourceRoot,
+    # Build and archive a comparison image without changing release aliases.
+    [switch] $TrialOnly
 )
 $ErrorActionPreference = 'Stop'
 $riverRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
@@ -15,13 +17,31 @@ $contractMain = Get-Content -LiteralPath (Join-Path $inputRoot 'crates/river-ser
 if ($contractSpec.paths.PSObject.Properties.Name -notcontains '/api/tiles/{image}' -or -not $contractMain.Contains('get(compatibility::tile_info)')) {
     throw 'Backend images must include the shared tile-info/default streamer contract; apply the common compatibility implementation to this source snapshot first.'
 }
+$corsSource = Join-Path $inputRoot 'crates/river-server/src/cors.rs'
+if (-not (Test-Path -LiteralPath $corsSource) -or -not $contractMain.Contains('cors::expose_response_headers')) {
+    throw 'Backend images must include the shared hosting CORS implementation; apply it to every channel/source snapshot before building.'
+}
 $buildRoot = Join-Path $riverRoot "reports\image-builds\$Milestone"
 if (Test-Path -LiteralPath $buildRoot) { throw "A build already exists for $Milestone; use a new milestone name." }
 $snapshotRoot = Join-Path $buildRoot 'source'
 New-Item -ItemType Directory -Path $snapshotRoot -Force | Out-Null
 foreach ($name in @('Cargo.toml', 'Cargo.lock', 'Dockerfile.backend', '.dockerignore', 'crates', 'deploy', 'licenses', 'nvjpeg2000-sidecar', 'web')) {
-    Copy-Item -LiteralPath (Join-Path $inputRoot $name) -Destination $snapshotRoot -Recurse
+    if ($name -eq 'deploy') {
+        $deploySnapshot = New-Item -ItemType Directory -Path (Join-Path $snapshotRoot 'deploy')
+        Get-ChildItem -LiteralPath (Join-Path $inputRoot 'deploy') -Force |
+            Where-Object { $_.Name -ne 'local-state' } |
+            ForEach-Object { Copy-Item -LiteralPath $_.FullName -Destination $deploySnapshot.FullName -Recurse }
+    } else {
+        Copy-Item -LiteralPath (Join-Path $inputRoot $name) -Destination $snapshotRoot -Recurse
+    }
 }
+# The server embeds this file at compile time. Stamp the frozen copy before
+# hashing it so the served spec and the image tag share the same identity.
+$frozenSpecPath = Join-Path $snapshotRoot 'deploy/openapi.json'
+$frozenSpec = Get-Content -LiteralPath $frozenSpecPath -Raw | ConvertFrom-Json
+$frozenSpec.info.version = $Milestone
+[System.IO.File]::WriteAllText($frozenSpecPath, ($frozenSpec | ConvertTo-Json -Depth 100) + [Environment]::NewLine)
+
 $imageTag = "river:$Milestone"
 $statusPath = Join-Path $buildRoot 'status.json'
 $sources = Get-ChildItem -LiteralPath $snapshotRoot -Recurse -File | ForEach-Object {
@@ -60,6 +80,7 @@ try {
     @{ state = 'built'; tag = $imageTag; imageId = $metadata[0].Id; bytes = $metadata[0].Size; archive = $compressedPath; archiveBytes = (Get-Item -LiteralPath $compressedPath).Length; archiveSha256 = $archiveHash; completedAt = [DateTimeOffset]::UtcNow.ToString('o') } |
         ConvertTo-Json | Set-Content -LiteralPath $statusPath -Encoding utf8
     Write-Output "Built $imageTag ($($metadata[0].Size) bytes). Frozen source and logs: $buildRoot"
+    if ($TrialOnly) { return }
     # A successful experimental build advances Latest only. Qualification is
     # required separately before changing Stable or LTS.
     docker image tag $imageTag river:latest

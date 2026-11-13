@@ -65,10 +65,12 @@
         <h1>River</h1>
         <p class="note">Image catalog</p>
         <label>Data source<select id="catalog-source"><option value="all">All connected S3 sources</option><option value="">Local assets</option></select></label>
-        <label>Search images<input id="catalog-search" type="search" placeholder="Name or asset ID" /></label>
-        <label>S3 search mode<select id="catalog-search-mode"><option value="contains">Name contains</option><option value="prefix">Key starts with</option></select></label>
+        <label>Search images<input id="catalog-search" type="search" placeholder="folder/image" aria-describedby="catalog-search-help" /></label>
+        <label>S3 search mode<select id="catalog-search-mode"><option value="prefix" selected>Key starts with</option><option value="contains">Key contains</option></select></label>
+        <p id="catalog-search-help" class="note">Prefix search filters in S3. Contains checks one page at a time.</p>
+        <label>Objects per page<select id="catalog-page-size"><option value="25">25</option><option value="50">50</option><option value="100" selected>100</option></select></label>
         <label for="catalog-sort">Sort by</label><div class="catalog-sort"><select id="catalog-sort"><option value="name">Name</option><option value="pixels">Pixel count</option><option value="bytes">Source size</option><option value="width">Width</option><option value="height">Height</option><option value="bitDepth">Bit depth</option><option value="resolutionLevels">Resolution levels</option></select><button id="catalog-direction" aria-label="Sort descending" title="Sort descending">↑</button></div>
-        <button id="catalog-refresh">Refresh catalog</button>
+        <button id="catalog-refresh">Search</button>
         <div class="view-actions"><button id="catalog-previous" disabled>Previous page</button><button id="catalog-next" disabled>Next page</button></div>
         <p id="catalog-count" class="note" aria-live="polite">Loading images…</p>
       </div>
@@ -86,7 +88,7 @@
       <form id="api-url-form"><label>API URL<input id="api-url" type="url" placeholder="http://localhost:18080" required /></label><button type="submit">Connect to API</button><button id="api-url-reset" type="button">Use this server</button></form>
       <p class="note">Drag the image to pan. Scroll over it to zoom toward the pointer. Coordinates below are for automation and precise requests.</p>
       <div class="view-actions"><button id="fit">Fit image</button><button id="random" title="Choose a random viewport and zoom">Random view</button></div>
-      <label>Target decoder<select id="decoder-driver"><option value="openjpeg">OpenJPEG</option><option value="jp2grok">JP2Grok</option><option value="openhtj2k">OpenHTJ2K + Grok fallback</option><option value="nvjpeg2000">nvJPEG2000 (CUDA)</option></select></label>
+      <label>Target decoder<select id="decoder-driver"><option value="auto">Auto</option><option value="openjpeg">OpenJPEG</option><option value="jp2grok">JP2Grok</option><option value="openhtj2k">OpenHTJ2K</option><option value="nvjpeg2000">nvJPEG2000 (CUDA)</option></select></label>
       <label>Request method<select id="delivery-method"><option value="progressive">Progressive WebSocket</option><option value="wmts">WMTS GetTile</option></select></label>
       <label>Output format<select id="raster-format"><option value="webp">WebP</option><option value="png">PNG</option><option value="avif">AVIF</option><option value="jxl">JPEG XL</option></select></label>
       <details open>
@@ -115,6 +117,7 @@
         <button id="s3-remove-source">Remove source</button>
         <button id="s3-refresh-objects">Browse objects</button>
         <label>JP2 / J2K object<select id="s3-object-list"></select></label>
+        <label>Object key prefix<input id="s3-object-search" type="search" placeholder="folder/image" /></label>
         <button id="s3-next-objects" disabled>Next page</button>
         <p class="note">Image dimensions and bit depth are detected automatically.</p>
         <button id="s3-load-object">Load into viewer</button>

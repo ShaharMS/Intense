@@ -98,7 +98,7 @@ impl Window {
 }
 #[cfg(test)] mod tests {
  use super::*;
- fn header()->Header {Header {image_origin:(0,0),width:4096,height:4096,components:3,bit_depth:8,levels:7,layers:1,layout:crate::decoder::NativeTileLayoutHint {origin_x:0,origin_y:0,width:4096,height:4096,columns:1,rows:1},progression:2,is_ht:false,cod:vec![1,2,0,1,0,6,4,4,0,1,0x22,0x33,0x44,0x55,0x66,0x77,0x88],first_part:0,codestream_end:100,packet_compatible:true,prefix_compatible:true,payload_digest:[0;32]}}
+ fn header()->Header {Header {image_origin:(0,0),width:4096,height:4096,components:3,display_rgb_only:false,bit_depth:8,levels:7,layers:1,layout:crate::decoder::NativeTileLayoutHint {origin_x:0,origin_y:0,width:4096,height:4096,columns:1,rows:1},progression:2,is_ht:false,cod:vec![1,2,0,1,0,6,4,4,0,1,0x22,0x33,0x44,0x55,0x66,0x77,0x88],first_part:0,codestream_end:100,packet_compatible:true,prefix_compatible:true,payload_digest:[0;32]}}
  #[test] fn window_alignment_preserves_support_and_bounds_huge_geometry() {
   let mut h=header();h.width=16384;h.height=16384;h.layout.width=h.width;h.layout.height=h.height;
   let roi=Selection {exact:None,regions:vec![(1796,1796,2812,2812)]};

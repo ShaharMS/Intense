@@ -4,32 +4,15 @@ use super::*;
 use std::sync::OnceLock;
 type PrefixKey=(String,u8,Vec<u16>);
 #[derive(Default)]
-struct PrefixCache {entries:HashMap<PrefixKey,(PreparedSubset,usize,u64)>,bytes:usize,clock:u64}
+struct PrefixCache {lru:BTreeMap<u64,PrefixKey>,entries:HashMap<PrefixKey,(PreparedSubset,usize,u64)>,bytes:usize,clock:u64}
 impl PrefixCache {
- fn get(&mut self,key:&PrefixKey)->Option<PreparedSubset> {
-  self.clock+=1;let entry=self.entries.get_mut(key)?;entry.2=self.clock;Some(entry.0.clone())
- }
- fn put(&mut self,key:PrefixKey,value:&PreparedSubset,limit:usize) {
-  // This route preserves every quality layer. Partial/spatial/legacy views
-  // must never be reused for a request asking for more packet data.
-  if value.route!="s3-multipart-compact-lowest-prefix" || value.bytes.len()>4*1024*1024 {return;}
-  let bytes=value.bytes.len()+key.0.len()+key.2.len()*2+256;
-  if bytes>limit {return;}
-  if let Some(old)=self.entries.remove(&key) {self.bytes-=old.1;}
-  while self.bytes+bytes>limit || self.entries.len()>=128 {
-   let Some(key)=self.entries.iter().min_by_key(|(_,v)|v.2).map(|(k,_)|k.clone()) else{break;};
-   self.bytes-=self.entries.remove(&key).unwrap().1;
-  }
-  self.clock+=1;self.bytes+=bytes;self.entries.insert(key,(value.clone(),bytes,self.clock));
- }
+ fn trim(&mut self,limit:usize)->crate::resources::Occupancy {while self.bytes>limit||self.entries.len()>crate::resources::entry_limit("RIVER_S3_PREPARED_PREFIX_CACHE_ENTRIES",limit){let Some((_,key))=self.lru.pop_first()else{break;};if let Some(old)=self.entries.remove(&key){self.bytes-=old.1;crate::resources::evict("prepared_prefixes",1);}}crate::resources::Occupancy{bytes:self.bytes,entries:self.entries.len(),..Default::default()}}
+ fn get(&mut self,key:&PrefixKey)->Option<PreparedSubset>{self.clock+=1;let now=self.clock;let Some(entry)=self.entries.get_mut(key)else{crate::resources::miss("prepared_prefixes");return None;};let old=entry.2;entry.2=now;let result=entry.0.clone();let bytes=entry.1;self.lru.remove(&old);self.lru.insert(now,key.clone());crate::resources::hit("prepared_prefixes",bytes);Some(result)}
+ fn put(&mut self,key:PrefixKey,value:&PreparedSubset,limit:usize){if value.route!="s3-multipart-compact-lowest-prefix"||value.bytes.len()>4*1024*1024{return;}let limit=crate::resources::effective("prepared_prefixes",limit);let bytes=value.bytes.len()+key.0.len()+key.2.len()*2+256;if bytes>limit{return;}if let Some(old)=self.entries.remove(&key){self.bytes-=old.1;self.lru.remove(&old.2);}let _=self.trim(limit.saturating_sub(bytes));self.clock+=1;self.bytes+=bytes;self.lru.insert(self.clock,key.clone());self.entries.insert(key,(value.clone(),bytes,self.clock));}
 }
-fn prefix_cache()->&'static Mutex<PrefixCache> {
- static CACHE:OnceLock<Mutex<PrefixCache>>=OnceLock::new();CACHE.get_or_init(||Mutex::new(PrefixCache::default()))
-}
-fn prefix_cache_budget(value:Option<&str>)->usize {
- value.and_then(|v|v.parse().ok()).unwrap_or(16*1024*1024).min(64*1024*1024)
-}
-fn prefix_cache_limit()->usize {prefix_cache_budget(std::env::var("RIVER_S3_PREPARED_PREFIX_CACHE_BYTES").ok().as_deref())}
+fn prefix_cache()->&'static Mutex<PrefixCache>{static C:OnceLock<Mutex<PrefixCache>>=OnceLock::new();static REGISTER:std::sync::Once=std::sync::Once::new();let cache=C.get_or_init(||Mutex::new(PrefixCache::default()));REGISTER.call_once(||crate::resources::register("prepared_prefixes",move|limit|cache.lock().unwrap_or_else(|e|e.into_inner()).trim(limit)));cache}
+fn prefix_cache_budget(value:Option<&str>)->usize{value.and_then(|v|v.parse().ok()).unwrap_or_else(||crate::resources::budget("prepared_prefixes"))}
+fn prefix_cache_limit()->usize{prefix_cache_budget(None)}
 struct Part {sot_offset:u64,header:Vec<u8>,range:Range<u64>,packets:usize,selected:usize}
 struct Tile {entries:Vec<(u64,u32)>,wanted:usize,total:usize,covered:usize,parts:Vec<Part>,
  states:BTreeMap<(u8,u64,u64,u8),(layered_packets::State,usize)>}
@@ -585,10 +568,10 @@ impl RemoteSource {
  }
  #[test] fn prefix_cache_configuration_accepts_zero_and_caps_budget() {
   assert_eq!(prefix_cache_budget(Some("0")),0);
-  assert_eq!(prefix_cache_budget(None),16*1024*1024);
-  assert_eq!(prefix_cache_budget(Some("invalid")),16*1024*1024);
+  assert_eq!(prefix_cache_budget(None),crate::resources::budget("prepared_prefixes"));
+  assert_eq!(prefix_cache_budget(Some("invalid")),crate::resources::budget("prepared_prefixes"));
   assert_eq!(prefix_cache_budget(Some("1048576")),1048576);
-  assert_eq!(prefix_cache_budget(Some("999999999")),64*1024*1024);
+  assert_eq!(prefix_cache_budget(Some("999999999")),999999999);
  }
  #[test] fn complete_quality_prefix_cache_bounds_versions_geometry_and_owned_bytes() {
   let prepared=PreparedSubset {view_reduction:3,technical_origin:None,bytes:vec![7;100],route:"s3-multipart-compact-lowest-prefix",jp2:false,width:128,height:128,layout:NativeTileLayoutHint {width:128,height:128,columns:1,rows:1,origin_x:0,origin_y:0},offset_x:0,offset_y:0};
@@ -627,7 +610,7 @@ impl RemoteSource {
  }
  #[test] fn lazy_counts_match_materialized_orders_in_shifted_clipped_grids() {
   for progression in 0..5 {for image_origin in [(0,0),(13,29)] {
-   let h=Header {image_origin,width:1703,height:1301,components:3,bit_depth:8,levels:6,layers:1,
+   let h=Header {image_origin,width:1703,height:1301,components:3,display_rgb_only:false,bit_depth:8,levels:6,layers:1,
     layout:NativeTileLayoutHint {origin_x:0,origin_y:0,width:1024,height:1024,columns:2,rows:2},
     progression,is_ht:false,cod:vec![1,progression,0,1,0,5,3,3,0,1,0x22,0x33,0x44,0x55,0x66,0x77],
     first_part:0,codestream_end:100,packet_compatible:true,prefix_compatible:true,payload_digest:[0;32]};
@@ -638,7 +621,7 @@ impl RemoteSource {
   }}
  }
  #[test] fn multilayer_resolution_prefix_retains_all_layers_for_decoder_layer_limits() {
-  let mut h=Header {image_origin:(0,0),width:128,height:128,components:3,bit_depth:8,levels:7,layers:10,
+  let mut h=Header {image_origin:(0,0),width:128,height:128,components:3,display_rgb_only:false,bit_depth:8,levels:7,layers:10,
    layout:NativeTileLayoutHint {origin_x:0,origin_y:0,width:128,height:128,columns:1,rows:1},
    progression:2,is_ht:false,cod:vec![0,2,0,10,1,6,4,4,0,1],first_part:0,codestream_end:100,
    packet_compatible:true,prefix_compatible:false,payload_digest:[0;32]};

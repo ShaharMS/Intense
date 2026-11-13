@@ -48,7 +48,7 @@ pub(super) fn decode(source: &Jpeg2000Source, region: (u32,u32,u32,u32), reducti
         }
     }
     let minimum=std::env::var("RIVER_OPENHT_MIN_PACKETS").ok().and_then(|v|v.parse().ok());
-    let enabled=prefer_openht || std::env::var("RIVER_GROK_PACKED_VIEWS").is_ok_and(|v|v=="true" || v=="1");
+    let enabled=!source.display_rgb_only && (prefer_openht || std::env::var("RIVER_GROK_PACKED_VIEWS").is_ok_and(|v|v=="true" || v=="1"));
     let view=if enabled {source.memory.as_ref().and_then(|data|super::packed::build(data,reduction).or_else(||if prefer_openht && std::env::var("RIVER_OPENHT_COARSE").is_ok_and(|v|v=="true" || v=="1") {super::packed::coarse(data,reduction,Some(region),minimum)}else{None}))}else{None};
     if std::env::var("RIVER_PROFILE_SOURCE").is_ok_and(|v|v=="true") {
         if let Some(view)=&view {tracing::info!(width=view.width,height=view.height,packed_bytes=view.data.len(),"Grok packed LL view selected");}
@@ -76,12 +76,27 @@ pub(super) fn decode(source: &Jpeg2000Source, region: (u32,u32,u32,u32), reducti
             (view.data.as_ptr(),view.data.len(),(x0/view.scale,y0/view.scale,x1.div_ceil(view.scale),y1.div_ceil(view.scale)),0)
         } else {let (b,n)=source.memory.as_ref().map(|d|(d.as_ptr(),d.len())).unwrap_or((std::ptr::null(),0));(b,n,region,reduction)}
     } else {let (b,n)=source.memory.as_ref().map(|d|(d.as_ptr(),d.len())).unwrap_or((std::ptr::null(),0));(b,n,region,reduction)};
+    let rgb_view = if source.display_rgb_only {
+        let input = source.memory.as_deref().context("native RGB view needs prepared bytes")?;
+        let mut view = Vec::new();
+        ensure!(super::write_rgb_view(input, &mut view)?, "unsupported JP2 channel mapping for native RGB view");
+        Some(view)
+    } else {
+        None
+    };
+    let (bytes, length) = rgb_view.as_ref().map_or((bytes, length), |view| (view.as_ptr(), view.len()));
     let (x0,y0,x1,y1)=area;
     let ptr = unsafe { (api.decode)(path.as_ptr(),bytes,length,x0,y0,x1,y1,level,u16::try_from(layers)?) };
     ensure!(!ptr.is_null(), "native Grok decode failed");
     let handle = Handle { ptr, api };
     let components = unsafe { (api.components)(handle.ptr) };
-    ensure!((1..=4).contains(&components), "unsupported native Grok components");
+    let components = if source.display_rgb_only {
+        ensure!((4..=16).contains(&components), "unsupported native Grok multispectral components");
+        3
+    } else {
+        ensure!((1..=4).contains(&components), "unsupported native Grok components");
+        components
+    };
     let mut planes = Vec::new();
     for component in 0..components {
         let mut plane = Plane::default();
@@ -102,7 +117,8 @@ pub(super) fn decode(source: &Jpeg2000Source, region: (u32,u32,u32,u32), reducti
         let mut values = [0u8;4];
         for (component, plane) in planes.iter().enumerate() {
             let index = y as usize*plane.stride as usize+x as usize;
-            let value = unsafe { if plane.sample_bytes==2 { *(plane.data as *const i16).add(index) as i32 }
+            let value = unsafe { if plane.sample_bytes==2 && plane.signed_samples==0 { *(plane.data as *const u16).add(index) as i32 }
+                else if plane.sample_bytes==2 { *(plane.data as *const i16).add(index) as i32 }
                 else { *(plane.data as *const i32).add(index) } };
             let value = value + if plane.signed_samples!=0 { 1 << (plane.precision-1) } else { 0 };
             let max = (1i32 << plane.precision)-1;
@@ -116,5 +132,5 @@ pub(super) fn decode(source: &Jpeg2000Source, region: (u32,u32,u32,u32), reducti
         };
         rgba.extend_from_slice(&pixel);
     } }
-    image::RgbaImage::from_raw(width,height,rgba).context("native Grok raster size mismatch").map(|image|(image,"jp2grok"))
+    image::RgbaImage::from_raw(width,height,rgba).context("native Grok raster size mismatch").map(|image|(image,"jp2grok-native"))
 }

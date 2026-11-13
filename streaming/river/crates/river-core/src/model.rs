@@ -322,6 +322,9 @@ pub struct ServerTiming {
     /// The source-decoding route selected for this frame. This mirrors the
     /// route attribute on the OpenTelemetry codec span.
     pub decoder_route: String,
+    /// The decoder or cache that actually produced this frame.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub decoder_backend: Option<String>,
     /// Time waiting for a Tokio blocking-decode worker.
     pub worker_queue_ms: f64,
     /// JPEG 2000 source decode plus conversion to River's canonical RGBA raster.

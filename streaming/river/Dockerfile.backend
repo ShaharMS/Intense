@@ -61,7 +61,7 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
 
 FROM debian:bookworm-slim AS runtime
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates libcurl4 libstdc++6 libpng16-16 libtiff6 liblz4-1 libmimalloc2.0 python3 python3-numpy tini \
+    ca-certificates libcurl4 libstdc++6 libpng16-16 libtiff6 liblz4-1 libmimalloc2.0 python3 python3-numpy tini openssl \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /opt/river
 COPY --from=build /out/river-server /usr/local/bin/river-server
@@ -111,7 +111,7 @@ ENV RIVER_BIND=0.0.0.0:8080 \
     RIVER_OTEL_ENABLED=false \
     NVIDIA_VISIBLE_DEVICES=all NVIDIA_DRIVER_CAPABILITIES=compute,utility \
     PYTHONUNBUFFERED=1
-EXPOSE 8080
+EXPOSE 8080 8443 8443/udp
 HEALTHCHECK --interval=10s --timeout=5s --start-period=180s --retries=6 CMD python3 -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=4)"
 ENTRYPOINT ["/usr/bin/tini", "--", "python3", "/opt/river/entrypoint.py"]
 

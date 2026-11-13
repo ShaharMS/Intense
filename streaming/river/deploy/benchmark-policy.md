@@ -26,7 +26,10 @@ For short diagnostic feedback, `tools/benchmark-controlled-cold.py` performs one
 correctness/repeat smoke across all six frozen requests, then six to twelve
 balanced pairs only on explicitly selected affected cases. It records cgroup
 CPU/throttling, source observations and exact source-read traces outside the HTTP
-timer. Use `--read-mode observe` to investigate CPU/measurement effects without
+timer. Use `--baseline-driver auto --candidate-driver auto` to exercise default routing
+with no driver query parameter. Record the backend and fallback route from each
+response before attributing latency to a decoder. Use `--read-mode observe` to
+investigate CPU/measurement effects without
 applying adaptive plans, and `--read-mode adaptive` for the distinct end-to-end
 adaptive workload. Report IO variation separately; equal IO is not proof of a
 code effect. The helper accepts only the existing Compose project `river` replicas
@@ -204,3 +207,99 @@ Stable/LTS811 advances from789 on the unchanged979MBunindexed cold preview at16m
 Stable830advances from811 on learned-source cold-object performance: deep tile1095to1023ms in twelve balanced pairs, all faster with identical188GETs/15905792bytes and exact pixels. Sources learn naturally across requests; this test first requests two other frozen images on the same sourceID. The confirmed gain is below10percent,so LTS remains811. Fresh sources retain full calibration; contradictory opening timing also retains it. Probe acceptance refreshes latency after the mandatory bandwidth pilot, preventing stale startup timing from authorizing16MiBbulk. All six fresh-source cases passed six paired rounds and zeroIOrepeats; real transitions and four-client learned-source admission checks passed. Final progressive viewport composites matched independent references across the same six cases; their sampled frame timings and intermediate preview pixels are not qualified as a speedup/exact-preview result. Standard startup remains Observe; read ORGANIZATIONAL-S3-PROFILE.md. Exact source provenance and raw limitations are in reports/kakadu-io-m303/source-refresh-release-m839.json; the mixed root worktree is preserved.
 
 Benchmark sizing correction (refinement experiments): use `RIVER_VIEWPORT_DECODE_CONCURRENCY`, not the unrecognized `RIVER_PER_VIEWPORT_DECODE_CONCURRENCY`. Controlled runners reject that misspelling and record resolved startup sizing after each restart. Reports before this correction retain their raw environment and measured behavior: the reviewed907/934runs were matched at4effective jobs per viewport despite an ignored value1. Do not reinterpret those as single-job measurements. Preserve original results and publish annotations separately.
+
+## Shared hosting compatibility maintenance
+
+Every retained channel image must include hosting-cors-v2 and pixel-pyramid-v1.
+For user-requested maintenance across Stable/LTS/Latest, apply the same shared
+change to each channel's frozen source; preserve its separate performance code.
+Keep the previous performance qualification as inherited evidence and make no
+new timing claim. Verify preflight origins/methods/custom headers/credentials,
+error header visibility, explicit origin restrictions, real browser image/canvas
+and WebSocket access, and all deployed slots before retiring superseded images.
+This does not qualify an underlying experiment for performance promotion.
+
+## Resource sizing maintenance
+
+Compare startup quotas, effective sizing, and persisted read policies before timing. Keep cold, metadata-warm, and exact repeats separate. Treat the cache-pressure and catalog-churn fixtures as resource and correctness checks. Shared maintenance can carry forward a qualified channel's performance evidence. New latency claims require their own matched measurements.
+
+### Source request concurrency
+
+Treat the per-source cap as an independent benchmark variable. Record the
+configured policy, effective cap, automatic I/O sizing, origin latency, wire
+GETs and bytes, and both client-side and origin peaks when available. Compare
+the same image on the same replica. Include both concurrent requests sharing
+one source and concurrent requests using separate source registrations.
+
+In m1093, cap 16 reduced paired completion time by 31% for two cold spatial
+HTJ2K previews on separate source registrations with automatic I/O sizing
+and a 2 CPU, 2 GiB container. Median batch time was 612 ms at cap 8 and
+419 ms at cap 16. In m1094, the 979 MB unindexed progressive viewport showed
+no measurable latency change. These results describe the tested controlled
+origins. Preserve explicit environment and persisted policy overrides when
+rolling out a default change. On servers exposing configuredSettings, use it
+for restoration and settings for effective measurements.
+
+### Progressive client setup
+
+Use the same client connection state in both arms of a backend comparison.
+Record whether the client used a fresh connection or performed a health
+request before the timer. Keep River and the asset cold in either case.
+Report client registration, server registration and header-probe durations
+separately where available. Keep fresh-client measurements for scenarios
+that include opening a new client connection.
+
+On the 11.12 GB fixture, the m1106 control on Stable m1105 reduced median
+client registration from 168 ms to 65 ms when a health request preceded the
+timer. The handler and probe timings did not show a comparable reduction.
+All 12 matched pairs had exact frames and identical source reads. Attribute
+this difference to the benchmark client setup, with no backend speedup
+claim. Evidence: reports/decoder-matrix-1038/progressive-gb11-m1106-client-preconnect.json.
+
+### End-of-codestream validation overlap
+
+Stable and LTS m1121 overlap the required EOC check with the first large
+PLT slab read on eligible single-part prefixes. The provisional tile part
+stays local to the parser until validation. On the 11.12 GB single-tile
+fixture with a preconnected client and a controlled 12.5 ms origin,
+12 matched pairs showed 10.4% lower first-frame latency and 10.7% lower
+completion latency versus m1109. Each run fetched 8 GETs and 5,619,826 bytes,
+and all frames matched. Three repeated requests for a corrupted EOC returned
+HTTP 422. These results apply to the tested viewport and origin.
+The qualification record is reports/decoder-matrix-1038/qualification-m1121.json.
+
+Stable and LTS m1184 qualify automatic Grok routing for eligible 512-pixel full-resolution tiles on indexed RGB JP2. The matched 55 MB and 979 MB crossover used fresh source identities with already running workers at 7 ms and 300 MB/s. The frozen process-cold suite supplies correctness and repeat-I/O evidence. See qualification-m1184.json for paired timings and range counts.
+
+Stable and LTS m1185 carry forward the qualified m1184 performance code. The release verifies JSON, ENV and live API precedence and the CORS and streamer contracts. It makes no new latency claim.
+
+Stable and LTS m1190 carry forward the qualified m1185 configuration and performance. The release verifies native TLS, configured protocols, and CORS. It makes no new latency claim.
+
+Stable and LTS m1195 qualify smallest-batch-first scheduling for the 979 MB typed-TLM viewport under the matched 7 ms and 300 MB/s profile. The 55 MB indexed and 979 MB unindexed progressive workloads serve as controls. The qualification report records the measured latency and origin I/O.
+
+Stable and LTS m1197 qualify adaptive refinement lane widening for the 979 MB typed TLM viewport under the matched 14 ms and 300 MB/s profile. The 7 ms large and 14 ms small progressive workloads serve as controls. The qualification report records the measured latency and origin I/O.
+
+Stable and LTS m1199 qualify bulk prefix lookahead with bounded preview lanes for the 979 MB typed TLM viewport under the matched 14 ms and 300 MB/s profile. The 7 ms large and 14 ms small progressive workloads serve as controls. The qualification report records the measured latency and origin I/O.
+
+Stable and LTS m1200 qualify bulk prefix lookahead with bounded preview lanes for the 979 MB typed TLM viewport under the matched 7 ms and 300 MB/s profile. The 2 ms large and 7 ms small progressive workloads serve as controls. The qualification report records the measured latency and origin I/O.
+
+Stable and LTS m1201 qualify bounded range lanes for the 979 MB typed-TLM still preview at 7 ms and 300 MB/s. The matched 2 ms and 55 MB controls guard the scope. Check exact pixels, peak source concurrency, physical GETs and bytes alongside latency.
+
+Stable and LTS m1202 qualify bounded range lanes for the 979 MB typed-TLM still preview at 14 ms and 300 MB/s with a source cap of 16. The matched 7 ms and 55 MB controls guard the scope. Check exact pixels, peak source concurrency, physical GETs and bytes alongside latency.
+
+m1206 is shared maintenance. Preserve prior performance qualification. For driver comparisons, pin CPU, memory, fixture, cold state and IO settings. Record the actual decoder backend separately from the requested driver and the preparation route. Count fallback rows under their actual backend.
+
+m1208 is shared storage maintenance. Preserve earlier latency qualification. Verify a read-only root with no cache mount, forced no-disk with a cache mount, exact file-based decoder output, and a scratch-limit rejection before promotion.
+
+m1214 is shared maintenance. Preserve earlier latency qualification. Verify live policy changes, cross-replica Redis and Valkey hits, outage fallback, and structured OTLP records independent of console format.
+
+m1217 qualifies prewarmed shared WebSocket batches on a cold receiver. Time asset registration separately, compare every progressive stage, and distinguish the version probe from frame IO.
+
+m1219 qualifies overlapping the final EOC check with the first bounded PLT read for the cold 11 GB deep tile at 14 ms. Require exact pixels, the same physical reads and bytes, the origin overlap trace, and a nearby 7 ms control. LTS remains m1217.
+
+m1220 qualifies native Grok in Auto for eligible single-native-tile sRGB deep requests. Report actual backends, independent pixels, range counts and bytes, and separate the adaptive 55 MB results from the matched 11 GB results.
+
+m1224 qualifies bounded indexed header lookahead and a single sampling wave for the 55 MB TLM/PLT cold zoom at 14 ms. Compare identical zoom geometry before and after an overview. Require exact pixels, measured origin range counts and bytes, and 7 ms and 979 MB controls.
+
+m1225 qualifies wider bounded scheduling for the 979 MB indexed progressive preview at 14 ms with a 16-request source limit. Compare first frame, full preview and final delivery separately. Require identical pixels and ranges, and retain 7 ms, eight-request and small-file controls.
+
+m1227 qualifies WebSocket Auto native Grok selection on the small indexed viewport. Verify the large OpenJPEG control and explicit or deployment-disabled driver behavior. Record actual frame backends, exact pixels and matched origin ranges.

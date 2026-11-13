@@ -45,13 +45,23 @@ service's policy from the image URL. Crystal can use River for both tile-info
 and pixel tiles through its existing URL configuration. Search, metadata,
 geographic placement and grids remain external services.
 
-The existing local `river-lts` endpoint is http://127.0.0.1:18082. The local
-Compose generator configures CORS for the viewer at127.0.0.1:18765 and Crystal
-at127.0.0.1:19074 or localhost:19074 across all backend slots. Per-slot
-RIVER_<SLOT>_CORS_ORIGINS values override this comma-separated allowlist.
-Other deployments must set the existing RIVER_CORS_ORIGINS to their actual
-browser origins or use a same-origin proxy. This requires no Crystal mode or
-new Crystal environment variables.
+The local `river-lts` endpoint is http://127.0.0.1:18082. All channels use the
+same CORS policy: by default any browser hosting origin works, including
+credentialed requests. River echoes the request origin, preflight method and
+requested header names; it never combines wildcard origins with credentials.
+Every response exposes its actual headers, including raster metadata, pagination
+cursors and error request IDs. Preflights are cached for600seconds and support
+private-network request headers. HTTP OPTIONS does not contact S3.
+
+`RIVER_CORS_ORIGINS=*` (also the unset default) accepts any origin. To restrict
+browser access, set a comma-separated list of complete HTTP/HTTPS origins.
+Local Compose accepts the global `RIVER_CORS_ORIGINS` value and per-slot
+`RIVER_<SLOT>_CORS_ORIGINS` overrides. CORS is a
+browser policy, not authentication. WebSockets use ws/wss and the proxy must
+forward upgrades. An HTTPS browser page needs an HTTPS/WSS River endpoint;
+browser mixed-content or local-network permission blocks cannot be removed by
+CORS headers. Reverse proxies should forward River's CORS headers rather than
+add a second Access-Control-Allow-Origin header.
 
 Source edits alone do not establish deployed availability. Check deploy/releases.json,
 the selected container imageID, /openapi.json and a real tile-info/tile response

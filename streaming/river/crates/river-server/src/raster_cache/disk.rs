@@ -1,13 +1,14 @@
 //! Disposable, checksummed encoded tiles; versioned identities prevent stale reuse.
 use super::{DecodedTile, Key};
 use sha2::{Digest, Sha256};
-use std::{collections::HashMap, io::{Read,Write}, path::PathBuf, sync::Mutex};
+use std::{io::{Read,Write}, path::PathBuf, sync::Mutex};
 const MAX_TILE: usize = 8*1024*1024;
 const HEADER: usize = 49;
-pub(super) struct Disk { root: PathBuf, budget: u64, state: Mutex<HashMap<String,(u64,std::time::SystemTime)>> }
+pub(super) struct Disk { root: PathBuf, budget: u64, state: Mutex<crate::cache_inventory::Inventory> }
 impl Disk {
     pub fn from_env() -> Option<Self> {
-        let budget = std::env::var("RIVER_RASTER_DISK_CACHE_BYTES").ok().and_then(|v|v.parse::<u64>().ok()).unwrap_or(256*1024*1024);
+        if !crate::storage_mode::disk_cache_enabled() { return None; }
+        let budget=crate::resources::plan().caches["raster_disk"].effective_target_bytes as u64;
         if budget==0 { return None; }
         let root = std::env::var_os("RIVER_RASTER_DISK_CACHE_ROOT").map(PathBuf::from)
             .or_else(|| std::env::var_os("RIVER_S3_CACHE_ROOT").map(|p|PathBuf::from(p).join("encoded-tiles-v1")))?;
@@ -15,60 +16,61 @@ impl Disk {
     }
     fn new(root:PathBuf,budget:u64) -> Option<Self> {
         std::fs::create_dir_all(&root).ok()?;
-        let mut entries = HashMap::new();
-        for entry in std::fs::read_dir(&root).ok()?.flatten() {
-            let name=entry.file_name().to_string_lossy().into_owned();
-            if name.len()!=64 || !name.bytes().all(|b|b.is_ascii_hexdigit()) { continue; }
-            if let Ok(meta)=entry.metadata() { if meta.is_file() { entries.insert(name,(meta.len(),meta.modified().unwrap_or(std::time::UNIX_EPOCH))); } }
-        }
-        let disk=Self { root,budget,state:Mutex::new(entries) };
-        disk.prune(0); Some(disk)
+        let entries=crate::cache_inventory::Inventory::open(root.clone(),budget,crate::resources::entry_limit("RIVER_RASTER_DISK_CACHE_ENTRIES",budget as usize),|path|path.file_name().and_then(|n|n.to_str()).is_some_and(|n|n.len()==64&&n.bytes().all(|b|b.is_ascii_hexdigit()))).ok()?;
+        Some(Self{root,budget,state:Mutex::new(entries)})
     }
-    fn id(key: &Key) -> String {
+    pub fn snapshot(&self)->crate::resources::Occupancy{let s=self.state.lock().unwrap_or_else(|e|e.into_inner());crate::resources::Occupancy{bytes:s.bytes as usize,entries:s.entries.len(),persistence_location:Some(self.root.to_string_lossy().into_owned()),..Default::default()}}
+    pub(super) fn id(key: &Key) -> String {
         // Bump schema when pixel conversion/codec defaults change. Include encoder settings.
         hex::encode(Sha256::digest(format!("river-encoded-v2:{key:?}").as_bytes()))
     }
-    fn prune(&self, extra: u64) {
-        let mut state=self.state.lock().unwrap_or_else(|e|e.into_inner());
-        self.prune_locked(&mut state,extra);
-    }
-    fn prune_locked(&self,state:&mut HashMap<String,(u64,std::time::SystemTime)>,extra:u64) {
-        let mut bytes:u64=state.values().map(|v|v.0).sum();
-        while bytes.saturating_add(extra)>self.budget || state.len()>=4096 {
-            let Some(name)=state.iter().min_by_key(|(_,v)|v.1).map(|(k,_)|k.clone()) else { break; };
-            if std::fs::remove_file(self.root.join(&name)).is_err() { break; }
-            bytes-=state.remove(&name).unwrap().0;
-        }
-    }
     pub fn get(&self,key:&Key) -> Option<DecodedTile> {
+        if crate::resources::budget("raster_disk") == 0 { return None; }
         let id=Self::id(key);
         let path=self.root.join(&id);
-        let file=std::fs::File::open(path).ok()?;
+        let file=match std::fs::File::open(path){Ok(f)=>f,Err(_)=>{crate::resources::miss("raster_disk");return None;}};
         let mut bytes=Vec::new(); file.take((MAX_TILE+HEADER+1) as u64).read_to_end(&mut bytes).ok()?;
+        let tile = Self::decode(key, &bytes)?;
+        self.state.lock().unwrap_or_else(|e|e.into_inner()).touch(&id);
+        crate::resources::hit("raster_disk", tile.raster.bytes.len());
+        Some(tile)
+    }
+    pub(super) fn decode(key: &Key, bytes: &[u8]) -> Option<DecodedTile> {
         if bytes.len()<HEADER || bytes.len()>MAX_TILE+HEADER || &bytes[..8]!=b"RIVRC001" { return None; }
         let mut digest=Sha256::new();digest.update(&bytes[..17]);digest.update(&bytes[HEADER..]);
         if digest.finalize().as_slice()!=&bytes[17..49] { return None; }
         let width=u32::from_le_bytes(bytes[8..12].try_into().ok()?);
         let height=u32::from_le_bytes(bytes[12..16].try_into().ok()?);
         if width==0 || height==0 || width>32768 || height>32768 { return None; }
-        if let Some(entry)=self.state.lock().unwrap_or_else(|e|e.into_inner()).get_mut(&id) { entry.1=std::time::SystemTime::now(); }
         Some(DecodedTile { rgba:None, tile_x:key.tiles[0].0,tile_y:key.tiles[0].1,raster:crate::decoder::DecodedRaster {
             width,height,bytes:bytes[HEADER..].to_vec().into(),content_type:key.format,
-            decoder_route:"encoded-raster-disk-cache",decode_ms:0.0,encode_ms:0.0,
+            decoder_backend: "encoded-raster-cache", decoder_route:"encoded-raster-disk-cache",decode_ms:0.0,encode_ms:0.0,
             source_cache_status:"encoded-raster-disk-hit",source_cache_ms:0.0,
             compressed_resolution_view:bytes[16]!=0,source_read_bytes:0,source_range_requests:0,source_cache_hit_bytes:0,
         }})
     }
+    pub(super) fn encode(tile: &DecodedTile) -> Vec<u8> {
+        let mut bytes = b"RIVRC001".to_vec();
+        bytes.extend(tile.raster.width.to_le_bytes());
+        bytes.extend(tile.raster.height.to_le_bytes());
+        bytes.push(u8::from(tile.raster.compressed_resolution_view));
+        let mut digest = Sha256::new();
+        digest.update(&bytes);
+        digest.update(&tile.raster.bytes);
+        bytes.extend(digest.finalize());
+        bytes.extend(&tile.raster.bytes);
+        bytes
+    }
     pub fn put(&self,key:&Key,tile:&DecodedTile) {
+        if crate::resources::budget("raster_disk") == 0 { return; }
         let data=&tile.raster.bytes;
         let size=(data.len()+HEADER) as u64;
         if data.len()>MAX_TILE || size>self.budget { return; }
         let id=Self::id(key);
         if self.get(key).is_some() { return; }
         let mut state=self.state.lock().unwrap_or_else(|e|e.into_inner());
-        if let Some(old)=state.remove(&id) { let _=old; let _=std::fs::remove_file(self.root.join(&id)); }
-        self.prune_locked(&mut state,size);
-        if state.values().map(|v|v.0).sum::<u64>().saturating_add(size)>self.budget { return; }
+        let removed=match state.make_room(&id,size){Ok(n)=>n,Err(_)=>return};crate::resources::evict("raster_disk",removed);
+        let old=state.entries.get(&id).map_or(0,|v|v.0);if state.bytes.saturating_sub(old).saturating_add(size)>self.budget{return;}
         let result=(|| -> std::io::Result<()> {
             let mut file=tempfile::NamedTempFile::new_in(&self.root)?;
             let mut header=b"RIVRC001".to_vec();header.extend(tile.raster.width.to_le_bytes());header.extend(tile.raster.height.to_le_bytes());
@@ -77,7 +79,7 @@ impl Disk {
             file.write_all(&header)?;file.write_all(&digest.finalize())?;file.write_all(data)?;
             file.persist(self.root.join(&id)).map_err(|e|e.error)?;Ok(())
         })();
-        if result.is_ok() { state.insert(id,(size,std::time::SystemTime::now())); }
+        if result.is_ok() { state.record(id,size); }
     }
 }
 
@@ -86,7 +88,7 @@ mod tests {
     use super::*;
     fn key(source:&str)->Key { Key { webp_method:255, source:source.into(),path:"same.jp2".into(),driver:"grok".into(),format:"image/png",tiles:vec![(2,3)],edge:512,reduction:2,layers:1 } }
     fn tile()->DecodedTile { DecodedTile { rgba:None, tile_x:2,tile_y:3,raster:crate::decoder::DecodedRaster {
-        width:16,height:16,bytes:vec![7;100].into(),content_type:"image/png",decoder_route:"roi",decode_ms:1.0,encode_ms:1.0,
+        width:16,height:16,bytes:vec![7;100].into(),content_type:"image/png",decoder_backend: "encoded-raster-cache", decoder_route:"roi",decode_ms:1.0,encode_ms:1.0,
         source_cache_status:"miss",source_cache_ms:1.0,compressed_resolution_view:true,source_read_bytes:12,source_range_requests:1,source_cache_hit_bytes:0,
     } } }
     #[test]
@@ -108,6 +110,6 @@ mod tests {
         for thread in threads { thread.join().unwrap(); }
         let bytes:u64=std::fs::read_dir(root.path()).unwrap().flatten().map(|e|e.metadata().unwrap().len()).sum();assert!(bytes<=300);
         drop(disk);let disk=Disk::new(root.path().into(),150).unwrap();
-        assert!(disk.state.lock().unwrap().values().map(|v|v.0).sum::<u64>()<=150);
+        assert!(disk.state.lock().unwrap().entries.values().map(|v|v.0).sum::<u64>()<=150);
     }
 }

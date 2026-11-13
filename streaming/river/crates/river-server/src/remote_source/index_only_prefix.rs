@@ -21,6 +21,9 @@ impl RemoteSource {
   if u64::from(width)*u64::from(height)>4*1024*1024 {return Ok(None);}
   let (wanted,_)=multipart_prefix::counts(h,0,h.levels-1-reduction)?;
   if wanted==0 || wanted>524288 {return Ok(None);}
+  // An explicitly single-part SOT cannot use the index-only chain.
+  let sot=self.read(h.first_part..h.first_part+12,context)?;
+  if sot[..4]==[0xff,0x90,0,10] && sot[11]==1 {return Ok(None);}
   let first=self.part_at(h.first_part,context)?;
   if first.tile!=0 || first.ordinal!=0 || first.total==1 || first.offset+first.length>=h.codestream_end.saturating_sub(2) {return Ok(None);}
   // This is a planning filter only; the full marker chain is still validated.

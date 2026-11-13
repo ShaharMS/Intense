@@ -1166,7 +1166,7 @@ impl NativeFine {
                     height: h,
                     bytes: bytes.into_boxed_slice().into(),
                     content_type: request.format.content_type(),
-                    decoder_route: route,
+                    decoder_backend: route, decoder_route: route,
                     decode_ms,
                     encode_ms: elapsed_ms(encode),
                     source_cache_status: "bypass",

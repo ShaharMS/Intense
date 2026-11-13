@@ -4,6 +4,6 @@
   "maxVersions": 4,
   "pinnedTags": [],
   "ownedTestContainerPrefix": "river-goal-",
-  "channelPolicy": "Keep current shared-contract Latest/Stable/LTS and immediate compatible previous/candidate, at most4distinctversions. Featureless versions below907 are retired; volumes,buildcache,exports and evidence remain.",
-  "minimumSupportedCheckpoint": 907
+  "channelPolicy": "Retain Latest, Stable and LTS, allowing overlap. Retain the immediate Stable rollback when there is room. Preserve volumes, exports, build cache and evidence.",
+  "minimumSupportedCheckpoint": 1037
 }

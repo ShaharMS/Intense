@@ -94,14 +94,14 @@ mod tests {
         assert!(cache.get("openjpeg",&individual).is_none());
     }
     fn request() -> TileDecodeRequest {
-        TileDecodeRequest { output_geometry:None, edge_mode:crate::edges::Mode::Crop, capture_pixels:false, webp_method: crate::encoding_settings::snapshot(), source_id: "snapshot-one".into(), whole_view: false,
+        TileDecodeRequest { progressive_final_reduction:None, output_geometry:None, edge_mode:crate::edges::Mode::Crop, capture_pixels:false, webp_method: crate::encoding_settings::snapshot(), source_id: "snapshot-one".into(), whole_view: false,
             source: crate::decoder::Jpeg2000Source::from_path("immutable.jp2", 1024, 1024),
             tiles: vec![(0, 0)], source_tile: 512, reduction: 0, layers: 1,
             format: river_core::RasterFormat::Png, decoder_threads: 1, max_native_tiles: 4, cached_tiles: vec![], work_ticket:None, cancellation: None }
     }
     fn tile(byte: u8) -> DecodedTile {
         DecodedTile { rgba:None, tile_x: 0, tile_y: 0, raster: crate::decoder::DecodedRaster {
-            width: 1, height: 1, bytes: vec![byte; 16].into(), content_type: "image/png", decoder_route: "roi",
+            width: 1, height: 1, bytes: vec![byte; 16].into(), content_type: "image/png", decoder_backend: "test", decoder_route: "roi",
             decode_ms: 20.0, encode_ms: 5.0, source_cache_status: "s3-range-miss", source_cache_ms: 4.0,
             compressed_resolution_view: false, source_read_bytes: 100, source_range_requests: 2, source_cache_hit_bytes: 0 } }
     }
@@ -155,6 +155,7 @@ impl Key {
     fn new(driver: &str, request: &TileDecodeRequest) -> Self {
         let mut tiles = request.source.prepared.as_ref().map(|info| info.original_tiles.clone()).unwrap_or_else(|| request.tiles.clone()); tiles.sort_unstable();
         let driver=if request.edge_mode==crate::edges::Mode::Crop {driver.to_owned()} else {format!("{driver}:edge={}",request.edge_mode.as_str())};
+        let driver=if request.source.display_rgb_only {format!("{driver}:multispectral-rgb-v1")}else{driver};
         let driver=match request.output_geometry {Some(g)=>format!("{driver}:output={}x{}x{}",g.edge,g.width,g.height),None=>driver};
         // Older Grok responses for this class can contain incorrect pixels.
         // Isolate only the corrected class, preserving unrelated disk-cache hits.
@@ -186,12 +187,10 @@ struct Entry { tile: Arc<DecodedTile>, bytes: usize, touched: u64 }
 struct State { entries: HashMap<Key, Entry>, lru: BTreeMap<u64, Key>, bytes: usize, clock: u64 }
 pub struct RasterCache { disk: Option<disk::Disk>, limit: usize, state: Mutex<State>, flights: Mutex<HashMap<Key, std::sync::Weak<tokio::sync::Mutex<()>>>> }
 impl RasterCache {
-    pub fn from_env() -> Arc<Self> {
-        Arc::new(Self { disk: disk::Disk::from_env(), limit: std::env::var("RIVER_RASTER_CACHE_BYTES").ok().and_then(|v| v.parse().ok()).unwrap_or(64 * 1024 * 1024),
-            state: Mutex::new(State::default()), flights: Mutex::new(HashMap::new()) })
-    }
+    pub fn from_env()->Arc<Self>{let cache=Arc::new(Self{disk:disk::Disk::from_env(),limit:crate::resources::budget("raster_results"),state:Mutex::new(State::default()),flights:Mutex::new(HashMap::new())});let weak=Arc::downgrade(&cache);crate::resources::register("raster_results",move|limit|weak.upgrade().map(|c|c.trim(limit)).unwrap_or_default());let weak=Arc::downgrade(&cache);crate::resources::register("raster_disk",move|_|weak.upgrade().and_then(|c|c.disk.as_ref().map(|d|d.snapshot())).unwrap_or_default());cache}
+    fn trim(&self,limit:usize)->crate::resources::Occupancy{let mut s=self.state.lock().unwrap_or_else(|e|e.into_inner());while s.bytes>limit||s.entries.len()>crate::resources::entry_limit("RIVER_RASTER_CACHE_ENTRIES",limit){let Some((_,key))=s.lru.pop_first()else{break;};if let Some(old)=s.entries.remove(&key){s.bytes-=old.bytes;crate::resources::retain_encoded("raster_results",old.bytes,&old.tile.raster.bytes);crate::resources::evict("raster_results",1);}}crate::resources::Occupancy{bytes:s.bytes,entries:s.entries.len(),..Default::default()}}
     pub fn flight(&self, driver: &str, request: &TileDecodeRequest) -> Option<Arc<tokio::sync::Mutex<()>>> {
-        if self.limit == 0 { return None; }
+        if crate::resources::effective("raster_results",self.limit)==0 && self.disk.is_none(){return None;}
         let mut key = Key::new(driver, request);
         if request.edge_mode!=crate::edges::Mode::Crop && key.tiles.iter().all(|&position|full_tile(request,position)) {key.driver=driver.to_owned();}
         {
@@ -209,7 +208,7 @@ impl RasterCache {
         Some(gate)
     }
     pub fn get(&self, driver: &str, request: &TileDecodeRequest) -> Option<Vec<DecodedTile>> {
-        if self.limit == 0 { return None; }
+        if crate::resources::effective("raster_results",self.limit)==0 && self.disk.is_none(){return None;}
         let started = Instant::now(); let key = Key::new(driver, request);
         let keys: Vec<_> = key.tiles.iter().map(|&position| key.single(position)).collect();
         let mut state = self.state.lock().unwrap_or_else(|error| error.into_inner());
@@ -226,14 +225,15 @@ impl RasterCache {
                 }
             }
             used_keys.push(key.clone());
-            if let Some(entry)=state.entries.get(&key) { tiles.push(entry.tile.as_ref().clone()); }
+            if let Some(entry)=state.entries.get(&key) {crate::resources::hit("raster_results",entry.bytes);tiles.push(entry.tile.as_ref().clone()); }
             else {
+                crate::resources::miss("raster_results");
                 let tile=match disk_tile {Some(tile)=>tile,None=>self.disk.as_ref()?.get(&key)?};
                 let bytes=tile.raster.bytes.len();
-                if bytes<=self.limit {
-                    while state.bytes+bytes>self.limit || state.entries.len()>=4096 {
+                if bytes<=crate::resources::effective("raster_results",self.limit) {
+                    while state.bytes+bytes>crate::resources::effective("raster_results",self.limit) || state.entries.len()>=crate::resources::entry_limit("RIVER_RASTER_CACHE_ENTRIES",self.limit) {
                         let Some((_,oldest))=state.lru.pop_first() else { break; };
-                        if let Some(old)=state.entries.remove(&oldest) { state.bytes-=old.bytes; }
+                        if let Some(old)=state.entries.remove(&oldest) { state.bytes-=old.bytes;crate::resources::retain_encoded("raster_results",old.bytes,&old.tile.raster.bytes);crate::resources::evict("raster_results",1); }
                     }
                     state.clock+=1;let touched=state.clock;
                     state.lru.insert(touched,key.clone());state.bytes+=bytes;
@@ -258,19 +258,52 @@ impl RasterCache {
         }
         Some(tiles)
     }
+    // Called only from blocking preparation. The async local-hit path never
+    // waits for a remote cache. Limit a preparation to one L2 round trip.
+    pub fn get_shared(&self, driver: &str, request: &TileDecodeRequest) -> Option<Vec<DecodedTile>> {
+        if !crate::shared_cache::tiles_enabled() || request.tiles.is_empty() || request.capture_pixels { return None; }
+        let key = Key::new(driver, request);
+        if !key.source.starts_with("s3v-") || request.source.prepared.is_some() { return None; }
+        let started = Instant::now();
+        let keys = key.tiles.iter().take(16).map(|&position| key.single(position)).collect::<Vec<_>>();
+        let ids = keys.iter().map(disk::Disk::id).collect::<Vec<_>>();
+        let values = if ids.len() == 1 {
+            vec![crate::shared_cache::get("tile", &ids[0])]
+        } else {
+            crate::shared_cache::get_tiles(&ids)
+        };
+        let lookup_ms = crate::decoder::elapsed_ms(started);
+        let tiles = keys.iter().zip(values).filter_map(|(key, value)| {
+            let mut tile = disk::Disk::decode(key, &value?)?;
+            tile.raster.decoder_backend = "encoded-raster-shared-cache";
+            tile.raster.decoder_route = "encoded-raster-shared-cache";
+            tile.raster.source_cache_status = "encoded-raster-shared-hit";
+            tile.raster.source_cache_ms = lookup_ms;
+            Some(tile)
+        }).collect::<Vec<_>>();
+        (!tiles.is_empty()).then_some(tiles)
+    }
     pub fn put(&self, driver: &str, request: &TileDecodeRequest, tiles: &[DecodedTile]) {
-        if tiles.is_empty() || self.limit == 0 { return; }
+        if tiles.is_empty(){return;}
         let base = Key::new(driver, request);
+        if base.source.starts_with("s3v-") {
+            for tile in tiles {
+                if crate::shared_cache::admit("tile", tile.raster.bytes.len().saturating_add(49)) {
+                    let key = base.single((tile.tile_x, tile.tile_y));
+                    crate::shared_cache::fill("tile", &disk::Disk::id(&key), disk::Disk::encode(tile));
+                }
+            }
+        }
         if let Some(disk)=&self.disk { for tile in tiles { disk.put(&base.single((tile.tile_x,tile.tile_y)),tile); } }
         let mut state = self.state.lock().unwrap_or_else(|error| error.into_inner());
         for tile in tiles {
         let bytes = tile.raster.bytes.len();
-        if bytes > self.limit { continue; }
+        if bytes > crate::resources::effective("raster_results",self.limit) { continue; }
         let key = base.single((tile.tile_x,tile.tile_y));
         if let Some(old) = state.entries.remove(&key) { state.bytes -= old.bytes; state.lru.remove(&old.touched); }
-        while state.bytes + bytes > self.limit || state.entries.len() >= 4096 {
+        while state.bytes + bytes > crate::resources::effective("raster_results",self.limit) || state.entries.len() >= crate::resources::entry_limit("RIVER_RASTER_CACHE_ENTRIES",self.limit) {
             let Some((_, oldest)) = state.lru.pop_first() else { break; };
-            if let Some(entry) = state.entries.remove(&oldest) { state.bytes -= entry.bytes; }
+            if let Some(entry) = state.entries.remove(&oldest) { state.bytes -= entry.bytes;crate::resources::retain_encoded("raster_results",entry.bytes,&entry.tile.raster.bytes);crate::resources::evict("raster_results",1); }
         }
         state.clock += 1; let touched = state.clock;
         state.lru.insert(touched, key.clone()); state.bytes += bytes;
@@ -285,7 +318,7 @@ mod output_key_tests {
     use super::*;
     #[test]
     fn explicit_output_geometry_is_in_cache_and_singleflight_identity() {
-        let request=TileDecodeRequest {output_geometry:None,edge_mode:crate::edges::Mode::Crop,source_id:"same".into(),webp_method:0,capture_pixels:false,whole_view:false,source:crate::decoder::Jpeg2000Source::from_path("same.jp2",1024,1024),tiles:vec![(0,0)],cached_tiles:vec![],work_ticket:None,source_tile:512,reduction:0,layers:0,format:river_core::RasterFormat::Png,decoder_threads:1,max_native_tiles:4,cancellation:None};
+        let request=TileDecodeRequest {progressive_final_reduction:None, output_geometry:None,edge_mode:crate::edges::Mode::Crop,source_id:"same".into(),webp_method:0,capture_pixels:false,whole_view:false,source:crate::decoder::Jpeg2000Source::from_path("same.jp2",1024,1024),tiles:vec![(0,0)],cached_tiles:vec![],work_ticket:None,source_tile:512,reduction:0,layers:0,format:river_core::RasterFormat::Png,decoder_threads:1,max_native_tiles:4,cancellation:None};
         let old=Key::new("driver",&request);let mut explicit=request.clone();
         explicit.output_geometry=Some(crate::edges::OutputGeometry {edge:256,width:256,height:256});
         let one=Key::new("driver",&explicit);assert_ne!(old,one);

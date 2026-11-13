@@ -6,7 +6,10 @@ const boundaryEnabled = document.querySelector('#boundary-enabled');
 const boundaryWidth = document.querySelector('#boundary-width');
 const catalogSearch = document.querySelector('#catalog-search');
 const catalogSearchMode = document.querySelector('#catalog-search-mode');
-let catalogSearchTimer;
+let catalogDraft = false;
+let catalogScanned = null;
+let catalogInitialized = false;
+const catalogPageSize = document.querySelector('#catalog-page-size');
 const catalogSort = document.querySelector('#catalog-sort');
 const catalogDirection = document.querySelector('#catalog-direction');
 const catalogList = document.querySelector('#catalog-list');
@@ -323,6 +326,8 @@ async function loadAsset({ preserve = false, randomize = false } = {}) {
 }
 
 async function refreshAvailableAssets({ next = false, previous = false } = {}) {
+  if (catalogDraft && (next || previous)) return;
+  catalogDraft = false;
   const generation = ++catalogGeneration;
   catalogAbort?.abort();
   catalogAbort = new AbortController();
@@ -334,33 +339,23 @@ async function refreshAvailableAssets({ next = false, previous = false } = {}) {
   renderCatalog();
   const start = previous ? catalogPageHistory.at(-1) : next ? catalogCursor : null;
   if (!next && !previous) { catalogPageHistory = []; catalogPageStart = null; }
-  const found = [];
-  let cursor = start;
-  let scanned = 0;
   try {
-    do {
-    const params = new URLSearchParams({ limit: String(50 - found.length) });
+    const params = new URLSearchParams({ limit: catalogPageSize.value });
     if (catalogSource.value) params.set('source', catalogSource.value);
     if (catalogSource.value && catalogSearch.value.trim()) params.set(catalogSearchMode.value === 'prefix' ? 'keyPrefix' : 'q', catalogSearch.value.trim());
-    if (cursor) params.set('cursor', cursor);
+    if (start) params.set('cursor', start);
     const response = await fetch(`${apiBase}/api/assets?${params}`, { signal: catalogAbort.signal });
     if (!response.ok) throw new Error(await responseError(response));
     const body = await response.json();
     if (generation !== catalogGeneration) return;
-    found.push(...(Array.isArray(body) ? body : body.objects));
     const following = Array.isArray(body) ? response.headers.get('x-river-next-cursor') : body.nextCursor;
-    if (following && following === cursor) throw new Error('Server returned a non-advancing search cursor');
-    cursor = following;
-    scanned += body.scannedObjects || 0;
-    catalogCount.textContent = `Searching… ${found.length} matches, ${scanned} objects checked`;
-    if (cursor && found.length < 50) await new Promise(resolve => setTimeout(resolve, 100));
-    if (generation !== catalogGeneration) return;
-    } while (cursor && found.length < 50);
+    if (following && following === start) throw new Error('Server returned a non-advancing search cursor');
     if (next) catalogPageHistory.push(catalogPageStart);
     if (previous) catalogPageHistory.pop();
     catalogPageStart = start;
-    availableAssets = found;
-    catalogCursor = cursor;
+    availableAssets = Array.isArray(body) ? body : body.objects;
+    catalogScanned = body.scannedObjects ?? null;
+    catalogCursor = following;
     catalogNext.disabled = !catalogCursor;
     catalogPrevious.disabled = !catalogPageHistory.length;
     catalogLoading = false;
@@ -369,12 +364,14 @@ async function refreshAvailableAssets({ next = false, previous = false } = {}) {
     if (generation !== catalogGeneration || error.name === 'AbortError') return;
     catalogLoading = false;
     catalogError = `Catalog unavailable: ${error.message}`;
+    catalogNext.disabled = !catalogCursor;
+    catalogPrevious.disabled = !catalogPageHistory.length;
     renderCatalog();
   }
 }
 catalogNext.addEventListener('click', () => { void refreshAvailableAssets({ next: true }); });
 catalogPrevious.addEventListener('click', () => { void refreshAvailableAssets({ previous: true }); });
-catalogSource.addEventListener('change', () => { clearTimeout(catalogSearchTimer); catalogCursor = null; catalogSearchMode.disabled = !catalogSource.value; void refreshAvailableAssets(); });
+catalogSource.addEventListener('change', () => { catalogCursor = null; catalogSearchMode.disabled = !catalogSource.value; void refreshAvailableAssets(); });
 
 function assetName(asset) {
   return asset.name || (asset.assetId === '94a94669d839b13292340cbbdec6b96c81475eb1e1f6158c55245a7355437290' ? 'Bretagne2.j2k' : asset.assetId);
@@ -388,7 +385,8 @@ function renderCatalog() {
     const order = catalogSort.value === 'name' ? assetName(a).localeCompare(assetName(b), undefined, { numeric: true }) : metric(a) - metric(b);
     return (catalogDescending ? -order : order) || assetName(a).localeCompare(assetName(b), undefined, { numeric: true }) || a.assetId.localeCompare(b.assetId);
   });
-  catalogCount.textContent = catalogError || (catalogLoading ? 'Searching…' : `${items.length} of ${availableAssets.length} images on this page${catalogCursor ? "; more pages available" : ""}`);
+  catalogCount.textContent = catalogDraft ? 'Search to apply these settings.' : catalogError || (catalogLoading ? 'Searching…' :
+    `${items.length} images on this page${catalogScanned == null ? '' : ` · ${catalogScanned} keys checked`}${catalogCursor ? ' · More pages available' : ''}`);
   catalogList.replaceChildren(...items.map(asset => {
     const button = document.createElement('button');
     button.className = 'catalog-item';
@@ -411,14 +409,26 @@ function renderCatalog() {
 }
 
 async function refreshViewerOptions() {
-  const [driverResponse, formatResponse] = await Promise.all([
+  const [driverResponse, formatResponse, wsCapabilities] = await Promise.all([
     fetch(`${apiBase}/api/drivers`),
     fetch(`${apiBase}/api/formats`),
+    fetch(`${apiBase}/api/ws-capabilities`)
+      .then(response => response.ok ? response.json() : null)
+      .catch(() => null),
   ]);
   if (!driverResponse.ok || !formatResponse.ok) throw new Error('decoder capabilities are unavailable');
   const drivers = await driverResponse.json();
   const formats = await formatResponse.json();
+  for (const info of drivers) {
+    if (![...decoderDriver.options].some(option => option.value === info.id)) {
+      decoderDriver.add(new Option(info.name || info.id, info.id));
+    }
+  }
   for (const option of decoderDriver.options) {
+    if (option.value === 'auto') {
+      option.dataset.serviceAvailable = String(wsCapabilities?.autoDriver === true);
+      continue;
+    }
     const info = drivers.find((driver) => driver.id === option.value);
     option.disabled = !info?.available;
     option.dataset.serviceAvailable = String(Boolean(info?.available));
@@ -437,7 +447,9 @@ function applyAssetDecoderCapabilities() {
   const supported = assetManifest?.supportedDecoderDrivers;
   for (const option of decoderDriver.options) {
     const available = option.dataset.serviceAvailable !== 'false';
-    option.disabled = !available || (Array.isArray(supported) && !supported.includes(option.value));
+    option.disabled = option.value === 'auto'
+      ? deliveryMethod.value !== 'wmts' && !available
+      : !available || (Array.isArray(supported) && !supported.includes(option.value));
   }
   if (decoderDriver.selectedOptions[0]?.disabled) {
     const usable = [...decoderDriver.options].find(option => !option.disabled);
@@ -568,7 +580,8 @@ async function requestWmtsViewport(viewport, format, driver) {
     try {
     const matrix = maxLevel - reduction;
     const url = new URL(`${apiBase}/wmts`);
-    for (const [key, value] of Object.entries({ SERVICE: 'WMTS', REQUEST: 'GetTile', VERSION: '1.0.0', LAYER: viewport.assetId, STYLE: 'default', FORMAT: `image/${format}`, DRIVER: driver, TILEMATRIXSET: `RiverPixel-${viewport.assetId}`, TILEMATRIX: matrix, TILEROW: row, TILECOL: col })) url.searchParams.set(key, value);
+    for (const [key, value] of Object.entries({ SERVICE: 'WMTS', REQUEST: 'GetTile', VERSION: '1.0.0', LAYER: viewport.assetId, STYLE: 'default', FORMAT: `image/${format}`, TILEMATRIXSET: `RiverPixel-${viewport.assetId}`, TILEMATRIX: matrix, TILEROW: row, TILECOL: col })) url.searchParams.set(key, value);
+    if (driver !== 'auto') url.searchParams.set('DRIVER', driver);
     if (preview && driver !== 'nvjpeg2000') url.searchParams.set('LAYERS', '1');
     const started = performance.now();
     const clientQueue = started - requestAt;
@@ -742,8 +755,11 @@ function connect() {
   session = new WebSocket(`${socketOrigin.toString().replace(/\/$/, '')}/ws`);
   session.binaryType = 'arraybuffer';
   session.onopen = async () => {
-    try { await loadS3Sources(); } catch (error) { console.warn("S3 sources unavailable:", error); }
-    void refreshAvailableAssets();
+    if (!catalogInitialized) {
+      catalogInitialized = true;
+      try { await loadS3Sources(); } catch (error) { console.warn("S3 sources unavailable:", error); }
+      void refreshAvailableAssets();
+    }
     try { await refreshViewerOptions(); } catch (error) { console.warn('River driver/format discovery failed:', error); }
     await loadAsset({ preserve: true });
 
@@ -1021,9 +1037,7 @@ document.querySelector('#s3-add-source').addEventListener('click', async () => {
     await loadS3Sources(); s3SourceList.value = body.id;
     catalogSource.value = body.id;
     await refreshAvailableAssets();
-    s3Cursor = null;
-    s3Next.disabled = true;
-    s3ObjectList.replaceChildren(...availableAssets.map(object => new Option(`${object.key} (${object.size} bytes)`, object.key)));
+    resetS3Browse();
     s3Status.textContent = `Saved ${body.name}. The connection is persisted on this server.`;
   } catch (error) { s3Status.textContent = `S3 setup failed: ${error.message}`; }
 });
@@ -1033,32 +1047,61 @@ document.querySelector('#s3-remove-source').addEventListener('click', async () =
     if (!s3SourceList.value) throw new Error('Choose a configured source.');
     const response = await fetch(`${apiBase}/api/s3/sources/${encodeURIComponent(s3SourceList.value)}`, { method: 'DELETE', headers: s3Headers() });
     if (!response.ok) { const body = await response.json(); throw new Error(body.message ?? body.code ?? `HTTP ${response.status}`); }
-    s3ObjectList.replaceChildren(); await loadS3Sources();
+    resetS3Browse(); await loadS3Sources();
     await refreshAvailableAssets();
     s3Status.textContent = 'Runtime connection removed. Previously loaded assets remain available until River restarts.';
   } catch (error) { s3Status.textContent = `Could not remove source: ${error.message}`; }
 });
 let s3Cursor = null;
+let s3Browse;
 const s3Next = document.querySelector('#s3-next-objects');
+const s3Search = document.querySelector('#s3-object-search');
+function resetS3Browse() {
+  s3Browse?.abort();
+  s3Cursor = null;
+  s3Next.disabled = true;
+  s3ObjectList.replaceChildren();
+}
 async function browseS3Objects(next = false) {
+  if (!next) resetS3Browse();
+  if (!s3SourceList.value) {
+    s3Status.textContent = 'Choose a configured source.';
+    return;
+  }
+  s3Browse?.abort();
+  const controller = new AbortController();
+  s3Browse = controller;
   s3Status.textContent = 'Listing S3 objects…';
   s3Next.disabled = true;
   try {
-    if (!s3SourceList.value) return;
-    const params = new URLSearchParams({ limit: '50' });
+    const params = new URLSearchParams({ limit: '100' });
+    if (s3Search.value.trim()) params.set('keyPrefix', s3Search.value.trim());
     if (next && s3Cursor) params.set('cursor', s3Cursor);
-    const response = await fetch(`${apiBase}/api/s3/sources/${encodeURIComponent(s3SourceList.value)}/objects?${params}`);
+    const response = await fetch(`${apiBase}/api/s3/sources/${encodeURIComponent(s3SourceList.value)}/objects?${params}`,
+      { signal: controller.signal });
     const body = await response.json();
+    if (controller.signal.aborted) return;
     if (!response.ok) throw new Error(body.message ?? body.code ?? `HTTP ${response.status}`);
     s3Cursor = body.nextCursor;
     s3Next.disabled = !s3Cursor;
     s3ObjectList.replaceChildren(...body.objects.map(object => new Option(`${object.key} (${object.size} bytes)`, object.key)));
-    s3Status.textContent = `${body.objects.length} images on this page${s3Cursor ? '; more pages available' : ''}.`;
-  } catch (error) { s3Status.textContent = `S3 listing failed: ${error.message}`; }
+    s3Status.textContent = `${body.objects.length} matching images on this page. ${s3Cursor ? 'Select Next page to keep browsing.' : 'End of results.'}`;
+  } catch (error) {
+    if (controller.signal.aborted) return;
+    s3Next.disabled = !s3Cursor;
+    s3Status.textContent = `S3 listing failed: ${error.message}`;
+  }
 }
 document.querySelector('#s3-refresh-objects').addEventListener('click', () => { void browseS3Objects(); });
 s3Next.addEventListener('click', () => { void browseS3Objects(true); });
-s3SourceList.addEventListener('change', () => { s3Cursor = null; void browseS3Objects(); });
+s3SourceList.addEventListener('change', () => { void browseS3Objects(); });
+s3Search.addEventListener('input', () => {
+  resetS3Browse();
+  s3Status.textContent = 'Select Browse objects to search.';
+});
+s3Search.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter') { event.preventDefault(); void browseS3Objects(); }
+});
 document.querySelector('#s3-load-object').addEventListener('click', async () => {
   s3Status.textContent = 'Reading image headers…';
   try {
@@ -1093,25 +1136,39 @@ for (const name of ['pointerup', 'pointercancel']) {
 }
 stage.addEventListener('wheel', (event) => { event.preventDefault(); zoomAt(event.clientX, event.clientY, Math.sign(event.deltaY)); }, { passive: false });
 decoderDriver.addEventListener('change', () => requestViewport());
-deliveryMethod.addEventListener('change', () => requestViewport());
+deliveryMethod.addEventListener('change', () => {
+  applyAssetDecoderCapabilities();
+  requestViewport();
+});
 rasterFormat.addEventListener('change', () => requestViewport());
 boundaryColor.addEventListener('input', () => { if (activeViewport) drawTileBoundaries(activeViewport); });
 boundaryEnabled.addEventListener('change', () => { if (activeViewport) drawTileBoundaries(activeViewport); });
 boundaryWidth.addEventListener('input', () => { document.querySelector('#boundary-width-value').textContent = `${boundaryWidth.value} px`; if (activeViewport) drawTileBoundaries(activeViewport); });
 catalogSearchMode.disabled = !catalogSource.value;
 function searchCatalog() {
-  clearTimeout(catalogSearchTimer);
   if (!catalogSource.value) { renderCatalog(); return; }
   catalogAbort?.abort();
   ++catalogGeneration;
-  catalogCursor = null;
+  catalogDraft = true;
+  catalogLoading = false;
   catalogNext.disabled = true;
-  catalogList.replaceChildren();
-  catalogCount.textContent = 'Searching…';
-  catalogSearchTimer = setTimeout(() => { void refreshAvailableAssets(); }, 300);
+  catalogPrevious.disabled = true;
+  renderCatalog();
 }
 catalogSearch.addEventListener('input', searchCatalog);
 catalogSearchMode.addEventListener('change', searchCatalog);
+catalogPageSize.addEventListener('change', () => {
+  catalogAbort?.abort();
+  ++catalogGeneration;
+  catalogDraft = true;
+  catalogLoading = false;
+  catalogNext.disabled = true;
+  catalogPrevious.disabled = true;
+  renderCatalog();
+});
+catalogSearch.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter') { event.preventDefault(); void refreshAvailableAssets(); }
+});
 catalogSort.addEventListener('change', renderCatalog);
 catalogDirection.addEventListener('click', () => {
   catalogDescending = !catalogDescending;

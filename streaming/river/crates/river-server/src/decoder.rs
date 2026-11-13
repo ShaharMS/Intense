@@ -24,6 +24,8 @@ pub struct Jpeg2000Source {
     pub path: PathBuf,
     pub remote: Option<std::sync::Arc<crate::remote_source::RemoteSource>>,
     pub memory: Option<std::sync::Arc<[u8]>>,
+    pub components:Option<u8>,
+    pub display_rgb_only:bool,
     pub prepared: Option<std::sync::Arc<PreparedIo>>,
     pub width: u32,
     pub height: u32,
@@ -51,7 +53,7 @@ pub struct PreparedIo {
     pub route: &'static str,
     pub stats: crate::remote_source::ReadStats,
     pub elapsed_ms: f64,
-    pub _file: Option<std::sync::Arc<tempfile::NamedTempFile>>,
+    pub _file: Option<std::sync::Arc<crate::storage_mode::ScratchFile>>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -71,6 +73,7 @@ pub struct DecodedRaster {
     pub bytes: axum::body::Bytes,
     pub content_type: &'static str,
     /// Route surfaced in every frame header, paired with the OTLP span.
+    pub decoder_backend: &'static str,
     pub decoder_route: &'static str,
     pub decode_ms: f64,
     pub encode_ms: f64,
@@ -101,6 +104,7 @@ impl Jpeg2000Source {
             path: path.into(),
             remote: None,
             memory: None,
+            components:None,display_rgb_only:false,
             prepared: None,
             width,
             height,
@@ -124,6 +128,7 @@ impl Jpeg2000Source {
             path: path.into(),
             remote: None,
             memory: None,
+            components:None,display_rgb_only:false,
             prepared: None,
             width,
             height,
@@ -265,7 +270,7 @@ impl Jpeg2000Source {
                         height,
                         bytes: bytes.into_boxed_slice().into(),
                         content_type: format.content_type(),
-                        decoder_route: "roi",
+                        decoder_backend: "openjpeg", decoder_route: "roi",
                         decode_ms,
                         encode_ms: elapsed_ms(encode_started),
                         source_cache_status: "bypass",

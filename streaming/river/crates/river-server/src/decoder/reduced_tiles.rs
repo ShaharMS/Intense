@@ -119,7 +119,7 @@ pub(super) fn render(source:&Jpeg2000Source,tiles:&[(u32,u32)],source_tile:u32,r
   let dx=(a-x0)/scale;let dy=(b-y0)/scale;let width=(w-dx).min((c-a).div_ceil(scale));let height=(h-dy).min((d-b).div_ceil(scale));
   ensure!(width>0 && height>0,"reduced native tile lies outside decoded union");
   let began=std::time::Instant::now();let bytes=super::encode_crop_rgba(&rgba,w,dx,dy,width,height,format)?;
-  Ok(super::DecodedTile {tile_x:x,tile_y:y,rgba:super::take_pixel_capture(),raster:super::DecodedRaster {width,height,bytes:bytes.into_boxed_slice().into(),content_type:format.content_type(),decoder_route:"openjpeg-parallel-reduced",decode_ms,encode_ms:super::elapsed_ms(began),source_cache_status:"bypass",source_cache_ms:0.0,compressed_resolution_view:false,source_read_bytes:0,source_range_requests:0,source_cache_hit_bytes:0}})
+  Ok(super::DecodedTile {tile_x:x,tile_y:y,rgba:super::take_pixel_capture(),raster:super::DecodedRaster {width,height,bytes:bytes.into_boxed_slice().into(),content_type:format.content_type(),decoder_backend: "openjpeg", decoder_route:"openjpeg-parallel-reduced",decode_ms,encode_ms:super::elapsed_ms(began),source_cache_status:"bypass",source_cache_ms:0.0,compressed_resolution_view:false,source_read_bytes:0,source_range_requests:0,source_cache_hit_bytes:0}})
  }).collect::<Result<Vec<_>>>()?;
  Ok(Some(decoded))
 }

@@ -18,7 +18,7 @@ use axum::{
         Path, Query, State, WebSocketUpgrade,
         ws::{Message, WebSocket},
     },
-    http::{HeaderName, HeaderValue, Method, StatusCode},
+    http::{HeaderValue, StatusCode},
     response::{IntoResponse, Response},
     routing::{get, post},
     serve::ListenerExt,
@@ -34,13 +34,18 @@ use river_core::{
     TileFrameHeader, Viewport, encode_tile_frame, plan_passes,
 };
 use sha2::{Digest, Sha256};
-use tokio::sync::{Mutex, RwLock, Semaphore};
-use tower_http::{cors::CorsLayer, services::ServeDir, trace::TraceLayer};
+use tokio::sync::{Mutex, RwLock};
+use tower_http::services::ServeDir;
 use tracing::{Instrument, info_span, instrument};
 use tracing_opentelemetry::{OpenTelemetryLayer, OpenTelemetrySpanExt};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use uuid::Uuid;
 
+mod cors;
+mod resources;
+mod asset_registry;
+mod display;
+mod cache_inventory;
 mod decoder;
 mod console_log;
 mod edges;
@@ -49,11 +54,16 @@ mod source_admission;
 mod requests;
 mod api_docs;
 mod source_cache;
+mod storage_mode;
+mod adaptation;
+mod shared_cache;
 mod remote_source;
 mod raster_cache;
 mod source_connections;
 mod encoding_settings;
 mod configuration;
+mod tls;
+mod http3;
 mod read_policy;
 mod settings_api;
 mod preview_pixels;
@@ -76,7 +86,7 @@ use engine::{DecoderDrivers, TileDecodeRequest};
 #[derive(Clone)]
 struct AppState {
     configuration_lock: Arc<Mutex<()>>,
-    assets: Arc<RwLock<BTreeMap<AssetId, RegisteredAsset>>>,
+    assets: Arc<RwLock<asset_registry::Assets>>,
     s3_sources: Arc<RwLock<HashMap<String, S3Source>>>,
     s3_load_lock: Arc<RwLock<()>>,
     s3_object_loads: Arc<Mutex<HashMap<String, std::sync::Weak<Mutex<()>>>>>,
@@ -86,8 +96,8 @@ struct AppState {
     catalog_backed: bool,
     /// Shared CPU budget across every socket. Each viewport receives one
     /// bounded ROI batch, so many clients cannot create an unbounded backlog.
-    decode_slots: Arc<Semaphore>,
-    source_io_slots: Arc<Semaphore>,
+    decode_slots: Arc<adaptation::Admission>,
+    source_io_slots: Arc<adaptation::Admission>,
     per_viewport_decode_concurrency: usize,
     /// Internal worker count for each native OpenJPEG decode. Combined with
     /// the shared semaphore this prevents multiplicative CPU oversubscription.
@@ -183,7 +193,7 @@ struct CatalogAsset {
 }
 
 #[derive(Clone)]
-struct RegisteredAsset {
+pub(crate) struct RegisteredAsset {
     local_header: Arc<tokio::sync::OnceCell<remote_source::Header>>,
     local_reader: Arc<tokio::sync::OnceCell<Arc<remote_source::RemoteSource>>>,
     manifest: AssetManifest,
@@ -200,10 +210,17 @@ type SocketSender = Arc<Mutex<futures_util::stream::SplitSink<WebSocket, Message
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    let configuration = configuration::snapshot()?;
+    adaptation::initialize(configuration.auto_adaptation_mode.as_deref())?;
+    if std::env::args().any(|arg|arg=="--resource-env") {println!("{}",resources::launcher_env());return Ok(());}
+    shared_cache::initialize(configuration.shared_cache)?;
+    storage_mode::validate()?;
     local_identity_mode()?;
     encoding_settings::restore()?;
     remote_source::validate_serial_transport()?;
-    let tracer_provider = init_tracing()?;
+    let (tracer_provider, logger_provider) = init_tracing()?;
+    storage_mode::print_startup();
+    resources::start();
     let default_asset = default_asset();
     let decode_concurrency = decode_concurrency_from_env();
     let per_viewport_decode_concurrency = std::env::var("RIVER_VIEWPORT_DECODE_CONCURRENCY")
@@ -247,7 +264,7 @@ async fn main() -> anyhow::Result<()> {
     }
     let state = AppState {
         configuration_lock: Arc::new(Mutex::new(())),
-        assets: Arc::new(RwLock::new(assets)),
+        assets: asset_registry::Assets::shared(assets),
         s3_sources: Arc::new(RwLock::new(HashMap::new())),
         s3_load_lock: Arc::new(RwLock::new(())),
         s3_object_loads: Arc::new(Mutex::new(HashMap::new())),
@@ -255,15 +272,14 @@ async fn main() -> anyhow::Result<()> {
         mosaic_root,
         catalog_backed: catalog_path.is_some(),
         mosaic_discovery_in_flight: Arc::new(AtomicBool::new(false)),
-        decode_slots: Arc::new(Semaphore::new(decode_concurrency)),
-        source_io_slots: Arc::new(Semaphore::new(std::env::var("RIVER_SOURCE_IO_CONCURRENCY").ok()
-            .and_then(|v| v.parse::<usize>().ok()).unwrap_or(4).clamp(1, 16))),
+        decode_slots: Arc::new(adaptation::Admission::new(decode_concurrency, "RIVER_DECODE_CONCURRENCY")),
+        source_io_slots: Arc::new(adaptation::Admission::new(resources::plan().source_io_concurrency, "RIVER_SOURCE_IO_CONCURRENCY")),
         per_viewport_decode_concurrency,
         openjpeg_threads_per_decode,
         max_native_tiles_per_job,
         preview_extra_reductions,
         refine_idle_delay,
-        tile_engines: DecoderDrivers::new(),
+        tile_engines: DecoderDrivers::new()?,
         delivery_pyramids_enabled,
     };
     tracing::info!(
@@ -280,9 +296,7 @@ async fn main() -> anyhow::Result<()> {
 
     source_connections::restore(&state).await?;
     if !state.catalog_backed { start_background_mosaic_discovery(&state); }
-    let cors_origins=std::env::var("RIVER_CORS_ORIGINS").unwrap_or_else(|_|"http://127.0.0.1:18765".into())
-        .split(',').map(str::trim).filter(|origin|!origin.is_empty()).map(str::parse::<HeaderValue>)
-        .collect::<Result<Vec<_>,_>>().context("Invalid RIVER_CORS_ORIGINS")?;
+    let cors = cors::layer(&std::env::var("RIVER_CORS_ORIGINS").unwrap_or_else(|_| "*".into()))?;
     let app = Router::new()
         .route("/health", get(health))
         .route("/openapi.json", get(api_docs::spec))
@@ -303,42 +317,22 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/cache/ht", get(ht_cache_status))
         .route("/api/formats", get(list_raster_formats))
         .route("/api/settings/configuration", get(settings_api::export).put(settings_api::import))
+        .route("/api/diagnostics/resources", get(|| async {Json(resources::diagnostics())}))
+        .route("/api/settings/adaptation", get(settings_api::get_adaptation).put(settings_api::put_adaptation).delete(settings_api::reset_adaptation))
+        .route("/api/settings/shared-cache", get(settings_api::get_shared_cache).put(settings_api::put_shared_cache).delete(settings_api::reset_shared_cache))
         .route("/api/diagnostics/source-reads", get(settings_api::get_source_reads).put(settings_api::put_source_reads).delete(settings_api::clear_source_reads))
         .route("/api/settings/read-policy", get(settings_api::get_policy).put(settings_api::put_policy))
+        .route("/api/settings/drivers", get(settings_api::get_drivers).put(settings_api::put_drivers))
         .route("/api/settings/encoding", get(get_encoding_settings).put(put_encoding_settings))
         .route("/wmts", get(wmts))
         .route("/streamer/v1/{z}/{x}/{y}/{file}", get(compatibility::tile))
         .route("/api/tiles/{image}", get(compatibility::tile_info))
-        .route("/ws", get(websocket))
+        .route("/ws", get(websocket).connect(websocket))
         .route("/ws/tiles", get(websocket))
         .fallback_service(ServeDir::new("web").append_index_html_on_directories(true))
         .layer(axum::middleware::from_fn(errors::normalize))
-        .layer(TraceLayer::new_for_http())
-        // Additional browser UI origins are an explicit deployment setting.
-        .layer(
-            CorsLayer::new()
-                .allow_origin(cors_origins)
-                .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE])
-                .allow_headers([
-                    HeaderName::from_static("authorization"),
-                    HeaderName::from_static("content-type"),
-                ])
-                .expose_headers([
-                    HeaderName::from_static("x-river-source-read-bytes"),
-                    HeaderName::from_static("x-river-source-range-requests"),
-                    HeaderName::from_static("x-river-source-cache-hit-bytes"),
-                    HeaderName::from_static("x-river-next-cursor"),
-                    HeaderName::from_static("x-river-trace-id"),
-                    HeaderName::from_static("x-river-request-id"),
-                    HeaderName::from_static("x-river-decoder-route"),
-                    HeaderName::from_static("x-river-queue-ms"),
-                    HeaderName::from_static("x-river-decode-ms"),
-                    HeaderName::from_static("x-river-encode-ms"),
-                    HeaderName::from_static("x-river-server-ms"),
-                    HeaderName::from_static("x-river-source-cache"),
-                    HeaderName::from_static("x-river-source-cache-ms"),
-                ]),
-        )
+        .layer(axum::middleware::from_fn(cors::expose_response_headers))
+        .layer(cors)
         .with_state(state);
 
     let address = std::env::var("RIVER_BIND")
@@ -346,14 +340,20 @@ async fn main() -> anyhow::Result<()> {
         .parse::<SocketAddr>()
         .context("RIVER_BIND must be a socket address")?;
     tracing::info!(%address, "River listening");
+    tokio::task::spawn_blocking(|| {
+        if let Err(error) = asset_registry::warm_locator_inventory() {
+            tracing::debug!(%error, "Asset locator inventory warmup deferred");
+        }
+    });
     let listener = tokio::net::TcpListener::bind(address).await?.tap_io(|stream| {
         // Small preview/cache-hit frames must not wait for delayed TCP ACKs.
         if let Err(error) = stream.set_nodelay(true) {
             tracing::warn!(%error, "unable to enable TCP_NODELAY");
         }
     });
-    axum::serve(listener, app).await?;
+    tls::serve(listener, app, tls::settings(configuration::snapshot()?.tls)?).await?;
     tracer_provider.shutdown()?;
+    if let Some(logger) = logger_provider { logger.shutdown()?; }
     Ok(())
 }
 
@@ -513,9 +513,17 @@ async fn render_wmts(state:AppState,query:WmtsQuery,geometry:Option<compatibilit
     else {
         return errors::reply(StatusCode::BAD_REQUEST,"unsupported_image_format","The requested FORMAT is unsupported or unavailable. GET /api/formats lists available MIME types.",serde_json::json!({"format":query.format}));
     };
-    let Some(driver) = parse_decoder_driver(&query.driver) else {
+    let auto_driver = matches!(query.driver.trim(), "" | "auto");
+    let Some(mut driver) = parse_decoder_driver(&query.driver) else {
         return errors::reply(StatusCode::BAD_REQUEST,"unknown_driver","Unknown decoder driver. Use openjpeg, jp2grok, openhtj2k or nvjpeg2000; GET /api/drivers lists runtime availability.",serde_json::json!({"driver":query.driver}));
     };
+    if auto_driver && state.tile_engines.get(driver).is_none() {
+        if let Some(available) = state.tile_engines.info().into_iter()
+            .filter(|info| info.available).find_map(|info| parse_decoder_driver(&info.id))
+        {
+            driver = available;
+        }
+    }
     let Some(engine) = state.tile_engines.get(driver) else {
         return (
             StatusCode::SERVICE_UNAVAILABLE,
@@ -563,6 +571,51 @@ async fn render_wmts(state:AppState,query:WmtsQuery,geometry:Option<compatibilit
     let Some(source) = asset.source else {
         return errors::reply(StatusCode::NOT_FOUND,"image_source_unavailable","The image is cataloged but has no readable source. Check the corpus mount or reconnect its S3 source.",serde_json::json!({"assetId":asset_id.0}));
     };
+    let prefer_grok = auto_driver
+        && geometry.is_some() && columns == 1 && rows == 1 && zoom > 0
+        && std::env::var("RIVER_GROK_RPCL_PREVIEW").map_or(true, |value| value == "1")
+        && source.remote.as_ref().is_some_and(|remote| {
+            let h = &remote.header;
+            !h.is_ht && h.components == 3 && h.bit_depth == 8
+                && u64::from(h.width) * u64::from(h.height) <= 4096 * 4096
+                && h.image_origin == (0, 0) && h.progression == 2 // RPCL
+                && u64::from(h.layout.columns) * u64::from(h.layout.rows) <= 16
+        });
+    let prefer_indexed_zoom_grok = auto_driver
+        && geometry.is_some() && zoom == 0 && tile_edge == 512
+        && query.layers.unwrap_or(0) == 0
+        && std::env::var("RIVER_TRIAL_GROK_INDEXED_ZOOM").as_deref() == Ok("1")
+        && source.remote.as_ref().is_some_and(|remote| {
+            let h = &remote.header;
+            !remote.serial_index && !h.is_ht && h.components == 3
+                && matches!(h.bit_depth, 8 | 16) && (4..=6).contains(&h.levels.saturating_sub(1))
+                && h.image_origin == (0, 0) && h.layout.origin_x == 0 && h.layout.origin_y == 0
+                && h.layout.width % 512 == 0 && h.layout.height % 512 == 0
+        });
+    let prefer_single_native_zoom_grok = auto_driver
+        && geometry.is_some() && zoom == 0 && tile_edge == 512
+        && query.layers.unwrap_or(0) == 0
+        && matches!(std::env::var("RIVER_GROK_NATIVE").as_deref(), Ok("1" | "true"))
+        && std::env::var("RIVER_GROK_SINGLE_NATIVE_DEEP").map_or(true, |value| value == "1")
+        && source.remote.as_ref().is_some_and(|remote| remote.native_grok_single_deep);
+    let (driver, engine) = if auto_driver && source.remote.as_ref().is_some_and(|reader| reader.header.is_ht) {
+        let selected = [DecoderDriver::Jp2Grok, DecoderDriver::OpenHtj2k, DecoderDriver::NvJpeg2000]
+            .into_iter()
+            .filter(|driver| *driver != DecoderDriver::NvJpeg2000
+                || (query.layers.unwrap_or(0) == 0 && source.reference_origin == (0, 0)))
+            .find_map(|driver| state.tile_engines.get(driver).map(|engine| (driver, engine)));
+        let Some(selected) = selected else {
+            return errors::reply(StatusCode::UNPROCESSABLE_ENTITY, "unsupported_ht_decoder",
+                "This HTJ2K image requires an enabled JP2Grok, OpenHTJ2K or compatible nvJPEG2000 decoder.",
+                serde_json::json!({}));
+        };
+        selected
+    } else if prefer_grok || prefer_indexed_zoom_grok || prefer_single_native_zoom_grok {
+        state.tile_engines.get(DecoderDriver::Jp2Grok)
+            .map_or((driver, engine), |grok| (DecoderDriver::Jp2Grok, grok))
+    } else {
+        (driver, engine)
+    };
     let layers = query.layers.unwrap_or(0);
     if driver == DecoderDriver::NvJpeg2000 && source.reference_origin != (0,0) {
         return errors::reply(StatusCode::BAD_REQUEST,"driver_origin_unsupported","Non-zero image origins require OpenJPEG or JP2Grok",serde_json::json!({}));
@@ -577,7 +630,7 @@ async fn render_wmts(state:AppState,query:WmtsQuery,geometry:Option<compatibilit
     let queued_at = Instant::now();
     let (_cancel_guard, cancellation) = remote_source::CancelOnDrop::new();
     let request = TileDecodeRequest {
-        output_geometry:geometry.map(|g| edges::OutputGeometry {edge:g.bitmap,
+        progressive_final_reduction:None, output_geometry:geometry.map(|g| edges::OutputGeometry {edge:g.bitmap,
             width:(u64::from((asset.manifest.width-col*tile_edge).min(tile_edge))*u64::from(g.bitmap)).div_ceil(u64::from(tile_edge)) as u32,
             height:(u64::from((asset.manifest.height-row*tile_edge).min(tile_edge))*u64::from(g.bitmap)).div_ceil(u64::from(tile_edge)) as u32}),
         edge_mode,
@@ -604,13 +657,16 @@ async fn render_wmts(state:AppState,query:WmtsQuery,geometry:Option<compatibilit
                 let _entered = span.enter();
                 let index_only=request.source.remote.as_ref().is_some_and(|remote|remote.serial_index && !remote.sequential_prefix);
                             let _source_admission=source_admission::Scope::enter(source_gate,index_only);
-                engine::prepare_admitted(preparer.as_ref(), request, io_permit, flight)
+                engine::prepare_admitted(preparer.as_ref(), request, io_permit, flight, false)
             }).await {
                 Ok(Ok((request, io_permit, flight))) => (request, Some(io_permit), flight),
-                Ok(Err(error)) => return errors::reply(StatusCode::UNPROCESSABLE_ENTITY,"source_prepare_failed",format!("Cannot prepare this image: {error:#}"),serde_json::json!({"assetId":asset_id.0,"driver":driver.as_str(),"matrix":level,"column":col,"row":row})),
+                Ok(Err(error)) => return errors::scratch_reply(&error).unwrap_or_else(|| errors::reply(StatusCode::UNPROCESSABLE_ENTITY,"source_prepare_failed",format!("Cannot prepare this image: {error:#}"),serde_json::json!({"assetId":asset_id.0,"driver":driver.as_str(),"matrix":level,"column":col,"row":row}))),
                 Err(error) => return errors::reply(StatusCode::INTERNAL_SERVER_ERROR,"source_prepare_worker_failed",format!("The source-preparation worker stopped unexpectedly: {error}"),serde_json::json!({"assetId":asset_id.0,"driver":driver.as_str()})),
             }
         } else { (request, None, flight) };
+        if request.tiles.is_empty() {
+            Ok(Ok((0.0, elapsed_ms(queued_at), request.cached_tiles.into_iter().next())))
+        } else {
         let cpu_queued_at = Instant::now();
         let Ok(permit) = state.decode_slots.clone().acquire_owned().await else {
             return errors::reply(StatusCode::SERVICE_UNAVAILABLE,"scheduler_unavailable","The decode or source-I/O scheduler has shut down. Retry after the River instance is ready.",serde_json::json!({}));
@@ -625,10 +681,12 @@ async fn render_wmts(state:AppState,query:WmtsQuery,geometry:Option<compatibilit
             drop(permit);
             result.map(|mut tiles| (queue_ms, elapsed_ms(queued_at), tiles.pop()))
         }).await
+        }
     };
     let (queue_ms, elapsed, decoded) = match decode {
         Ok(Ok((queue_ms, elapsed, Some(decoded)))) => (queue_ms, elapsed, decoded),
         Ok(Err(error)) => {
+            if let Some(response) = errors::scratch_reply(&error) { return response; }
             tracing::warn!(%error, "WMTS source decode failed");
             return (StatusCode::UNPROCESSABLE_ENTITY, Json(serde_json::json!({"code":"source_decode_failed","message":format!("{error:#}"),"details":{"assetId":asset_id.0,"driver":driver.as_str(),"matrix":level,"column":col,"row":row}}))).into_response();
         }
@@ -652,6 +710,8 @@ async fn render_wmts(state:AppState,query:WmtsQuery,geometry:Option<compatibilit
         "x-river-decoder-route",
         HeaderValue::from_static(decoded.raster.decoder_route),
     );
+    headers.insert("x-river-selected-driver", HeaderValue::from_static(driver.as_str()));
+    headers.insert("x-river-decoder-backend", HeaderValue::from_static(decoded.raster.decoder_backend));
     headers.insert(
         "x-river-queue-ms",
         HeaderValue::from_str(&format!("{queue_ms:.3}")).unwrap(),
@@ -684,29 +744,40 @@ async fn render_wmts(state:AppState,query:WmtsQuery,geometry:Option<compatibilit
     response
 }
 
-fn init_tracing() -> anyhow::Result<SdkTracerProvider> {
+fn init_tracing() -> anyhow::Result<(SdkTracerProvider, Option<opentelemetry_sdk::logs::SdkLoggerProvider>)> {
     // Declare service identity on the provider itself.  Relying on an SDK
     // default makes trace exploration needlessly ambiguous in a real shared
     // collector, where "unknown_service" is not a usable operational label.
     let service_name =
         std::env::var("OTEL_SERVICE_NAME").unwrap_or_else(|_| "river-server".to_owned());
     let builder = SdkTracerProvider::builder()
-        .with_resource(Resource::builder().with_service_name(service_name).build());
+        .with_resource(Resource::builder().with_service_name(service_name.clone()).build());
     let provider = if std::env::var("RIVER_OTEL_ENABLED").as_deref() == Ok("false") {
         builder.build()
     } else {
         builder.with_batch_exporter(SpanExporter::builder().with_tonic().build()?).build()
     };
     let tracer = provider.tracer("river-server");
+    let logging = console_log::initialize(configuration::snapshot()?.logging)?;
+    let logs = if logging.otlp_logs {
+        let exporter = opentelemetry_otlp::LogExporter::builder().with_tonic().build()?;
+        Some(opentelemetry_sdk::logs::SdkLoggerProvider::builder()
+            .with_resource(Resource::builder().with_service_name(service_name).build())
+            .with_batch_exporter(exporter).build())
+    } else { None };
+    let minimum = tracing_subscriber::EnvFilter::try_new(logging.minimum_level.as_str())?;
+    let filter = if std::env::var_os("RIVER_LOG_LEVEL").is_some() || configuration::snapshot()?.logging.is_some() {
+        minimum
+    } else {
+        tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or(minimum)
+    };
     tracing_subscriber::registry()
-        .with(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "river_server=info,tower_http=info".into()),
-        )
-        .with(tracing_subscriber::fmt::layer().event_format(console_log::Console).with_ansi(false))
+        .with(filter)
+        .with(tracing_subscriber::fmt::layer().event_format(console_log::Console { verbose: logging.verbose, pretty: logging.pretty_print }).with_ansi(false))
+        .with(logs.as_ref().map(|provider| console_log::StructuredLogs::new(provider, logging.verbose)))
         .with(OpenTelemetryLayer::new(tracer))
         .init();
-    Ok(provider)
+    Ok((provider, logs))
 }
 
 #[instrument(name = "river.http.health")]
@@ -725,7 +796,7 @@ async fn ht_cache_status() -> Json<serde_json::Value> {
 async fn list_decoder_drivers(
     State(state): State<AppState>,
 ) -> Json<Vec<engine::DecoderDriverInfo>> {
-    Json(state.tile_engines.info().to_vec())
+    Json(state.tile_engines.info())
 }
 
 #[instrument(name = "river.api.raster_formats")]
@@ -756,7 +827,7 @@ fn raster_format_options() -> [(RasterFormat, bool); 4] {
 
 fn parse_decoder_driver(value: &str) -> Option<DecoderDriver> {
     match value {
-        "" | "openjpeg" => Some(DecoderDriver::OpenJpeg),
+        "" | "auto" | "openjpeg" => Some(DecoderDriver::OpenJpeg),
         "jp2grok" => Some(DecoderDriver::Jp2Grok),
         "openhtj2k" => Some(DecoderDriver::OpenHtj2k),
         "nvjpeg2000" => Some(DecoderDriver::NvJpeg2000),
@@ -807,6 +878,13 @@ async fn manifest(State(state): State<AppState>, Path(asset_id): Path<String>,qu
 }
 
 async fn resolved_asset(state: &AppState, id: &AssetId) -> anyhow::Result<Option<RegisteredAsset>> {
+    if !state.assets.read().await.contains_key(id) {
+        if let Some((source,key))=remote_asset_key(&id.0).or_else(||asset_registry::lookup_locator(&id.0)) {
+            let response=load_s3_asset(State(state.clone()),Path(source),Json(S3AssetInput{key,width:None,height:None,bit_depth:None})).await;
+            anyhow::ensure!(response.status().is_success(),"Cannot reload evicted image metadata: {}",response.status());
+            anyhow::ensure!(state.assets.read().await.contains_key(id),"Source version changed; reopen the original image URL to obtain current metadata");
+        }
+    }
     let Some(mut asset) = state.assets.read().await.get(id).cloned() else { return Ok(None); };
     let Some(source) = asset.source.as_ref().filter(|source| source.remote.is_none()).cloned()
         else { return Ok(Some(asset)); };
@@ -854,9 +932,8 @@ async fn resolved_asset(state: &AppState, id: &AssetId) -> anyhow::Result<Option
 fn remote_asset_id(source_id: &str, key: &str) -> String {
     format!("s3-{}", hex::encode(serde_json::to_vec(&(source_id, key)).unwrap()))
 }
-fn remote_asset_key(id: &str) -> Option<(String, String)> {
-    serde_json::from_slice(&hex::decode(id.strip_prefix("s3-")?).ok()?).ok()
-}
+fn remote_asset_key(id:&str)->Option<(String,String)> {serde_json::from_slice(&hex::decode(id.strip_prefix("s3-")?).ok()?).ok()}
+
 fn page_limit(limit: Option<usize>) -> usize { limit.unwrap_or(50).clamp(1, 100) }
 
 fn page_ids<'a>(ids: impl Iterator<Item = &'a str>, cursor: Option<&str>, limit: usize) -> (Vec<&'a str>, bool) {
@@ -1061,6 +1138,7 @@ async fn load_s3_asset(
     Path(source_id): Path<String>,
     Json(input): Json<S3AssetInput>,
 ) -> Response {
+    let registration_started = std::time::Instant::now();
     // Configuration mutations exclude opens, while distinct objects may load
     // concurrently. Duplicate requests share only their own object's gate.
     let _load = state.s3_load_lock.read().await;
@@ -1087,7 +1165,10 @@ async fn load_s3_asset(
         }
     };
     let _object_load = gate.lock().await;
-    if let Some(asset) = state.assets.read().await.get(&AssetId(remote_id.clone())) {
+    let cached=state.assets.read().await.get(&AssetId(remote_id.clone())).cloned();
+    let age=state.assets.read().await.age(&AssetId(remote_id.clone()));
+    let ttl=std::env::var("RIVER_S3_METADATA_TTL_MS").ok().and_then(|v|v.parse().ok()).unwrap_or(30000u64);
+    if let Some(asset)=cached.filter(|_|age.is_some_and(|age|age<Duration::from_millis(ttl))) {
         if input.width.is_some_and(|w| w != asset.manifest.width)
             || input.height.is_some_and(|h| h != asset.manifest.height)
             || input.bit_depth.is_some_and(|d| d != asset.manifest.bit_depth) {
@@ -1095,7 +1176,7 @@ async fn load_s3_asset(
         }
         return Json(serde_json::json!({"assetId":asset.manifest.asset_id.0,
             "width":asset.manifest.width,"height":asset.manifest.height,
-            "bytes":asset.manifest.quality.cumulative_layer_bytes.last(),"bytesFetched":0,"rangeRequests":0,"identityKind":"s3-version","cached":true})).into_response();
+            "bytes":asset.manifest.quality.cumulative_layer_bytes.last(),"bytesFetched":0,"rangeRequests":0,"serverRegistrationMs":registration_started.elapsed().as_secs_f64()*1000.0,"headerProbeMs":0.0,"identityKind":"s3-version","cached":true})).into_response();
     }
     let location =
         match ObjectPath::parse(key) {
@@ -1116,6 +1197,7 @@ async fn load_s3_asset(
         )
             .into_response();
     }
+    let probe_started = std::time::Instant::now();
     let io_permit = match state.source_io_slots.clone().acquire_owned().await {
         Ok(permit) => permit,
         Err(_) => return errors::reply(StatusCode::SERVICE_UNAVAILABLE,"scheduler_unavailable","The source-I/O scheduler has shut down.",serde_json::json!({})),
@@ -1129,15 +1211,17 @@ async fn load_s3_asset(
         Err(_) => return errors::reply(StatusCode::GATEWAY_TIMEOUT,"s3_probe_timeout","S3 did not return its bounded header probe within 10 seconds. Check source connectivity and provider latency.",serde_json::json!({"sourceId":source_id,"key":key})),
         Ok(Err(error)) => return errors::reply(StatusCode::BAD_GATEWAY,"s3_probe_failed",format!("Cannot read the initial S3 header range: {error:#}"),serde_json::json!({"sourceId":source_id,"key":key})),
     };
+    let probe_ms = probe_started.elapsed().as_secs_f64() * 1000.0;
     let meta=&probe.meta;
     // This is a version identity, deliberately distinct from a content SHA-256.
-    let asset_id = format!("s3v-{}", hex::encode(Sha256::digest(serde_json::to_vec(&(
+    let version_id = format!("s3v-{}", hex::encode(Sha256::digest(serde_json::to_vec(&(
         &source.id, &source.endpoint, &source.bucket, key, meta.size, &meta.e_tag, &meta.version, meta.last_modified
     )).unwrap())));
+    let asset_id=version_id.clone();
     let runtime = tokio::runtime::Handle::current();
     let store = source.store.clone();
     let cache = state.s3_range_cache.clone();
-    let id = asset_id.clone();
+    let id = version_id.clone();
     let source_id_for_reader = source.id.clone();
     let size = meta.size;
     #[cfg(all(feature="grok",unix))] let native_region=source.region.clone();
@@ -1154,7 +1238,8 @@ async fn load_s3_asset(
     }).await;
     let (remote, stats) = match loaded {
         Ok(Ok(loaded)) => loaded,
-        error => return (StatusCode::UNPROCESSABLE_ENTITY, Json(serde_json::json!({"code":"s3_header_failed","message":format!("{error:?}")}))).into_response(),
+        Ok(Err(error)) => return errors::reply(StatusCode::UNPROCESSABLE_ENTITY,"s3_header_failed",format!("Cannot read JPEG 2000 header: {error:#}"),remote_source::header_error_details(&error)),
+        Err(error) => return errors::reply(StatusCode::INTERNAL_SERVER_ERROR,"s3_header_worker_failed",format!("The image header worker stopped: {error}"),serde_json::json!({})),
     };
     let header = &remote.header;
     if input.width.is_some_and(|w| w != header.width) || input.height.is_some_and(|h| h != header.height)
@@ -1163,6 +1248,7 @@ async fn load_s3_asset(
     }
     let mut source_file = Jpeg2000Source::from_catalog(PathBuf::from(key), header.width, header.height, Some(header.layout));
     source_file.reference_origin = header.image_origin;
+    source_file.components=Some(header.components);source_file.display_rgb_only=header.display_rgb_only;
     source_file.remote = Some(remote.clone());
     let asset = RegisteredAsset {
         local_header: Arc::new(tokio::sync::OnceCell::new()), local_reader: Arc::new(tokio::sync::OnceCell::new()),
@@ -1189,13 +1275,15 @@ async fn load_s3_asset(
         gain_source: None,
         gain_scale: 1,
     };
+    let locator=(asset_id.clone(),source.id.clone(),key.to_owned());
+    tokio::task::spawn_blocking(move||{if let Err(error)=asset_registry::remember_locator(&locator.0,&locator.1,&locator.2){tracing::debug!(%error,"asset locator persistence unavailable; original URLs remain demand-loadable");}}).await.ok();
     state
         .assets
         .write()
         .await
         .insert(AssetId(asset_id.clone()), asset.clone());
     state.assets.write().await.insert(AssetId(remote_id), asset);
-    Json(serde_json::json!({"assetId":asset_id,"width":header.width,"height":header.height,"bytes":size,"bytesFetched":stats.bytes,"rangeRequests":stats.requests,"identityKind":"s3-version","loadedFrom":{"sourceId":source.id,"bucket":source.bucket,"key":key},"cache":"bounded compressed ranges; no full-file download"})).into_response()
+    Json(serde_json::json!({"assetId":asset_id,"width":header.width,"height":header.height,"bytes":size,"bytesFetched":stats.bytes,"rangeRequests":stats.requests,"serverRegistrationMs":registration_started.elapsed().as_secs_f64()*1000.0,"headerProbeMs":probe_ms,"identityKind":"s3-version","loadedFrom":{"sourceId":source.id,"bucket":source.bucket,"key":key},"cache":"bounded compressed ranges; no full-file download"})).into_response()
 }
 
 #[instrument(name = "river.catalog.start_background_discovery", skip(state))]
@@ -1515,7 +1603,7 @@ async fn serve_request(
             let decode_layers = if decoder_source.path == source.path && source_layers >= available_layers { 0 } else { source_layers };
             let webp_method=encoding_settings::snapshot();
             let canonical_request=TileDecodeRequest {
-        output_geometry:None,
+        progressive_final_reduction:None, output_geometry:None,
                 edge_mode,
                 source_id:asset.manifest.asset_id.0.clone(),webp_method,capture_pixels:false,whole_view:group_whole_view,source:decoder_source.clone(),
                 tiles:group.tiles.clone(),source_tile:decoder_tile,reduction:decoder_reduce,layers:decode_layers,
@@ -1556,7 +1644,7 @@ async fn serve_request(
             };
             // Decode 2×2 transport-tile unions. That amortizes OpenJPEG codec
             // setup while retaining four CPU-parallel jobs for an HD viewport.
-            let batches =
+            let mut batches =
                 if patch_edge.is_some() {
                     let batch_size=std::env::var("RIVER_PREVIEW_PATCH_BATCH_TILES").ok()
                         .and_then(|value|value.parse::<usize>().ok()).unwrap_or(if patch_edge==Some(1024) {32} else {8});
@@ -1568,6 +1656,21 @@ async fn serve_request(
                 };
             let mut preview_pixels=patch_edge.filter(|_|edge_mode==edges::Mode::Crop).and_then(|edge|preview_pixels::Pixels::new(&canonical_request,edge));
             let capture_pixels=preview_pixels.is_some();
+            let shared_prefix = driver == DecoderDriver::OpenJpeg
+                || (driver == DecoderDriver::Jp2Grok
+                    && !std::env::var("RIVER_GROK_PROGRESSIVE_PREFIX")
+                        .is_ok_and(|value| value == "0" || value.eq_ignore_ascii_case("false")));
+            let progressive_final_reduction = (planned.kind == river_core::PassKind::Preview
+                && group_whole_view && shared_prefix).then_some(zoom);
+            if patch_edge.is_none()
+                && progressive_final_reduction.is_some()
+                && decoder_source.remote.is_some()
+                && std::env::var("RIVER_TRIAL_SINGLE_REMOTE_PREVIEW").as_deref() == Ok("1")
+                && batches.first().is_some_and(|batch| batch.len() > 1)
+            {
+                let first_tile = batches[0].remove(0);
+                batches.insert(0, vec![first_tile]);
+            }
             let mut jobs = futures_util::stream::iter(batches.into_iter().map(|batch| {
                 let slots = state.decode_slots.clone();
                 let io_slots = state.source_io_slots.clone();
@@ -1582,7 +1685,7 @@ async fn serve_request(
                 let whole_view = group_whole_view;
                 async move {
                     let request = TileDecodeRequest {
-        output_geometry:None,
+        progressive_final_reduction, output_geometry:None,
                             edge_mode,
                             webp_method,
                             capture_pixels,
@@ -1604,6 +1707,18 @@ async fn serve_request(
                         None => None,
                     };
                     if let Some(tiles) = engine.cached(&request) { return Ok((0.0, tiles)); }
+                    let (request, shared_checked) = if defer_refinement && crate::shared_cache::tiles_enabled()
+                        && request.source.remote.is_some() && !request.capture_pixels
+                    {
+                        let probe = engine.clone();
+                        let request = tokio::task::spawn_blocking(move || probe.probe_shared(request)).await
+                            .context("shared tile cache worker stopped")?;
+                        request.ensure_active()?;
+                        if request.tiles.is_empty() {
+                            if let Some(tiles) = engine.cached(&request) { return Ok((0.0, tiles)); }
+                        }
+                        (request, true)
+                    } else { (request, false) };
                     if defer_refinement {
                         refinement_gate.get_or_init(|| async { tokio::time::sleep(refine_idle_delay.saturating_sub(viewport_started.elapsed())).await }).await;
                     }
@@ -1618,7 +1733,7 @@ async fn serve_request(
                             let _entered = span.enter();
                             let index_only=request.source.remote.as_ref().is_some_and(|remote|remote.serial_index && !remote.sequential_prefix);
                             let _source_admission=source_admission::Scope::enter(source_gate,index_only);
-                            engine::prepare_admitted(preparer.as_ref(), request, io_permit, flight)
+                            engine::prepare_admitted(preparer.as_ref(), request, io_permit, flight, shared_checked)
                         }).await
                             .context("source preparation worker stopped")??;
                         (request, Some(io_permit), flight)
@@ -1645,7 +1760,10 @@ async fn serve_request(
             }));
             // Finish the first spatial batch before starting jobs which could
             // otherwise acquire the index lock ahead of the first useful pixels.
-            let first=if patch_edge.is_some() {jobs.next().await} else {None};
+            let prioritize_remote_preview = progressive_final_reduction.is_some()
+                && decoder_source.remote.is_some()
+                && std::env::var("RIVER_TRIAL_FIRST_REMOTE_PREVIEW").as_deref() == Ok("1");
+            let first=if patch_edge.is_some() || prioritize_remote_preview {jobs.next().await} else {None};
             let jobs=if let Some(first)=first {
                 futures_util::stream::once(first).chain(jobs.buffer_unordered(state.per_viewport_decode_concurrency)).boxed()
             } else {jobs.buffer_unordered(state.per_viewport_decode_concurrency).boxed()};
@@ -1683,6 +1801,7 @@ async fn serve_request(
                         content_type: decoded.content_type.to_owned(),
                         server_timing: ServerTiming {
                             decoder_route: decoded.decoder_route.to_owned(),
+                            decoder_backend: Some(decoded.decoder_backend.to_owned()),
                             worker_queue_ms,
                             decode_ms: decoded.decode_ms,
                             encode_ms: decoded.encode_ms,
@@ -1755,17 +1874,7 @@ fn display_tile_extent(tile: u32, source_tile: u32, image_extent: u32, zoom: u8)
         .div_ceil(1u32 << zoom)
 }
 
-fn decode_concurrency_from_env() -> usize {
-    std::env::var("RIVER_DECODE_CONCURRENCY")
-        .ok()
-        .and_then(|value| value.parse().ok())
-        .filter(|&value| value > 0)
-        .unwrap_or_else(|| {
-            std::thread::available_parallelism()
-                .map(|count| count.get().saturating_sub(1).clamp(1, 2))
-                .unwrap_or(1)
-        })
-}
+fn decode_concurrency_from_env() -> usize { resources::plan().decode_concurrency }
 
 async fn send_control(socket: &SocketSender, message: ServerMessage) -> anyhow::Result<()> {
     socket

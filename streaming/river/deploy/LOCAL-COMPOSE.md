@@ -75,7 +75,14 @@ Private state is in ignored `deploy/local-stack.json` and
 replica-1 retains the legacy `river_river-s3-cache` volume. Corpus/data volumes,
 storage services and existing instrumentation are preserved. Never run down -v.
 
-The default CORS allowlist also includes Crystal at `http://127.0.0.1:19074`
-and `http://localhost:19074`. Override each slot with `RIVER_<SLOT>_CORS_ORIGINS`.
+CORS accepts any browser hosting origin by default, including credentialed
+requests and custom headers. Set global `RIVER_CORS_ORIGINS` or override an
+individual slot with `RIVER_<SLOT>_CORS_ORIGINS` to restrict origins explicitly.
 See `deploy/portable/agent-handoff/STREAMER-COMPATIBILITY.md` for the shared
 tile-info/default256pixel pyramid contract; deployed availability follows releases.json.
+
+Local Compose and portable deployment default to 16 concurrent reads per
+source. An explicit RIVER_S3_SOURCE_MAX_REQUESTS value overrides the Compose
+default. A saved read-policy maxSourceRequests value takes precedence over
+both. The cap controls source connections separately from automatic source-I/O
+and decode sizing.

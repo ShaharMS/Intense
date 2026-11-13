@@ -68,6 +68,11 @@ impl Pipeline {
             Ok(())=>break,
             Err(mpsc::TrySendError::Full(returned))=>{message=returned;std::thread::sleep(Duration::from_millis(1));},
             Err(mpsc::TrySendError::Disconnected(_))=>{
+                context.check()?;
+                if std::env::var("RIVER_OPENHT_STRICT").as_deref()!=Ok("true") {
+                    tracing::warn!("OpenHT overlap worker closed its input; continuing source preparation");
+                    return Ok(false);
+                }
                 if let Some(worker)=self.worker.take(){match worker.join(){Ok(Err(error))=>return Err(error).context("pipeline decoder failed"),Err(_)=>bail!("pipeline decoder thread stopped unexpectedly"),_=>{}}}
                 bail!("pipeline decoder closed its input before completing the image");
             },
@@ -131,6 +136,22 @@ impl Pipeline {
 impl std::fmt::Display for PrefixNotCached {fn fmt(&self,f:&mut std::fmt::Formatter<'_>)->std::fmt::Result {write!(f,"pipeline prefix is not cached")}}
 impl std::error::Error for PrefixNotCached {}
 impl RemoteSource {
+    pub(super) fn resolve_pipeline(&self,context:&mut ReadContext)->Result<bool> {
+        let Some(pipeline)=context.pipeline.take() else {return Ok(false);};
+        let result=pipeline.finish();
+        context.check()?;
+        match result {
+            Ok(output)=>{
+                context.pipeline_output=output;
+                Ok(context.pipeline_output.is_some())
+            }
+            Err(error) if std::env::var("RIVER_OPENHT_STRICT").as_deref()!=Ok("true")=>{
+                tracing::warn!(%error,"OpenHT overlap failed; continuing source preparation");
+                Ok(false)
+            }
+            Err(error)=>Err(error),
+        }
+    }
     fn cached_lowest_tile(&self,part:&TilePart,reduction:u8,context:&mut ReadContext)->Result<Option<Vec<u8>>>{
         let (header,start,lengths,compatible)=self.tile_header(part,context)?;
         if !header.is_empty() || lengths.is_some() || !compatible {return Ok(None);}

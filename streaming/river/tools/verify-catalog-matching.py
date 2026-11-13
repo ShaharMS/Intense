@@ -1,4 +1,4 @@
-"""Verify matching-result pages across connected S3s without reading image bodies."""
+"""Verify one provider page per catalog action without reading image bodies."""
 import argparse,json,threading,uuid
 from http.server import BaseHTTPRequestHandler,ThreadingHTTPServer
 from urllib.parse import parse_qs,urlparse,urlencode
@@ -14,10 +14,10 @@ class S3(BaseHTTPRequestHandler):
     def do_GET(self):
         q=parse_qs(urlparse(self.path).query)
         if 'list-type' not in q:bodies.append(self.path);self.send_error(500);return
-        limit=int(q['max-keys'][0]);assert 1<=limit<=50
+        limit=int(q['max-keys'][0]);assert 1<=limit<=100
         start=int(q.get('continuation-token',['0'])[0]);prefix=q.get('prefix',[''])[0]
         selected=[key for key in keys if key.startswith(prefix)];page=selected[start:start+limit];end=start+len(page)
-        calls.append((urlparse(self.path).path,limit,start))
+        calls.append((urlparse(self.path).path,limit,start,prefix))
         contents=''.join(f'<Contents><Key>{key}</Key><LastModified>2026-10-15T00:00:00Z</LastModified><ETag>"fixture"</ETag><Size>12345</Size></Contents>' for key in page)
         more=end<len(selected);continuation=f'<NextContinuationToken>{end}</NextContinuationToken>' if more else ''
         body=f'<ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">{contents}<IsTruncated>{str(more).lower()}</IsTruncated>{continuation}</ListBucketResult>'.encode()
@@ -29,14 +29,22 @@ def request(path,body=None,method=None):
         content=r.read();return json.loads(content) if content else None
 ids=['search-'+uuid.uuid4().hex[:12]+suffix for suffix in ['a','b']];created=[]
 try:
+    assert request('/api/s3/sources') == [], 'Use a benchmark replica with isolated empty S3 settings'
     for index,source in enumerate(ids):
         request('/api/s3/sources',dict(id=source,name=source,endpoint=f'http://host.docker.internal:{server.server_port}',bucket=f'fixture{index}',region='us-east-1',prefix='folder',accessKeyId='fixture',secretAccessKey='fixture',allowHttp=True,virtualHostedStyle=False));created.append(source)
+    before=len(calls)
+    prefix_page=request('/api/assets?'+urlencode(dict(source=ids[0],keyPrefix='needle-',limit=100)))
+    assert len(calls)-before==1 and calls[-1][1:]==(100,0,'folder/needle-')
+    assert len(prefix_page['objects'])==60 and prefix_page['nextCursor'] is None
+    before=len(calls)
+    empty=request('/api/assets?'+urlencode(dict(source=ids[0],q='needle',limit=100)))
+    assert len(calls)-before==1 and empty['objects']==[] and empty['nextCursor']
     pages=[];cursor=None;current=[];all_results=[];responses=[];first_cursor=None
     while True:
         query=dict(source='all',q='NEEDLE',limit=50-len(current))
         if cursor:query['cursor']=cursor
         before=len(calls);body=request('/api/assets?'+urlencode(query));delta=len(calls)-before
-        assert delta<=10 and body['providerRequests']==delta
+        assert delta==1 and body['providerRequests']==1
         assert len(body['objects'])<=int(query['limit'])
         if not first_cursor:first_cursor=body.get('nextCursor')
         current+=body['objects'];cursor=body.get('nextCursor');responses.append(dict(matches=len(body['objects']),providerRequests=delta))

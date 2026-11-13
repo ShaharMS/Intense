@@ -9,8 +9,10 @@ from deployment_handoff import install_handoff
 
 parser = argparse.ArgumentParser()
 parser.add_argument('milestone')
-parser.add_argument('--suffix', default='', choices=['','-final','-native-pool','-16core-guide','-qualified','-serial-auto'])
+parser.add_argument('--suffix', default='', choices=['','-final','-native-pool','-16core-guide','-qualified','-qualified-handoff','-serial-auto'])
 parser.add_argument('--performance-report', type=Path)
+parser.add_argument('--release-record', type=Path, help='Use a staged release record when preparing a verified image for rollout.')
+parser.add_argument('--benchmark-policy', type=Path, help='Use the benchmark policy staged for the same rollout.')
 parser.add_argument('--configuration-profile', type=Path, help='Attach a qualified, image-specific opt-in configuration profile.')
 parser.add_argument('--stage-only',action='store_true',help='Prepare the deployment folder for upgrade verification before final ZIP assembly')
 parser.add_argument('--enable-structural-reads', action='store_true', help='Enable verified precinct/multipart paths in this candidate bundle')
@@ -30,6 +32,12 @@ root = Path(__file__).resolve().parents[1]
 build = root / 'reports/image-builds' / args.milestone
 status = json.loads((build / 'status.json').read_text(encoding='utf-8-sig'))
 assert status['state'] == 'built'
+if args.milestone == '2026.11.08-nearby-bulk-preview-m1200-trial' and args.suffix == '-qualified-handoff':
+    proof = json.loads(args.performance_report.read_text(encoding='utf-8'))
+    assert {'regression-mb50-same-slot-m1200.json','regression-gb11-preview-same-slot-m1200.json'} <= proof['evidence'].keys(), (
+        'm1200 must clear both same-slot still-preview controls before packaging for rollout'
+    )
+
 configuration_profile = None
 serial_default = 'sdk'
 if args.configuration_profile:
@@ -49,12 +57,35 @@ services:
     image: ''' + tag + '''
     pull_policy: never
     restart: unless-stopped
+    env_file:
+      - path: ${RIVER_CONFIG_ENV_FILE:-./river-config.env}
+        required: false
     environment:
+      RIVER_S3_LL_INITIAL_BYTES:
+      RIVER_S3_TLM_LL_FUSED_BYTES:
+      RIVER_S3_PROGRESSIVE_EARLY_DISCOVERY:
+      RIVER_GROK_PROGRESSIVE_PREFIX:
+      RIVER_PREFIX_RECOVERY_PROBE:
+      RIVER_S3_INDEX_PILOT_BYTES:
+      RIVER_MEMORY_BUDGET_BYTES:
+      RIVER_CACHE_MEMORY_BYTES:
+      RIVER_RESOURCE_ADAPTIVE:
+      RIVER_ASSET_METADATA_CACHE_BYTES:
+      RIVER_ASSET_LOCATOR_CACHE_BYTES:
+      RIVER_ASSET_LOCATOR_CACHE_ENTRIES:
+      RIVER_S3_METADATA_TTL_MS:
+      RIVER_S3_INDEX_MEMORY_BYTES:
+      RIVER_S3_INDEX_MEMORY_ENTRIES:
+      RIVER_S3_INDEX_CACHE_BYTES:
+      RIVER_S3_INDEX_CACHE_ENTRIES:
+      RIVER_S3_HEADER_CACHE_BYTES:
+      RIVER_NATIVE_TILE_CACHE_BYTES:
+      RIVER_RASTER_CACHE_BYTES:
       RIVER_S3_ADAPTIVE_READS: ${RIVER_S3_ADAPTIVE_READS:-observe}
       RIVER_S3_SOURCE_MAX_REQUESTS: ${RIVER_S3_SOURCE_MAX_REQUESTS:-16}
       RIVER_S3_MAX_RETRIES: ${RIVER_S3_MAX_RETRIES:-2}
-      RIVER_S3_PARSED_HEADER_CACHE_BYTES: ${RIVER_S3_PARSED_HEADER_CACHE_BYTES:-16777216}
-      RIVER_S3_PACKET_PLAN_CACHE_BYTES: ${RIVER_S3_PACKET_PLAN_CACHE_BYTES:-67108864}
+      RIVER_S3_PARSED_HEADER_CACHE_BYTES: ${RIVER_S3_PARSED_HEADER_CACHE_BYTES:-auto}
+      RIVER_S3_PACKET_PLAN_CACHE_BYTES: ${RIVER_S3_PACKET_PLAN_CACHE_BYTES:-auto}
       RIVER_S3_PREP_METADATA_BYTES: ${RIVER_S3_PREP_METADATA_BYTES:-4194304}
       RIVER_TRACE_SOURCE_READS: ${RIVER_TRACE_SOURCE_READS:-0}
       RIVER_PROFILE_SOURCE:
@@ -80,18 +111,18 @@ services:
       RIVER_GROK_NATIVE: ${RIVER_GROK_NATIVE:-true}
       RIVER_GROK_NATIVE_THREADS:
       RIVER_GROK_PACKED_VIEWS: ${RIVER_GROK_PACKED_VIEWS:-true}
-      RIVER_OPENHT_WORKERS: ${RIVER_OPENHT_WORKERS:-1}
+      RIVER_OPENHT_WORKERS: ${RIVER_OPENHT_WORKERS:-auto}
       RIVER_OPENHT_WORKER_THREADS: ${RIVER_OPENHT_WORKER_THREADS:-auto}
       RIVER_OPENHT_DIRECT_BLOCKS: "${RIVER_OPENHT_DIRECT_BLOCKS:-auto}"
       RIVER_OPENHT_PIPELINE: "${RIVER_OPENHT_PIPELINE:-auto}"
       RIVER_OPENHT_PIPELINE_BATCH_TILES: ${RIVER_OPENHT_PIPELINE_BATCH_TILES:-256}
-      RIVER_OPENHT_WORKER_MEMORY_MIB: ${RIVER_OPENHT_WORKER_MEMORY_MIB:-1536}
+      RIVER_OPENHT_WORKER_MEMORY_MIB: ${RIVER_OPENHT_WORKER_MEMORY_MIB:-auto}
       RIVER_OPENHT_TIMEOUT_MS: ${RIVER_OPENHT_TIMEOUT_MS:-30000}
       RIVER_OPENHT_MIN_PACKETS: "${RIVER_OPENHT_MIN_PACKETS:-}"
       RIVER_OPENHT_ALLOCATOR_LIBRARY: ${RIVER_OPENHT_ALLOCATOR_LIBRARY-/usr/lib/x86_64-linux-gnu/libmimalloc.so.2}
       RIVER_WEBP_METHOD: ${RIVER_WEBP_METHOD:-0}
-      RIVER_CORS_ORIGINS: ${RIVER_CORS_ORIGINS:-http://127.0.0.1:18765,http://127.0.0.1:19074,http://localhost:19074}
-      RIVER_RASTER_DISK_CACHE_BYTES: ${RIVER_RASTER_DISK_CACHE_BYTES:-268435456}
+      RIVER_CORS_ORIGINS: ${RIVER_CORS_ORIGINS:-*}
+      RIVER_RASTER_DISK_CACHE_BYTES: ${RIVER_RASTER_DISK_CACHE_BYTES:-auto}
       RIVER_S3_RANGE_CACHE_BYTES:
       RIVER_S3_PREPARED_PREFIX_CACHE_BYTES:
       RIVER_PROGRESSIVE_SMALL_PREVIEW_GAIN:
@@ -119,6 +150,26 @@ volumes:
   river-cache:
   river-config:
 ''', encoding='utf-8', newline='\n')
+tls_docs = build / 'source/deploy/portable/DEPLOY.md'
+diskless = (build / 'source/crates/river-server/src/storage_mode.rs').is_file()
+if diskless:
+    (package / 'compose.ram-only.yaml').write_text('''services:
+  river:
+    read_only: true
+    shm_size: 512m
+    volumes: !override
+      - ${RIVER_DATA_DIR:-./data}:/data:ro
+      - river-config:/var/lib/river/config
+''', encoding='utf-8')
+if tls_docs.is_file() and '### Native TLS and protocol selection' in tls_docs.read_text(encoding='utf-8'):
+    (package / 'compose.tls.yaml').write_text("""services:
+  river:
+    ports:
+      - "${RIVER_TLS_PUBLISH_ADDRESS:-127.0.0.1}:${RIVER_TLS_PORT:-18443}:8443"
+      - "${RIVER_TLS_PUBLISH_ADDRESS:-127.0.0.1}:${RIVER_TLS_PORT:-18443}:8443/udp"
+    volumes:
+      - "${RIVER_TLS_DIRECTORY:-./tls}:/run/river-tls:ro"
+""", encoding='utf-8')
 (package / 'compose.gpu.yaml').write_text('services:\n  river:\n    gpus: all\n', encoding='utf-8', newline='\n')
 (package / '.env.example').write_text('''COMPOSE_PROJECT_NAME=river-portable
 RIVER_BIND_ADDRESS=127.0.0.1
@@ -130,7 +181,7 @@ RIVER_PROFILE=auto
 RIVER_S3_SERIAL_TRANSPORT=sdk
 RIVER_S3_SOURCE_MAX_REQUESTS=16
 RIVER_S3_MAX_RETRIES=2
-RIVER_S3_PARSED_HEADER_CACHE_BYTES=16777216
+RIVER_S3_PARSED_HEADER_CACHE_BYTES=auto
 RIVER_TRACE_SOURCE_READS=0
 # Optional isolated diagnostics; unset these for normal serving.
 # RIVER_PROFILE_SOURCE=1
@@ -158,8 +209,8 @@ RIVER_OPENHT_PIPELINE=auto
 RIVER_OPENHT_PIPELINE_BATCH_TILES=256
 RIVER_OPENHT_MIN_PACKETS=
 RIVER_WEBP_METHOD=0
-RIVER_CORS_ORIGINS=http://127.0.0.1:18765,http://127.0.0.1:19074,http://localhost:19074
-RIVER_RASTER_DISK_CACHE_BYTES=268435456
+RIVER_CORS_ORIGINS=*
+RIVER_RASTER_DISK_CACHE_BYTES=auto
 # Optional shared compressed-byte budget; zero disables shared retention.
 # RIVER_S3_RANGE_CACHE_BYTES=0
 # Optional complete-quality compact-prefix cache; default16MiB, zero disables.
@@ -224,7 +275,7 @@ S3 sources can be connected in the UI. Definitions and credentials persist priva
 auto is the default profile: CPU quota and memory-aware admission, native Grok with CLI compatibility fallback, faster WebP encoding. RIVER_PROFILE=compact retains conservative concurrency. RIVER_WEBP_METHOD in .env is the startup fallback when no saved encoding setting exists; RIVER_GROK_NATIVE=false selects CLI-only decoding.
 The openhtj2k driver is selectable in the viewer, WMTS DRIVER, compatibility driver query, and WebSocket driver field. It uses an isolated reusable OpenHT worker for conservatively supported coarsest-resolution packet views, with Grok for other layouts and small jobs. Existing HT-coded streams use the Grok fallback; this accelerator also decodes ordinary JPEG 2000 without changing its entropy data. Response routes identify openht-packed-ranges or openht-fallback-s3-packet-ranges/openht-fallback-s3-tile-part-ranges/openht-fallback-s3-disk-compatibility. Worker errors are explicit; source images remain unchanged. One worker is the default. Automatic native threads use half the available CPU budget divided across workers, capped at sixteen when direct blocks are enabled (eight otherwise). Automatic direct frame budgets fall back to at most eight while another source preparation or worker request is pending. Compact retains two; an explicit numeric value overrides adaptation. increase RIVER_OPENHT_WORKERS only after measuring capacity and memory.
 
-WebP method is configurable live: GET /api/settings/encoding; PUT /api/settings/encoding with JSON {"webpMethod":4}. Methods 0 through 6 are accepted. The viewer provides Server encoding controls without a token. The saved setting overrides the startup environment fallback and persists in river-config/configuration.json. Cache entries are separated by method; in-flight render groups retain their snapshot.
+WebP method is configurable live: GET /api/settings/encoding; PUT /api/settings/encoding with JSON {"webpMethod":4}. Methods 0 through 6 are accepted. The viewer provides Server encoding controls without a token. The running API setting takes precedence and persists in river-config/configuration.json when JSON persistence is enabled. An explicit environment value takes precedence over JSON on restart. Cache entries are separated by method; in-flight render groups retain their snapshot.
 The viewer opts into early spatial preview patches for large remote images. Legacy WebSocket clients retain the original tile grid unless they send progressivePatches:true. Final tiles retain the original grid. Cached previews use compact tiles to keep repeated loads fast.
 The optional RIVER_S3_RANGE_CACHE_BYTES setting in .env overrides the shared compressed-byte budget; zero disables that cache. If omitted, the runtime profile chooses its normal budget. A reader-local buffer retains at most 16 KiB of already-read blocks during a preparation; it is discarded afterward. Header, index and rendered-tile caches have independent budgets.
 Encoded tiles persist in a bounded 256 MiB cache. RIVER_RASTER_DISK_CACHE_BYTES=0 disables it. Version changes invalidate entries. Original imagery remains unchanged.
@@ -242,13 +293,33 @@ if configuration_profile is not None:
     example.write_text(text.replace('RIVER_S3_SERIAL_TRANSPORT=sdk', 'RIVER_S3_SERIAL_TRANSPORT=auto'), encoding='utf-8', newline='\n')
     with (package / 'README.md').open('a', encoding='utf-8') as readme:
         readme.write('\nThis configuration-profile bundle defaults to auto serial transport for fresh installations. Existing .env and saved API settings retain their values. Read SERIAL-AUTO-PROFILE.md and review apply-serial-transport.py before changing an existing installation. The backend image is unchanged.\n')
-release = json.loads((root / 'deploy/releases.json').read_text(encoding='utf-8'))
+release = json.loads((args.release_record or root / 'deploy/releases.json').read_text(encoding='utf-8'))
 manifest['releaseChannels'] = []
 for channel, identity in [('latest', release.get('latestImageId')), ('stable', release.get('imageId')), ('lts', release.get('ltsImageId'))]:
     if identity == status['imageId']:
         manifest['releaseChannels'].append(channel)
+if (build / 'source/deploy/portable/DEPLOY.md').is_file():
+    deployment_source = (build / 'source/deploy/portable/DEPLOY.md').read_text(encoding='utf-8')
+    heading = '### Environment and live settings'
+    if heading in deployment_source:
+        environment_section = deployment_source.split(heading, 1)[1].split('\n### ', 1)[0]
+        with (package / 'DEPLOY.txt').open('a', encoding='utf-8') as readme:
+            readme.write('\nPut container settings in river-config.env beside compose.yaml, or set RIVER_CONFIG_ENV_FILE.\n\n')
+            readme.write(heading + environment_section.rstrip() + '\n')
+if (package / 'compose.tls.yaml').is_file():
+    heading = '### Native TLS and protocol selection'
+    with (package / 'DEPLOY.txt').open('a', encoding='utf-8') as readme:
+        readme.write('\nMount the TLS files using compose.tls.yaml and configure their paths in river-config.env or JSON. After loading the image, run docker compose -f compose.yaml -f compose.tls.yaml up -d.\n\n')
+        section = tls_docs.read_text(encoding='utf-8').split(heading, 1)[1].split('\n### ', 1)[0]
+        readme.write(heading + section.rstrip() + '\n')
+logging_source = build / 'source/crates/river-server/src/console_log.rs'
+if logging_source.is_file() and 'RIVER_LOG_REQUEST_SUMMARY' in logging_source.read_text(encoding='utf-8'):
+    heading = '### Request logging'
+    section = (root / 'deploy/portable/DEPLOY.md').read_text(encoding='utf-8').split(heading, 1)[1]
+    with (package / 'DEPLOY.txt').open('a', encoding='utf-8') as readme:
+        readme.write('\n' + heading + section)
 (package / 'release.json').write_text(json.dumps(release, indent=2), encoding='utf-8', newline='\n')
-shutil.copyfile(root / 'deploy/benchmark-policy.md', package / 'BENCHMARK-POLICY.md')
+shutil.copyfile(args.benchmark_policy or root / 'deploy/benchmark-policy.md', package / 'BENCHMARK-POLICY.md')
 (package / 'BUILD-MANIFEST.json').write_text(json.dumps(manifest, indent=2), encoding='utf-8', newline='\n')
 with (package / 'README.md').open('a',encoding='utf-8',newline='\n') as readme:
     readme.write("\nThe openhtj2k driver can directly decode eligible classic Part1 packed LL blocks with bounded scratch memory instead of constructing a full precinct hierarchy. Originals are unchanged. Valid unsupported packed layouts retain the existing decoder. Direct decoding writes normalized samples into RGBA from component-aligned precinct groups without full sample planes; larger eligible blocks also use this path. RIVER_OPENHT_DIRECT_BLOCKS=true forces a direct attempt; false disables it. With the automatic packet threshold, compatible rasters of at least 65536 pixels can use the worker even below 16384 packets; tiny rasters retain the prior route. An explicit RIVER_OPENHT_MIN_PACKETS value overrides automatic selection (0 forces worker selection for diagnostics). These controls are passed through from .env.\n")
@@ -302,6 +373,155 @@ with (package / 'README.md').open('a',encoding='utf-8') as readme:
     readme.write('\nRIVER_S3_PRECINCT_REBASE=auto reduces decoder geometry for eligible one-layer, zero-origin, reversible Part1 sources with a usable single-part PLT index. Precinct alignment and the full-depth wavelet support envelope preserve requested pixels; irrelevant packets inside the temporary window remain empty. This covers reduced preview passes as well as final tiles. Automatic windows require at least64 million original pixels, at most256 million window pixels and at least4x area reduction. SOP/EPH and unsupported layouts retain ordinary decoding. Source files remain unchanged. Set false to disable; true explicitly selects eligible windows without the automatic size gate.\n')
 
 install_handoff(package)
+if (build / 'source/crates/river-server/src/shared_cache.rs').is_file():
+    guide = root / 'deploy/portable/agent-handoff/ADAPTATION-AND-SHARED-CACHE.md'
+    shutil.copyfile(guide, package / guide.name)
+    if 'fn get_tiles(' in (build / 'source/crates/river-server/src/shared_cache.rs').read_text(encoding='utf-8'):
+        with (package / guide.name).open('a', encoding='utf-8') as handoff:
+            handoff.write('''
+## Progressive shared tile batches
+
+Each prepared WebSocket tile group can look up several versioned encoded
+tiles in one bounded pipeline. The response limit and maximum value size
+determine how many keys are included. Hits keep their exact pixels. Misses
+use the normal source path. Fully cached final groups skip the refinement
+idle delay, while groups with missing tiles retain that delay. Asset
+registration still needs a source version probe.
+
+Use the shared-cache API to check batchedTileLookups and tileHits. Compare
+registration, first frame, preview coverage and final delivery separately.
+''')
+    remote_source = (build / 'source/crates/river-server/src/remote_source.rs').read_text(encoding='utf-8')
+    if 'fn final_plt_probe(' in remote_source:
+        with (package / guide.name).open('a', encoding='utf-8') as handoff:
+            handoff.write('''
+## Cold deep reads on large single-tile sources
+
+For eligible adaptive reads, River can overlap the required end-marker
+check with the first bounded packet-length-table read. Source validation
+and the existing byte and request limits still apply. The qualification
+evidence records the measured 11 GB workload, paired timing, origin
+timestamps and pixel checks. The optimization does not require Valkey.
+''')
+    if 'let plt_header_hint =' in remote_source and 'RangePass::PayloadSample' in remote_source:
+        with (package / guide.name).open('a', encoding='utf-8') as handoff:
+            handoff.write('''
+## Cold indexed zoom reads
+
+On adaptive sources, River may dispatch the first batch of required
+payload samples together when the source has spare request slots. The
+batch uses at most eight lanes and respects the source request limit and
+explicit `RIVER_S3_RANGE_CONCURRENCY`. The range planner keeps its existing
+cost and overfetch estimates.
+
+For a single eligible RPCL tile part, a cached PLT length can suggest
+reading up to two blocks with the SOT probe. River still validates the
+selected tile header and its packet lengths from their own bytes. A
+previously validated header remains reusable. Set
+`RIVER_S3_TLM_ADJACENT_BLOCK=0` to turn off the adjacent-block hint.
+
+When checking a rollout, measure the same zoom on a fresh source identity
+and after an overview. Record discovery, payload and mixed GETs separately
+and check the pixels against an independent reference.
+''')
+            if 'RangePass::PayloadReplanned' in remote_source:
+                handoff.write('\nAfter payload sampling, the remaining planned ranges can also use idle source slots within the same limit.\n')
+    if 'A distant source with spare admission can overlap more RTTs.' in remote_source:
+        with (package / guide.name).open('a', encoding='utf-8') as handoff:
+            handoff.write('''
+## Large indexed progressive previews
+
+A bounded indexed preview batch with at least 64 ranges can use up to
+16 concurrent source requests when River measures at least 12 ms of source
+latency and adaptive reads are enabled. The effective source cap and any
+explicit range concurrency override still apply. This changes dispatch
+timing. Each range is selected by the existing read planner.
+
+The qualification workload uses a 979 MB TLM-indexed JPEG 2000 source.
+Measure first frame, full preview, and final delivery separately. Check
+the actual source cap, origin ranges, and exact frame pixels.
+''')
+    if 'native_grok_indexed_viewport' in remote_source:
+        with (package / guide.name).open('a', encoding='utf-8') as handoff:
+            handoff.write('''
+## WebSocket Auto decoder selection
+
+WebSocket Auto can choose native JP2Grok for a full reduced viewport on a
+small, lossless, indexed sRGB JP2 with RPCL packet order. The 979 MB
+indexed control uses OpenJPEG. Explicit WebSocket driver requests and
+the effective enabled-driver list still control selection.
+
+Read `serverTiming.decoderBackend` in each frame to identify the decoder
+or cache that produced it. A request for OpenHTJ2K can use native Grok
+through its fallback. Compare the backend, pixels, first frame, preview
+coverage, final delivery, and origin I/O separately.
+''')
+    if 'native_grok_single_deep' in remote_source:
+        with (package / guide.name).open('a', encoding='utf-8') as handoff:
+            handoff.write('''
+## Auto decoder for plain sRGB deep tiles
+
+Auto can select native JP2Grok for full-resolution 512-pixel HTTP tiles on
+remote, unindexed, single-native-tile JP2 with one reversible RPCL layer,
+six wavelet decompositions, and three unsigned, full-sampling 8-bit sRGB
+components. Grok must be enabled. Explicit driver requests take precedence.
+
+Set `RIVER_GROK_SINGLE_NATIVE_DEEP=0` in the container environment or
+portable `river-config.env` to disable this preference. Compare the selected
+driver, actual backend and fallback route in the response
+headers. Check exact pixels and origin GETs and bytes against the same
+fixture and CPU budget before attributing any timing change to the decoder.
+''')
+    with (package / 'AGENTS.md').open('a', encoding='utf-8') as handoff:
+        handoff.write('\nFor live adaptation, pretty logs and Redis/Valkey sharing, read ADAPTATION-AND-SHARED-CACHE.md.\n')
+if diskless:
+    guide = root / 'deploy/portable/agent-handoff/RAM-ONLY-DEPLOYMENT.md'
+    shutil.copyfile(guide, package / guide.name)
+    with (package / 'AGENTS.md').open('a', encoding='utf-8') as handoff:
+        handoff.write('\nFor diskless pods and bounded RAM scratch, read RAM-ONLY-DEPLOYMENT.md before changing volume mounts or memory limits.\n')
+if (package / 'compose.tls.yaml').is_file():
+    guide = root / 'deploy/portable/agent-handoff/NATIVE-TLS-DEPLOYMENT.md'
+    shutil.copyfile(guide, package / guide.name)
+    instructions = package / 'AGENTS.md'
+    with instructions.open('a', encoding='utf-8') as handoff:
+        handoff.write('\nFor native TLS, read NATIVE-TLS-DEPLOYMENT.md before changing listeners, certificates, or published ports.\n')
+if any(marker in tag for marker in ('-indexed-bulk-preview-m1199-', '-nearby-bulk-preview-m1200-',
+                                   '-indexed-still-lanes-m1201-', '-distant-still-lanes-m1202-')):
+    guide = root / 'deploy/portable/agent-handoff/INDEXED-PROGRESSIVE-DEPLOYMENT.md'
+    content = guide.read_text(encoding='utf-8-sig')
+    if '-indexed-bulk-preview-m1199-' not in tag:
+        content = content.replace('m1199','m1200').replace('14 ms configured origin','7 ms configured origin').replace('at least 10 ms','at least 6 ms')
+    if '-indexed-still-lanes-m1201-' in tag or '-distant-still-lanes-m1202-' in tag:
+        content += '''
+
+## Still previews in m1201
+
+m1201 inherits the progressive behavior above. Its separate still-preview
+change lets a large compatible typed-TLM reduced preview use up to eight
+lanes for an existing batch of prefix reads. The adaptive read policy,
+observed latency of at least 6 ms, and source connection cap govern the
+choice. River keeps an explicit RIVER_S3_RANGE_CONCURRENCY override.
+
+Use PERFORMANCE.json for the matched 979 MB still-preview comparison.
+Check first and repeated requests separately and record peak source
+concurrency, GETs, bytes, and pixel equality. This scheduling change
+preserves the requested ranges and does not need an image rewrite.
+'''
+    if '-distant-still-lanes-m1202-' in tag:
+        content += '''
+
+## Distant still previews in m1202
+
+For the same eligible still-preview batch, River can use up to sixteen lanes
+at an observed source latency of at least 12 ms. The configured source limit
+still applies, and an explicit RIVER_S3_RANGE_CONCURRENCY remains authoritative.
+The matched distant workload uses 14 ms configured delay, 300 MB/s and a
+sixteen-request source limit. Keep the existing source limit when upgrading.
+'''
+    (package / guide.name).write_text(content,encoding='utf-8')
+    with (package / 'AGENTS.md').open('a', encoding='utf-8') as handoff:
+        handoff.write('\nFor indexed progressive tuning, read INDEXED-PROGRESSIVE-DEPLOYMENT.md.\n')
+
 codec_profile_source = build / 'source/crates/river-openjpeg-sys/vendor/src/lib/openjp2/tcd.c'
 if codec_profile_source.exists() and 'RIVER_PROFILE_CODEC' in codec_profile_source.read_text(encoding='utf-8'):
     with (package / 'README.md').open('a', encoding='utf-8', newline='\n') as readme:
@@ -440,13 +660,13 @@ if ('discovery_reuse_confident' in (build/'source/crates/river-server/src/read_p
         readme.write('\nLearned-source discovery: Adaptive mode can reuse a mature source profile after fresh confirming preparation reads and validated recent part geometry. Fresh sources and contradictory opening timing retain full calibration. The mandatory bandwidth pilot refreshes latency before committing speculative traffic, so an ending startup delay cannot authorize a large read using stale timing. Learning remains process-local and keyed by configured sourceID. Read ORGANIZATIONAL-S3-PROFILE.md and PERFORMANCE.json for settings, exact qualification and limits.\n')
 if '/api/tiles/{image}' in (build/'source/crates/river-server/src/main.rs').read_text(encoding='utf-8'):
     with (package/'README.md').open('a',encoding='utf-8') as readme:
-        readme.write('\nShared streamer contract: GET /api/tiles/{encoded-original-image-url} and default streamer tiles use the same256pixel,ratio1 pixel pyramid. maxzoom=max(0,ceil(log2(max(width,height)/256))). PNG/WebP and transparent fixed-size padding work through connected sources without client-side registration. Explicit geometry and WMTS retain their behavior. Read STREAMER-COMPATIBILITY.md before replacing an external tile-info service: its pyramid policy must match. Local CORS defaults include Crystal at127.0.0.1:19074 and localhost:19074; configure existing RIVER_CORS_ORIGINS for other browser origins or use a same-origin proxy.\n')
+        readme.write('\nShared streamer contract: GET /api/tiles/{encoded-original-image-url} and default streamer tiles use the same256pixel,ratio1 pixel pyramid. maxzoom=max(0,ceil(log2(max(width,height)/256))). PNG/WebP and transparent fixed-size padding work through connected sources without client-side registration. Explicit geometry and WMTS retain their behavior. Read STREAMER-COMPATIBILITY.md before replacing an external tile-info service: its pyramid policy must match. CORS defaults accept any browser hosting origin, including credentials and custom request headers. RIVER_CORS_ORIGINS optionally restricts access to exact origins. HTTPS pages require an HTTPS/WSS API endpoint.\n')
 if performance is not None and json.loads(performance.read_text(encoding='utf-8')).get('qualifiedForPromotion') is False:
     readme_path=package/'README.md'
     readme_path.write_text('EXPERIMENTAL CANDIDATE: NOT RELEASE-QUALIFIED\n\n'
         'Read PERFORMANCE.json for the exact current evidence and pending checks. '
         'Feature descriptions below include inherited behavior and historical validation; '
-        'they do not establish qualification of this candidate. Stable/LTS are unchanged.\n\n'
+        'they do not establish qualification of this candidate. Current Stable/LTS follow release.json.\n\n'
         +readme_path.read_text(encoding='utf-8'),encoding='utf-8')
 if manifest['releaseChannels']:
     readme_path = package / 'README.md'
@@ -454,6 +674,10 @@ if manifest['releaseChannels']:
         'Read release.json and PERFORMANCE.json for current qualification and limitations. '
         'Inherited checkpoint notes below describe their historical validation; they do not override current channel metadata.\n\n'
         + readme_path.read_text(encoding='utf-8'), encoding='utf-8')
+resource_guide = root / 'deploy/RESOURCE-SIZING.md'
+if resource_guide.is_file() and (build/'source/crates/river-server/src/resources.rs').is_file():
+    shutil.copyfile(resource_guide, package / 'RESOURCE-SIZING.md')
+
 files = sorted(p for p in package.rglob('*') if p.is_file() and p.name != 'SHA256SUMS')
 (package / 'SHA256SUMS').write_text(''.join(hashlib.sha256(p.read_bytes()).hexdigest() + '  ' + p.relative_to(package).as_posix() + '\n' for p in files), encoding='ascii', newline='\n')
 if args.stage_only:

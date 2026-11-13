@@ -346,6 +346,7 @@ impl Image {
   /// `alpha_default` - The default value for the alpha channel if there is no alpha component.
   pub fn get_pixels(&self, alpha_default: Option<u32>) -> Result<ImageData> {
     let comps = self.components();
+    let comps=if comps.len()>4 || (comps.len()==4 && !comps.iter().any(|c|c.is_alpha())) {&comps[..3]}else{comps};
     let (width, height) = comps
       .get(0)
       .map(|c| (c.width(), c.height()))

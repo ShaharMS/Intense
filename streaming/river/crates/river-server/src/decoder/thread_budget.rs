@@ -24,11 +24,12 @@ impl Drop for Budget<'_> {fn drop(&mut self) {self.pool.free.fetch_add(self.clai
 fn automatic_max_threads(cpus:usize)->usize {match cpus {n if n>=16=>16,n if n>=8=>4,n if n>=4=>2,_=>1}}
 pub(crate) fn default_max_threads()->usize {
  if std::env::var("RIVER_PROFILE").is_ok_and(|p|p=="compact" || p=="throughput16") {return 1;}
- automatic_max_threads(std::thread::available_parallelism().map_or(1,usize::from))
+ let cpus = crate::resources::plan().detected.effective_cpus;
+ if cpus >= 32 && crate::adaptation::startup_liberal_ram() { 24 } else { automatic_max_threads(cpus) }
 }
 fn shared_pool()->&'static Pool {
  static POOL:OnceLock<Pool>=OnceLock::new();
- POOL.get_or_init(||Pool::new(std::thread::available_parallelism().map_or(1,usize::from),crate::decode_concurrency_from_env()))
+ POOL.get_or_init(||Pool::new(crate::resources::plan().detected.effective_cpus,crate::decode_concurrency_from_env()))
 }
 pub(crate) fn acquire(maximum:usize,large:bool)->Budget<'static> {
  shared_pool().acquire(maximum,large)
@@ -74,7 +75,10 @@ fn maximum_with_groups(maximum:usize,pixels:u64,active:usize,cpus:usize,slots:us
 
 pub(crate) fn request_maximum(request:&crate::engine::TileDecodeRequest)->usize {
  let pool=shared_pool();
- maximum_with_groups(request.decoder_threads,useful_pixels(request),ACTIVE_WORK.load(Ordering::Acquire),pool.cpus,pool.slots,compact_native_groups(request))
+ let ceiling = if crate::adaptation::conserve_compute() && !crate::adaptation::explicit("RIVER_OPENJPEG_THREADS_PER_DECODE") {
+     request.decoder_threads.div_ceil(2)
+ } else { request.decoder_threads };
+ maximum_with_groups(ceiling,useful_pixels(request),ACTIVE_WORK.load(Ordering::Acquire),pool.cpus,pool.slots,compact_native_groups(request))
 }
 
 pub(crate) fn large_request(request:&crate::engine::TileDecodeRequest)->bool {

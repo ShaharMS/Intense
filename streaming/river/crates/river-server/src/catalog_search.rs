@@ -1,4 +1,4 @@
-//! Matching-result pages, with bounded provider work and resumable scans.
+//! One bounded provider page per request, with resumable searches.
 use super::*;
 
 #[derive(Default,serde::Serialize,serde::Deserialize)]
@@ -24,13 +24,12 @@ pub(super) async fn search(state:AppState,query:AssetListQuery)->Response {
     };
     let limit=page_limit(query.limit);
     let mut objects=Vec::new();let mut scanned=0;let mut calls=0;
-    let started=Instant::now();
-    while cursor.source<sources.len() && objects.len()<limit && calls<10 && started.elapsed()<Duration::from_secs(2) {
+    if cursor.source < sources.len() {
         let source=&sources[cursor.source];
         let base=source.prefix.trim_matches('/');
         let prefix=format!("{}{}{}",base,if base.is_empty() {""} else {"/"},prefix.trim_start_matches('/'));
         let page=match source.store.list_paginated((!prefix.is_empty()).then_some(prefix.as_str()),PaginatedListOptions {
-            max_keys:Some(limit-objects.len()),page_token:cursor.token.clone(),..Default::default()
+            max_keys:Some(limit),page_token:cursor.token.clone(),..Default::default()
         }).await {
             Ok(page)=>page,
             Err(error)=>return (StatusCode::BAD_GATEWAY,Json(serde_json::json!({"code":"s3_list_failed","sourceId":source.id,"message":error.to_string()}))).into_response(),

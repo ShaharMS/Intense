@@ -1,8 +1,9 @@
 //! Stitch normalized decoded pixels, never encoded/lossy patches.
-use std::{collections::HashSet,sync::{OnceLock,atomic::{AtomicUsize,Ordering}}};
+use std::{collections::HashSet,sync::{atomic::{AtomicUsize,Ordering}}};
 use crate::{decoder::{DecodedTile,DecodedRaster},engine::TileDecodeRequest};
 static USED:AtomicUsize=AtomicUsize::new(0);
-fn limit()->usize {static LIMIT:OnceLock<usize>=OnceLock::new();*LIMIT.get_or_init(||std::env::var("RIVER_PREVIEW_PIXEL_REUSE_BYTES").ok().and_then(|v|v.parse().ok()).unwrap_or(32*1024*1024))}
+fn limit()->usize {crate::resources::plan().preview_buffer_bytes}
+
 pub struct Pixels {width:u32,height:u32,edge:u32,scale:u32,data:Vec<u8>,seen:HashSet<(u32,u32)>,valid:bool,charge:usize}
 impl Drop for Pixels {fn drop(&mut self) {USED.fetch_sub(self.charge,Ordering::AcqRel);}}
 impl Pixels {
@@ -45,7 +46,7 @@ impl Pixels {
             let started=std::time::Instant::now();
             let bytes=crate::decoder::encode_crop_rgba(&self.data,self.width,x,y,width,height,request.format)?;
             Ok(DecodedTile {tile_x,tile_y,rgba:None,raster:DecodedRaster {width,height,bytes:bytes.into(),content_type:request.format.content_type(),
-                decoder_route:"preview-pixel-reuse",decode_ms:0.0,encode_ms:crate::decoder::elapsed_ms(started),source_cache_status:"decoded-preview-reuse",
+                decoder_backend: "cached-pixels", decoder_route:"preview-pixel-reuse",decode_ms:0.0,encode_ms:crate::decoder::elapsed_ms(started),source_cache_status:"decoded-preview-reuse",
                 source_cache_ms:0.0,compressed_resolution_view:false,source_read_bytes:0,source_range_requests:0,source_cache_hit_bytes:0}})
         }).collect()
     }
@@ -55,7 +56,7 @@ impl Pixels {
 mod tests {
     use super::*;
     fn request(format:river_core::RasterFormat)->TileDecodeRequest {
-        TileDecodeRequest { output_geometry:None, edge_mode:crate::edges::Mode::Crop,source_id:"immutable".into(),source:crate::decoder::Jpeg2000Source::from_path("immutable.jp2",12,6),
+        TileDecodeRequest { progressive_final_reduction:None, output_geometry:None, edge_mode:crate::edges::Mode::Crop,source_id:"immutable".into(),source:crate::decoder::Jpeg2000Source::from_path("immutable.jp2",12,6),
             webp_method:0,capture_pixels:false,whole_view:true,tiles:vec![(0,0),(1,0)],source_tile:8,reduction:1,layers:0,format,
             decoder_threads:1,max_native_tiles:4,cached_tiles:vec![],work_ticket:None,cancellation:None}
     }
@@ -65,7 +66,7 @@ mod tests {
             let h=2.min(3-y*2);let mut rgba=Vec::new();
             for row in y*2..y*2+h {rgba.extend_from_slice(&data[((row*6+x*2)*4) as usize..((row*6+x*2+2)*4) as usize]);}
             pixels.add(&DecodedTile {tile_x:x,tile_y:y,rgba:Some(rgba.into()),raster:DecodedRaster {width:2,height:h,bytes:vec![].into(),
-                content_type:"image/png",decoder_route:"test",decode_ms:0.0,encode_ms:0.0,source_cache_status:"test",source_cache_ms:0.0,
+                content_type:"image/png",decoder_backend: "cached-pixels", decoder_route:"test",decode_ms:0.0,encode_ms:0.0,source_cache_status:"test",source_cache_ms:0.0,
                 compressed_resolution_view:false,source_read_bytes:0,source_range_requests:0,source_cache_hit_bytes:0}});
         }}
     }

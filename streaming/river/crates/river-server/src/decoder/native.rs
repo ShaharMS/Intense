@@ -259,12 +259,13 @@ impl OpenJpegTileDecoder {
             }
             let image = &*self.image;
             let components = std::slice::from_raw_parts(image.comps, image.numcomps as usize);
-            if components.is_empty() || components.len() > 4 {
+            if components.is_empty() || components.len() > 16 {
                 bail!(
                     "native tile {tile_index} has unsupported component count {}",
                     components.len()
                 );
             }
+            let components=if components.len()>4 || (components.len()==4 && components[3].alpha==0) {&components[..3]}else{components};
             let width = components[0].w;
             let height = components[0].h;
             if width == 0 || height == 0 {
@@ -323,22 +324,18 @@ struct NativeEntry { tile: Arc<RawNativeTile>, bytes: usize, touched: u64 }
 struct NativeCacheState { entries: HashMap<NativeKey, NativeEntry>, lru: BTreeMap<u64, NativeKey>, bytes: usize, clock: u64 }
 struct NativeCache { limit: usize, state: Mutex<NativeCacheState>, flights: Mutex<HashMap<NativeKey, Weak<Mutex<()>>>> }
 impl NativeCache {
-    fn shared() -> &'static Self {
-        static CACHE: OnceLock<NativeCache> = OnceLock::new();
-        CACHE.get_or_init(|| Self { limit: std::env::var("RIVER_NATIVE_TILE_CACHE_BYTES").ok()
-            .and_then(|v| v.parse().ok()).unwrap_or(64*1024*1024),
-            state: Mutex::new(NativeCacheState::default()), flights: Mutex::new(HashMap::new()) })
-    }
+    fn shared()->&'static Self {static C:OnceLock<NativeCache>=OnceLock::new();static REGISTER:std::sync::Once=std::sync::Once::new();let cache=C.get_or_init(||Self{limit:crate::resources::budget("native_tiles"),state:Mutex::new(NativeCacheState::default()),flights:Mutex::new(HashMap::new())});REGISTER.call_once(||crate::resources::register("native_tiles",move|limit|cache.trim(limit)));cache}
+    fn trim(&self,limit:usize)->crate::resources::Occupancy {let mut s=self.state.lock().unwrap_or_else(|e|e.into_inner());while s.bytes>limit||s.entries.len()>crate::resources::entry_limit("RIVER_NATIVE_TILE_CACHE_ENTRIES",limit){let Some((_,key))=s.lru.pop_first()else{break;};if let Some(old)=s.entries.remove(&key){s.bytes-=old.bytes;crate::resources::retain("native_tiles",old.bytes,&old.tile);crate::resources::evict("native_tiles",1);}}crate::resources::Occupancy{bytes:s.bytes,entries:s.entries.len(),..Default::default()}}
     fn get(&self, key: &NativeKey) -> Option<Arc<RawNativeTile>> {
         let mut state = self.state.lock().unwrap();
-        let entry = state.entries.get(key)?;
+        let Some(entry)=state.entries.get(key)else{crate::resources::miss("native_tiles");return None;};crate::resources::hit("native_tiles",entry.bytes);
         let tile = entry.tile.clone(); let old = entry.touched;
         state.lru.remove(&old); state.clock += 1; let clock = state.clock;
         state.lru.insert(clock,key.clone()); state.entries.get_mut(key).unwrap().touched = clock;
         Some(tile)
     }
     fn decode(&self, key: Option<NativeKey>, decode: impl FnOnce() -> Result<RawNativeTile>) -> Result<Arc<RawNativeTile>> {
-        let Some(key) = key.filter(|_| self.limit > 0) else { return decode().map(Arc::new); };
+        let Some(key) = key.filter(|_| crate::resources::effective("native_tiles",self.limit) > 0) else { return decode().map(Arc::new); };
         if let Some(tile) = self.get(&key) { return Ok(tile); }
         let gate = {
             let mut flights = self.flights.lock().unwrap();
@@ -350,11 +347,11 @@ impl NativeCache {
         if let Some(tile) = self.get(&key) { return Ok(tile); }
         let tile = Arc::new(decode()?);
         let bytes = tile.rgba.capacity();
-        if bytes <= self.limit {
+        if bytes <= crate::resources::effective("native_tiles",self.limit) {
             let mut state = self.state.lock().unwrap();
-            while state.bytes + bytes > self.limit || state.entries.len() >= 1024 {
+            while state.bytes + bytes > crate::resources::effective("native_tiles",self.limit) || state.entries.len() >= crate::resources::entry_limit("RIVER_NATIVE_TILE_CACHE_ENTRIES",self.limit) {
                 let Some((_, oldest)) = state.lru.pop_first() else { break; };
-                if let Some(entry) = state.entries.remove(&oldest) { state.bytes -= entry.bytes; }
+                if let Some(entry) = state.entries.remove(&oldest) { state.bytes -= entry.bytes;crate::resources::retain("native_tiles",entry.bytes,&entry.tile);crate::resources::evict("native_tiles",1); }
             }
             state.clock += 1; let touched = state.clock;
             state.bytes += bytes; state.lru.insert(touched,key.clone());
@@ -514,7 +511,7 @@ pub(super) fn decode_transport_tiles(
                     height: tile.height,
                     bytes: bytes.into_boxed_slice().into(),
                     content_type: format.content_type(),
-                    decoder_route: "native-tile",
+                    decoder_backend: "openjpeg", decoder_route: "native-tile",
                     decode_ms,
                     encode_ms: elapsed_ms(encode_started),
                     source_cache_status: "bypass",

@@ -28,7 +28,7 @@ pub fn settings()->Settings {SETTINGS.get_or_init(||Mutex::new(Settings::default
 pub fn apply(value:Settings) {*SETTINGS.get_or_init(||Mutex::new(Settings::default())).lock().unwrap_or_else(|e|e.into_inner())=value;}
 #[derive(Debug,Default,Clone,serde::Serialize)]
 #[serde(rename_all="camelCase")]
-pub struct Observation {#[serde(skip_serializing_if="Option::is_none")]pub contiguous_ranges:Option<ContiguousDecision>,#[serde(skip_serializing_if="Option::is_none")]pub last_body_bytes_per_second:Option<f64>,#[serde(skip_serializing_if="Option::is_none")]pub index_header_decision:Option<IndexHeaderDecision>,pub active_reads:u64,pub active_preparations:u64,pub admission_waits:u64,pub samples:u64,pub bytes:u64,pub latency_ms:Option<f64>,pub effective_bytes_per_second:Option<f64>,pub throughput_samples:u64,pub body_bytes_per_second:Option<f64>,pub body_throughput_samples:u64,pub sdk_serial_reads:u64,pub native_serial_requests:u64,pub last_decision:Option<Decision>}
+pub struct Observation {#[serde(skip)]small_body_stalls:u8,pub prefix_lookahead_backoff:bool,pub prefix_lookahead_backoff_entries:u64,#[serde(skip)]header_window_us:[u64;8],#[serde(skip)]header_window_count:u64,#[serde(skip_serializing_if="Option::is_none")]pub recent_header_minimum_ms:Option<f64>,#[serde(skip_serializing_if="Option::is_none")]pub contiguous_ranges:Option<ContiguousDecision>,#[serde(skip_serializing_if="Option::is_none")]pub last_body_bytes_per_second:Option<f64>,#[serde(skip_serializing_if="Option::is_none")]pub index_header_decision:Option<IndexHeaderDecision>,pub active_reads:u64,pub active_preparations:u64,pub admission_waits:u64,pub samples:u64,pub bytes:u64,pub latency_ms:Option<f64>,pub effective_bytes_per_second:Option<f64>,pub throughput_samples:u64,pub body_bytes_per_second:Option<f64>,pub body_throughput_samples:u64,pub sdk_serial_reads:u64,pub native_serial_requests:u64,pub last_decision:Option<Decision>}
 #[derive(Debug,Clone,serde::Serialize)]
 #[serde(rename_all="camelCase")]
 pub struct ContiguousDecision {pub reason:String,pub max_range_bytes:u64,pub body_time_budget_ms:u32,pub sample_count:u64,pub body_throughput_samples:u64,pub gap_bytes_added:u64}
@@ -50,6 +50,38 @@ pub struct SourcePermit<'a>(&'a Profile);
 pub struct SourcePreparation<'a>(&'a Profile);
 impl Drop for SourcePreparation<'_> {fn drop(&mut self){self.0.3.fetch_sub(1,std::sync::atomic::Ordering::AcqRel);}}
 impl Observation {
+ fn record_header_timing(&mut self,headers:Duration) {
+  let micros=headers.as_micros().clamp(1,u128::from(u64::MAX)) as u64;
+  let position=(self.header_window_count%8) as usize;
+  self.header_window_us[position]=micros;
+  self.header_window_count=self.header_window_count.saturating_add(1);
+  self.recent_header_minimum_ms=self.header_window_us.iter().copied().filter(|v|*v>0)
+    .min().map(|us|us as f64/1000.0);
+ }
+ pub fn discovery_reuse_confident(&self,minimum_samples:u32)->bool {
+  if self.header_window_count<8 || self.samples<u64::from(minimum_samples) || self.body_throughput_samples<3 {return false;}
+  let minimum=self.header_window_us.iter().copied().filter(|v|*v>0).min().unwrap_or(0);
+  let latest=self.header_window_us[((self.header_window_count-1)%8) as usize];
+  minimum>0 && latest<=minimum.saturating_mul(2)
+ }
+ pub fn discovery_latency_us(&self,historical:u64)->u64 {
+  if self.header_window_count<8 {return historical;}
+  self.header_window_us.iter().copied().filter(|v|*v>0).min().unwrap_or(historical)
+ }
+
+ fn record_prefix_body(&mut self,bytes:u64,headers:Option<Duration>,total:Duration) {
+  let Some(header)=headers else{return;};
+  let Some(body)=total.checked_sub(header).filter(|d|!d.is_zero()) else{return;};
+  if bytes>=THROUGHPUT_SAMPLE_BYTES {self.small_body_stalls=0;self.prefix_lookahead_backoff=false;return;}
+  if bytes<8*1024 {return;}
+  let stalled=body>=Duration::from_millis(2).max(header.mul_f64(0.5));
+  self.small_body_stalls=if stalled {self.small_body_stalls.saturating_add(1).min(3)}else{0};
+  let backoff = self.small_body_stalls >= 3;
+  if backoff && !self.prefix_lookahead_backoff {
+   self.prefix_lookahead_backoff_entries = self.prefix_lookahead_backoff_entries.saturating_add(1);
+  }
+  self.prefix_lookahead_backoff = backoff;
+ }
  pub fn planning_bytes_per_second(&self)->Option<f64> {
   let valid=|value:Option<f64>|value.filter(|rate|rate.is_finite() && *rate>0.0);
   if self.body_throughput_samples>=3 {
@@ -95,8 +127,9 @@ impl Profile {
  pub fn record_transfer(&self,bytes:u64,headers:Option<Duration>,total:Duration) {
   if settings().mode==Mode::Disabled {return;}
   let mut s=self.0.lock().unwrap_or_else(|e|e.into_inner());s.samples=s.samples.saturating_add(1);s.bytes=s.bytes.saturating_add(bytes);
+  s.record_prefix_body(bytes,headers,total);
   let ewma=|old:Option<f64>,new:f64|Some(old.map_or(new,|old|old*0.875+new*0.125));
-  if let Some(headers)=headers {s.latency_ms=ewma(s.latency_ms,headers.as_secs_f64()*1000.0);}
+  if let Some(headers)=headers {s.record_header_timing(headers);s.latency_ms=ewma(s.latency_ms,headers.as_secs_f64()*1000.0);}
   if bytes>=THROUGHPUT_SAMPLE_BYTES && total.as_secs_f64()>0.0 {s.throughput_samples=s.throughput_samples.saturating_add(1);s.effective_bytes_per_second=ewma(s.effective_bytes_per_second,bytes as f64/total.as_secs_f64());}
   // The planner adds header latency separately. Keep the legacy whole-request
   // rate for diagnostics/fallback, but do not charge that latency again when

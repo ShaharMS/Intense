@@ -89,3 +89,104 @@ Do not add `--volumes` if you want to retain the compressed caches. The image
 archives, sizes, image IDs and SHA-256 hashes are recorded in `BUILD-MANIFEST.json`
 and `SHA256SUMS`. Component license notices are included in the backend image
 under `/usr/share/doc/river/licenses` and in this package's `licenses/` directory.
+
+## Browser origins and reverse proxies
+
+CORS works from any browser origin by default, including credentialed clients,
+custom headers, tile images and readable error responses. `RIVER_CORS_ORIGINS=*`
+is the default; use a comma-separated origin list only when restrictions are
+intentional. Existing installations with an old generated localhost-only value
+must change that value to `*` to enable arbitrary hosting origins.
+
+Keep the browser page and API on compatible protocols: an HTTPS page needs an
+HTTPS/WSS API behind your existing TLS proxy. Forward River's CORS headers;
+do not add a second Access-Control-Allow-Origin header in the proxy.
+
+### Environment and live settings
+
+The viewer fetches one S3 provider page per action. Choose 25, 50 or 100 keys
+per catalog page and press Search or Enter. Prefix mode sends the prefix to
+S3. Contains mode filters the returned page locally on the server and can
+show zero matches with more pages available. Use Next page to continue.
+
+At startup River applies JSON configuration first, then container environment
+variables. A numbered ENV source overrides the complete JSON connection with
+the same ID. Other JSON connections are preserved. Send source changes through
+POST /api/s3/sources (the same ID replaces the active connection).
+
+Example container environment:
+
+    RIVER_S3_SOURCE_COUNT=1
+    RIVER_S3_SOURCE_1_ID=imagery
+    RIVER_S3_SOURCE_1_BUCKET=imagery
+    RIVER_S3_SOURCE_1_REGION=us-east-1
+    RIVER_ENABLED_DRIVERS=openjpeg,jp2grok
+
+Supply RIVER_S3_SOURCE_1_ACCESS_KEY_ID and RIVER_S3_SOURCE_1_SECRET_ACCESS_KEY
+from your secret store. Optional per-source fields are NAME, ENDPOINT, REGION,
+PREFIX, SESSION_TOKEN, ALLOW_HTTP, VIRTUAL_HOSTED_STYLE, and MAX_RETRIES.
+Boolean fields accept true or false. Pass the variables through the container
+environment or the service's Compose env_file.
+
+JSON accepts an optional enabledDrivers list. Read or update the active list
+at GET or PUT /api/settings/drivers with a JSON body such as
+{"enabledDrivers":["openjpeg"]}. Null allows every available decoder.
+Live API changes take precedence until restart. Drivers still require their
+runtime dependencies. Explicit requests for a disabled driver are rejected.
+
+Environment values are reapplied on restart. Set RIVER_CONFIG_MODE=env to
+skip JSON entirely and keep API edits in memory. In JSON mode, unrelated
+API edits do not copy environment-supplied sources into the file.
+
+### Native TLS and protocol selection
+
+Mount the certificate material read-only. River accepts a PEM chain and key,
+or a PFX/PKCS#12 identity. Use one of these sets of container variables:
+
+    RIVER_TLS_CERT_FILE=/run/river-tls/tls.crt
+    RIVER_TLS_KEY_FILE=/run/river-tls/tls.key
+
+    RIVER_TLS_PFX_FILE=/run/river-tls/river.pfx
+    RIVER_TLS_PFX_PASSWORD_FILE=/run/river-tls/password
+
+The password file is optional for a PFX with an empty password. Never place
+the private key or password in JSON. The optional JSON tls object accepts
+bind, certFile, keyFile, pfxFile, pfxPasswordFile, protocols and http3PublicPort.
+ENV overrides JSON. TLS settings and certificate rotation require a restart.
+RIVER_TLS_ENABLED=false disables native TLS.
+
+RIVER_TLS_PROTOCOLS accepts a comma-separated list of http/1.1, h2 and h3.
+The default is http/1.1,h2. JSON uses an array such as ["h2", "h3"].
+RIVER_TLS_BIND defaults to 0.0.0.0:8443. HTTP/1.1 and HTTP/2 use TCP.
+HTTP/3 uses UDP on the same listener port. RIVER_HTTP3_PUBLIC_PORT sets the
+advertised UDP port when it differs from the bind port. WebSockets use HTTPS
+over HTTP/1.1 or HTTP/2. Keep one of those protocols for the progressive viewer.
+
+Use a Kubernetes TLS Secret mounted at /run/river-tls for PEM, or a generic
+Secret with the PFX and password files. Target TCP and/or UDP port 8443 in
+the Service to match the selected protocols. The original plaintext port
+remains available for internal traffic and health probes. Publish only the
+TLS port for an HTTPS-only public endpoint.
+
+### Request logging
+
+At startup, use the optional JSON logging object or these container variables.
+Environment values override JSON. Restart River after changing these settings.
+
+    RIVER_LOG_LEVEL=info
+    RIVER_LOG_REQUEST_SUMMARY=true
+    RIVER_LOG_VERBOSE=false
+    RIVER_LOG_UNPROCESSABLE_LEVEL=warn
+
+The corresponding JSON fields are minimumLevel, requestSummary, verbose and
+unprocessableLevel. Levels are off, error, warn, info, debug and trace.
+Without an explicit logging configuration, RUST_LOG still accepts advanced
+target filters. For detailed diagnostics, set verbose to true and the level to
+debug. The HTTP summary uses readable field names and includes the status,
+safe route template, request ID, trace ID, timings, selected driver, actual
+decoder backend and source IO counters where the response supplies them.
+
+Collect River's stdout with your platform's log agent. An OpenTelemetry
+Collector or Grafana Alloy can read the container logs and fan them out to
+Loki or other configured sinks. Configure bounded queues and retries in the
+collector. Keep sink credentials and network delivery in that collector.

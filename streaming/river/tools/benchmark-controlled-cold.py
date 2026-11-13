@@ -14,10 +14,11 @@ a.add_argument('--capture-stage-logs',action='store_true',help='Capture decode-s
 a.add_argument('--capture-source-reads',action='store_true',help='Enable bounded source-read tracing for a smoke-only diagnostic; never release timing evidence.')
 a.add_argument('--common-policy',action='store_true',help='Omit newer indexHeaders settings on both versions for comparisons with stable295.')
 a.add_argument('--warm-samples',type=int,default=1,help='Timed exact repeats after each cold response; each must add zero source IO.')
-for version in ['baseline','candidate']:a.add_argument('--'+version+'-driver',default='openjpeg',choices=['openjpeg','jp2grok','openhtj2k','nvjpeg2000'])
+for version in ['baseline','candidate']:a.add_argument('--'+version+'-driver',default='openjpeg',choices=['auto','openjpeg','jp2grok','openhtj2k','nvjpeg2000'])
 for version in ['baseline','candidate']:a.add_argument('--'+version+'-serial-transport',default='sdk',choices=['sdk','curl','auto'])
 a.add_argument('--compare-grok-pool',action='store_true',help='Same-image JP2Grok configuration experiment; permit only the native shared-pool environment value to differ.')
 a.add_argument('--compare-openjpeg-threads',action='store_true',help='Same-image OpenJPEG worker-budget experiment; permit only RIVER_OPENJPEG_THREADS_PER_DECODE to differ.')
+a.add_argument('--compare-decode-slots',action='store_true',help='Same-image OpenJPEG decode-admission experiment; permit only RIVER_DECODE_CONCURRENCY to differ.')
 a.add_argument('--compare-tokio-workers',action='store_true',help='Same-image runtime scheduling experiment; permit only TOKIO_WORKER_THREADS to differ and record the running process configuration.')
 a.add_argument('--compare-index-probes',action='store_true',help='Same-image OpenJPEG experiment; permit only index shard count and probe-byte budget to differ.')
 a.add_argument('--source-request-limit',type=int,choices=range(1,65),help='Explicit identical per-source concurrent operation limit.')
@@ -39,12 +40,17 @@ for name,v in versions.items():
  labels=inspect[name]['Config'].get('Labels') or {}
  assert not any(e.startswith('RIVER_PER_VIEWPORT_DECODE_CONCURRENCY=') for e in inspect[name]['Config']['Env']),'Unrecognized sizing variable: use RIVER_VIEWPORT_DECODE_CONCURRENCY'
  assert labels.get('com.docker.compose.project')=='river' and labels.get('com.docker.compose.service') in ['replica-1','replica-2','replica-3','replica-4'],'Mutating benchmarks must use fixed River Compose replica slots.'
-assert sum([args.compare_grok_pool,args.compare_index_probes,args.compare_openjpeg_threads,args.compare_tokio_workers])<=1
+assert sum([args.compare_grok_pool,args.compare_index_probes,args.compare_openjpeg_threads,args.compare_tokio_workers,args.compare_decode_slots])<=1
 if args.compare_openjpeg_threads:
  assert args.baseline_driver==args.candidate_driver=='openjpeg' and inspect['baseline']['Image']==inspect['candidate']['Image']
  envs={v:dict(x.split('=',1) for x in inspect[v]['Config']['Env']) for v in versions}
  thread_values={v:envs[v].pop('RIVER_OPENJPEG_THREADS_PER_DECODE') for v in versions}
  assert all(1<=int(n)<=64 for n in thread_values.values()) and envs['baseline']==envs['candidate']
+elif args.compare_decode_slots:
+ assert args.baseline_driver==args.candidate_driver=='openjpeg' and inspect['baseline']['Image']==inspect['candidate']['Image']
+ envs={v:dict(x.split('=',1) for x in inspect[v]['Config']['Env']) for v in versions}
+ slot_values={v:envs[v].pop('RIVER_DECODE_CONCURRENCY',None) for v in versions}
+ assert slot_values['baseline']!=slot_values['candidate'] and envs['baseline']==envs['candidate']
 elif args.compare_tokio_workers:
  assert args.baseline_driver==args.candidate_driver=='openjpeg' and inspect['baseline']['Image']==inspect['candidate']['Image']
  envs={v:dict(x.split('=',1) for x in inspect[v]['Config']['Env']) for v in versions}
@@ -114,6 +120,7 @@ if args.compare_index_probes:report['configurationComparison']=dict(fields=['RIV
 report['requireEmptySourcesBeforeCold']=args.require_empty_sources
 if args.compare_grok_pool:report['configurationComparison']=dict(field='RIVER_GROK_NATIVE_THREADS',values=pool_values,codeComparison=False)
 if args.compare_openjpeg_threads:report['configurationComparison']=dict(field='RIVER_OPENJPEG_THREADS_PER_DECODE',values=thread_values,codeComparison=False)
+if args.compare_decode_slots:report['configurationComparison']=dict(field='RIVER_DECODE_CONCURRENCY',values=slot_values,codeComparison=False)
 if args.compare_tokio_workers:report['configurationComparison']=dict(field='TOKIO_WORKER_THREADS',values=runtime_values,codeComparison=False)
 format_audit=manifest_path.parent/'format-audit.json'
 if format_audit.exists():
@@ -121,6 +128,7 @@ if format_audit.exists():
  assert all(any(c['sha256']==source['sha256'] and c['file']==source['file'] for c in all_cases) for source in audit['sources'])
  report['sourceFormatAudit']=audit
 if args.smoke_only:report['pairs']=0
+temporary_sources=set()
 def sample(c,version,trial,phase):
  v=versions[version];api=v['api'];subprocess.run(['docker','restart',v['container']],check=True,stdout=subprocess.DEVNULL)
  for _ in range(100):
@@ -161,10 +169,12 @@ def sample(c,version,trial,phase):
    if len(set(transports.values()))>1:left.pop('serialTransport');right.pop('serialTransport')
    assert left==right,'Public read-policy settings must match for a code comparison'
   js(api+'/api/s3/sources',dict(id=sid,name=sid,bucket='fixture',region='us-east-1',endpoint=endpoint,accessKeyId='fixture',secretAccessKey='fixture',allowHttp=True),'POST')
+  temporary_sources.add((api,sid))
  except Exception as error:
   report['setupFailure']=dict(case=c['name'],version=version,trial=trial,error=repr(error),body=getattr(error,'response_body',None));save();raise
  control=args.origin_control+'/__stats/'+sid;assert not any(js(control)['wire'].values())
  q=dict(image=endpoint+'/fixture/'+c['name']+'.jp2',driver=drivers[version],edge='crop',tileSize=c['tileSize'],minZoom=0,maxZoom=c['maxZoom'],tilePixelRatio=1)
+ if drivers[version]=='auto': q.pop('driver')
  url=api+f'/streamer/v1/{c["z"]}/{c["x"]}/{c["y"]}/tile.png?'+urllib.parse.urlencode(q)
  before=cpu(v['container']);t=time.perf_counter()
  try:body,headers=http(url)
@@ -191,18 +201,39 @@ def sample(c,version,trial,phase):
  row['driver']=drivers[version]
  row['sourceId']=sid
  row['responseBytes']=len(body)
+ if args.capture_source_reads:
+  # Keep the independent origin's timestamps for dependency/overlap analysis.
+  # This is outside the measured request and disabled for latency benchmarks.
+  origin_snapshot=js(control)
+  assert origin_snapshot['wire']==wire
+  row['originRanges']=origin_snapshot['ranges']
  if args.compare_tokio_workers:row['runtimeThreadSnapshot']=runtime_snapshot
  if args.capture_stage_logs:
   row['stageLogs']=subprocess.check_output(['docker','logs','--since',profile_started,v['container']],text=True,stderr=subprocess.STDOUT).splitlines()
  row['repeatWallMs']=repeat_times
  row['repeatPhases']=repeat_phases
  http(api+'/api/s3/sources/'+sid,method='DELETE')
+ temporary_sources.remove((api,sid))
  (rows if phase=='timed' else smoke).append(row);save();print(json.dumps({k:row[k] for k in ['case','version','trial','phase','wallMs','wire']}),flush=True)
-for i,c in enumerate(all_cases):
- for version in (['baseline','candidate'] if i%2==0 else ['candidate','baseline']):sample(c,version,-1,'smoke')
-for trial in range(0 if args.smoke_only else args.pairs):
- for c in cases:
-  for version in (['baseline','candidate'] if trial%2==0 else ['candidate','baseline']):sample(c,version,trial,'timed')
+original_policies={}
+for api in dict.fromkeys(v['api'] for v in versions.values()):
+ policy=js(api+'/api/settings/read-policy')
+ if 'configuredSettings' in policy:
+  original_policies[api]=policy['configuredSettings']
+try:
+ for i,c in enumerate(all_cases):
+  for version in (['baseline','candidate'] if i%2==0 else ['candidate','baseline']):sample(c,version,-1,'smoke')
+ for trial in range(0 if args.smoke_only else args.pairs):
+  for c in cases:
+   for version in (['baseline','candidate'] if trial%2==0 else ['candidate','baseline']):sample(c,version,trial,'timed')
+finally:
+ try:
+  for api,sid in sorted(temporary_sources):
+   http(api+'/api/s3/sources/'+sid,method='DELETE')
+ finally:
+  for api,policy in original_policies.items():
+   js(api+'/api/settings/read-policy',policy,'PUT')
+   assert js(api+'/api/settings/read-policy')['configuredSettings']==policy,'Configured policy was not restored'
 summary={}
 for c in ([] if args.smoke_only else cases):
  name=c['name'];d=[];io_equal=[]

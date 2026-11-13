@@ -66,7 +66,7 @@ RiverGrokHandle* river_grok_decode(const char* path, const uint8_t* bytes, size_
             grk_object_unref(codec); return nullptr;
         }
         auto* image = grk_decompress_get_image(codec);
-        if (!image || !image->numcomps || image->numcomps > 4) {
+        if (!image || !image->numcomps || image->numcomps > 16) {
             grk_object_unref(codec); return nullptr;
         }
         // This bridge exposes component samples, not the CLI's colour

@@ -52,6 +52,7 @@ fn hex_digest(value: &str) -> bool {
 
 impl SourceCache {
     pub fn from_env() -> Result<Option<Self>> {
+        if !crate::storage_mode::disk_cache_enabled() { return Ok(None); }
         let Some(root) = std::env::var_os("RIVER_LOCAL_SOURCE_CACHE_ROOT") else {
             return Ok(None);
         };
@@ -175,6 +176,7 @@ impl SourceCache {
     }
     #[instrument(name = "river.source.cache.prepare", skip(self, source), fields(cache_hit = tracing::field::Empty, source_bytes = tracing::field::Empty))]
     pub fn get(&self, source: &Path) -> Result<Option<Arc<CachedFile>>> {
+        if !crate::storage_mode::disk_cache_enabled() || crate::adaptation::conserve_disk() { return Ok(None); }
         let source = source.canonicalize()?;
         if !source.starts_with(&self.input_root) {
             return Ok(None);

@@ -27,7 +27,7 @@ def parse_effective_sizing(text):
         selected=[line for line in lines if (match:=re.search(r'\bt=(\d+)\s+\w+\s+e=(\d+)\b',line)) and match.groups()==identity.groups()]
     values={}
     for line in selected:
-        for key,value in re.findall(r'(?<!\w)([a-z_]+)=([0-9]+)',line):
+        for key,value in re.findall(r'(?<!\w)([a-z_]+)="?([0-9]+)"?',line):
             if key in keys:
                 if key in values and values[key]!=int(value):return None
                 values[key]=int(value)

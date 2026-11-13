@@ -43,7 +43,7 @@ pub(super) fn transport(allow_http:bool)->Result<(ClientOptions,SharedTransport)
 pub(super) fn save(sources:&HashMap<String,S3Source>)->Result<()> {
     let mut values=sources.values().map(|s|s.connection.clone()).collect::<Vec<_>>();values.sort_by(|a,b|a.id.cmp(&b.id));
     // Preserve in-memory-only source configuration for unconfigured development servers.
-    if std::env::var_os("RIVER_CONFIGURATION_FILE").is_none() && std::env::var_os("RIVER_S3_CONNECTIONS_FILE").is_none() {return Ok(());}
+    if !crate::configuration::env_only() && std::env::var_os("RIVER_CONFIGURATION_FILE").is_none() && std::env::var_os("RIVER_S3_CONNECTIONS_FILE").is_none() {return Ok(());}
     crate::configuration::update(|d|{d.sources=values;Ok(())})?;Ok(())
 }
 pub(super) async fn restore(state:&AppState)->Result<()> {

@@ -12,3 +12,5 @@ dist/
 # Never copy local configuration secrets into an image.
 .env
 .env.*
+
+deploy/local-state/

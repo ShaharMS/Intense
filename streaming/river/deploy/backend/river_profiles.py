@@ -1,5 +1,5 @@
 """Container sizing defaults; explicit environment settings always win."""
-import os
+import os, json, subprocess
 from pathlib import Path
 PROFILES = {
     'compact': {},
@@ -20,27 +20,7 @@ def apply_profile(environ):
     if name not in (*PROFILES, 'auto'):
         raise ValueError('RIVER_PROFILE must be auto, compact or throughput16')
     defaults = dict(PROFILES.get(name, {}))
-    if name == 'auto':
-        cpus = len(os.sched_getaffinity(0)) if hasattr(os, 'sched_getaffinity') else os.cpu_count() or 1
-        memory = 2 * 1024**3
-        try:
-            memory = os.sysconf('SC_PAGE_SIZE') * os.sysconf('SC_PHYS_PAGES')
-        except (AttributeError, ValueError, OSError):
-            pass
-        try:
-            quota, period = Path('/sys/fs/cgroup/cpu.max').read_text().split()
-            if quota != 'max': cpus = min(cpus, max(1, (int(quota)+int(period)-1)//int(period)))
-        except (OSError, ValueError):
-            pass
-        try:
-            limit = Path('/sys/fs/cgroup/memory.max').read_text().strip()
-            if limit != 'max': memory = min(memory, int(limit))
-        except (OSError, ValueError):
-            pass
-        slots = max(1, min(8, cpus//2, memory//(2*1024**3)))
-        cache = max(16*1024**2, min(256*1024**2, memory//32))
-        defaults.update(RIVER_DECODE_CONCURRENCY=str(slots), RIVER_SOURCE_IO_CONCURRENCY=str(min(8,max(2,slots*2))),
-                        RIVER_RASTER_CACHE_BYTES=str(cache), RIVER_S3_RANGE_CACHE_BYTES=str(cache))
+    # The Rust resource coordinator owns automatic sizing and diagnostics.
     defaults.update(RIVER_GROK_NATIVE='true', RIVER_WEBP_METHOD='0')
     # OpenJPEG constructs its initial pool before River applies each codec's
     # explicit thread budget. Mirroring the request limit here creates and
@@ -49,4 +29,10 @@ def apply_profile(environ):
     defaults['OPJ_NUM_THREADS']='0'
     for key, value in defaults.items():
         environ.setdefault(key, value)
+    # GPU helper workers use the same detected budget; explicit settings win.
+    server=Path('/usr/local/bin/river-server')
+    if server.exists():
+        values=json.loads(subprocess.check_output([str(server),'--resource-env'],env=dict(environ),text=True))
+        for key,value in values.items():
+            if environ.get(key, "").strip().lower() in ("", "auto"): environ[key]=value
     return name

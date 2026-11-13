@@ -70,6 +70,7 @@ pub struct Cache {
 }
 static CACHE: OnceLock<std::result::Result<Arc<Cache>, String>> = OnceLock::new();
 pub fn global() -> Result<Arc<Cache>> {
+    anyhow::ensure!(crate::storage_mode::disk_cache_enabled() && !crate::adaptation::conserve_disk(), "Persistent HT cache is disabled by the active storage policy");
     CACHE
         .get_or_init(|| Cache::new().map_err(|e| e.to_string()))
         .clone()

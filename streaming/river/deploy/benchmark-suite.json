@@ -2,8 +2,8 @@
   "schemaVersion": 2,
   "manifest": "reports/fixed-gate-v2/manifest.json",
   "manifestSha256": "286381a215a3d2e95ef8e0c464a437dc8dd9cbcbfc7b004361b64c546a67ce69",
-  "baselineRelease": 934,
-  "baselineEvidence": "reports\\kakadu-io-m303\\refinement-age-release-m956.json",
+  "baselineRelease": 1227,
+  "baselineEvidence": "reports/decoder-matrix-1038/qualification-m1227.json",
   "requiredSizeClasses": [
     "50MB",
     "900-1000MB",
@@ -39,12 +39,13 @@
   },
   "initialBaselineRelease": 263,
   "initialBaselineEvidence": "reports/fixed-gate-v2/baseline-263.json",
-  "ltsRelease": 934,
+  "ltsRelease": 1227,
   "networkProfiles": "deploy/benchmark-network-profiles.json",
   "ltsMinimumImprovementPercent": 10,
-  "minimumSupportedRelease": 907,
-  "latestRelease": 1010,
+  "minimumSupportedRelease": 1037,
+  "inheritedPerformanceRelease": 934,
+  "latestRelease": 1143,
   "latestVerified": false,
-  "latestReleaseEvidence": "reports/image-builds/2026.11.03-whole-probe-envelope-combo-m1010-trial/status.json",
-  "currentVerdict": "Stable 934, LTS 934; Latest 1010 is unqualified. See deploy/releases.json for current qualification; prior reports remain historical evidence."
+  "latestReleaseEvidence": "reports/decoder-matrix-1038/latest-m1143-qualification.json",
+  "currentVerdict": "m1227 qualifies Auto for small indexed WebSocket viewports."
 }

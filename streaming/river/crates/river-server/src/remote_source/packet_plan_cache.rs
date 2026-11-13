@@ -15,34 +15,32 @@ struct Entry {plan:Plan,bytes:usize,touched:u64}
 pub(super) struct Cache {limit:usize,state:Mutex<State>}
 impl Cache {
  fn new(limit:usize)->Self {Self {limit,state:Mutex::new(State::default())}}
- pub(super) fn shared()->&'static Self {
-  static CACHE:OnceLock<Cache>=OnceLock::new();
-  CACHE.get_or_init(||Self::new(std::env::var("RIVER_S3_PACKET_PLAN_CACHE_BYTES").ok().and_then(|v|v.parse().ok())
-   .unwrap_or(64*1024*1024).min(256*1024*1024)))
- }
+ pub(super) fn shared()->&'static Self {static C:OnceLock<Cache>=OnceLock::new();static REGISTER:std::sync::Once=std::sync::Once::new();let cache=C.get_or_init(||Cache::new(crate::resources::budget("packet_plans")));REGISTER.call_once(||crate::resources::register("packet_plans",move|limit|cache.trim(limit)));cache}
+ fn trim(&self,limit:usize)->crate::resources::Occupancy {let mut s=self.state.lock().unwrap_or_else(|e|e.into_inner());while s.bytes>limit||s.entries.len()>crate::resources::entry_limit("RIVER_S3_PACKET_PLAN_CACHE_ENTRIES",limit){let Some((_,key))=s.lru.pop_first()else{break;};if let Some(old)=s.entries.remove(&key){s.bytes-=old.bytes;crate::resources::evict("packet_plans",1);}}crate::resources::Occupancy{bytes:s.bytes,entries:s.entries.len(),..Default::default()}}
  fn tick(s:&mut State)->u64 {
   if s.clock==u64::MAX {s.entries.clear();s.lru.clear();s.bytes=0;s.clock=0;}
   s.clock+=1;s.clock
  }
  pub(super) fn get_or_build(&self,h:&Header,tile:u16,prefix:Option<u8>)->anyhow::Result<(Plan,bool)> {
   let key=Key::new(h,tile,prefix);
-  if self.limit>0 {
+  if crate::resources::effective("packet_plans",self.limit)>0 {
    let mut s=self.state.lock().unwrap_or_else(|e|e.into_inner());let now=Self::tick(&mut s);
    if let Some(entry)=s.entries.get_mut(&key) {
-    let old=entry.touched;entry.touched=now;let plan=entry.plan.clone();
+    crate::resources::hit("packet_plans",entry.bytes);let old=entry.touched;entry.touched=now;let plan=entry.plan.clone();
     s.lru.remove(&old);s.lru.insert(now,key);return Ok((plan,true));
    }
   }
+  crate::resources::miss("packet_plans");
   // Build outside the cache lock; unrelated images must not wait for geometry.
   let (packets,total)=packet_order(h,tile,prefix)?;let plan=(Arc::new(packets),total);
   let bytes=plan.0.capacity().saturating_mul(std::mem::size_of::<Packet>())
    .saturating_add(key.cod.capacity()*2).saturating_add(384);
-  if self.limit>0 && bytes<=self.limit {
+  if crate::resources::effective("packet_plans",self.limit)>0 && bytes<=crate::resources::effective("packet_plans",self.limit) {
    let mut s=self.state.lock().unwrap_or_else(|e|e.into_inner());let now=Self::tick(&mut s);
-   if let Some(old)=s.entries.remove(&key) {s.bytes-=old.bytes;s.lru.remove(&old.touched);}
-   while s.bytes.saturating_add(bytes)>self.limit || s.entries.len()>=512 {
+   if let Some(old)=s.entries.remove(&key) {s.bytes-=old.bytes;crate::resources::evict("packet_plans",1);s.lru.remove(&old.touched);}
+   while s.bytes.saturating_add(bytes)>crate::resources::effective("packet_plans",self.limit) || s.entries.len()>=crate::resources::entry_limit("RIVER_S3_PACKET_PLAN_CACHE_ENTRIES",crate::resources::effective("packet_plans",self.limit)) {
     let Some((_,old_key))=s.lru.pop_first() else{break;};
-    if let Some(old)=s.entries.remove(&old_key) {s.bytes-=old.bytes;}
+    if let Some(old)=s.entries.remove(&old_key) {s.bytes-=old.bytes;crate::resources::evict("packet_plans",1);}
    }
    s.bytes+=bytes;s.lru.insert(now,key.clone());s.entries.insert(key,Entry {plan:plan.clone(),bytes,touched:now});
   }
@@ -51,7 +49,7 @@ impl Cache {
 }
 #[cfg(test)]mod tests {
  use super::*;use crate::decoder::NativeTileLayoutHint;
- fn header()->Header {Header {image_origin:(0,0),width:1024,height:1024,components:3,bit_depth:12,levels:4,layers:10,
+ fn header()->Header {Header {image_origin:(0,0),width:1024,height:1024,components:3,display_rgb_only:false,bit_depth:12,levels:4,layers:10,
   layout:NativeTileLayoutHint {origin_x:0,origin_y:0,width:1024,height:1024,columns:1,rows:1},
   progression:2,is_ht:false,cod:vec![1,2,0,10,1,3,4,4,4,1,0x55,0x55,0x55,0x55],
   first_part:0,codestream_end:100,packet_compatible:true,prefix_compatible:false,payload_digest:[0;32]}}

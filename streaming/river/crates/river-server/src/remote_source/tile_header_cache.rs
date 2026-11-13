@@ -6,12 +6,13 @@ struct Entry {part:TilePart,header:ParsedTileHeader,bytes:usize,touched:u64}
 pub(super) struct Cache {limit:usize,state:Mutex<State>}
 impl Cache {
  fn new(limit:usize)->Self {Self {limit,state:Mutex::new(State::default())}}
- pub fn shared()->&'static Self {static C:OnceLock<Cache>=OnceLock::new();C.get_or_init(||Cache::new(std::env::var("RIVER_S3_PARSED_HEADER_CACHE_BYTES").ok().and_then(|s|s.parse().ok()).unwrap_or(16*1024*1024)))}
+ pub fn shared()->&'static Self {static C:OnceLock<Cache>=OnceLock::new();static REGISTER:std::sync::Once=std::sync::Once::new();let cache=C.get_or_init(||Cache::new(crate::resources::budget("parsed_headers")));REGISTER.call_once(||crate::resources::register("parsed_headers",move|limit|cache.trim(limit)));cache}
+ fn trim(&self,limit:usize)->crate::resources::Occupancy {let mut s=self.state.lock().unwrap_or_else(|e|e.into_inner());while s.bytes>limit||s.entries.len()>crate::resources::entry_limit("RIVER_S3_PARSED_HEADER_CACHE_ENTRIES",limit){let Some((_,key))=s.lru.pop_first()else{break;};if let Some(old)=s.entries.remove(&key){s.bytes-=old.bytes;crate::resources::evict("parsed_headers",1);}}crate::resources::Occupancy{bytes:s.bytes,entries:s.entries.len(),..Default::default()}}
  pub fn get(&self,id:&str,part:&TilePart)->Option<ParsedTileHeader> {
-  if self.limit==0 {return None;}
+  if crate::resources::effective("parsed_headers",self.limit)==0 {return None;}
   let mut s=self.state.lock().unwrap_or_else(|e|e.into_inner());
   if s.clock==u64::MAX {*s=State::default();}s.clock+=1;let now=s.clock;
-  let key=(id.to_owned(),part.offset);let entry=s.entries.get_mut(&key)?;
+  let key=(id.to_owned(),part.offset);let Some(entry)=s.entries.get_mut(&key)else{crate::resources::miss("parsed_headers");return None;};crate::resources::hit("parsed_headers",entry.bytes);
   if entry.part!=*part {return None;}
   let old=entry.touched;entry.touched=now;let header=entry.header.clone();
   s.lru.remove(&old);s.lru.insert(now,key);Some(header)
@@ -19,20 +20,20 @@ impl Cache {
  /// A parsed header also proves its exact SOT on this immutable source version.
  /// The payload start lets callers preserve requested entropy read-ahead.
  pub fn indexed(&self,id:&str,offset:u64)->Option<(TilePart,u64)> {
-  if self.limit==0 {return None;}
+  if crate::resources::effective("parsed_headers",self.limit)==0 {return None;}
   let mut s=self.state.lock().unwrap_or_else(|e|e.into_inner());
   if s.clock==u64::MAX {*s=State::default();}s.clock+=1;let now=s.clock;
-  let key=(id.to_owned(),offset);let entry=s.entries.get_mut(&key)?;
+  let key=(id.to_owned(),offset);let Some(entry)=s.entries.get_mut(&key)else{crate::resources::miss("parsed_headers");return None;};crate::resources::hit("parsed_headers",entry.bytes);
   let old=entry.touched;entry.touched=now;let result=(entry.part.clone(),entry.header.1);
   s.lru.remove(&old);s.lru.insert(now,key);Some(result)
  }
  pub fn put(&self,id:&str,part:&TilePart,header:&ParsedTileHeader) {
   let bytes=id.len()*2+header.0.capacity()+header.2.as_ref().map_or(0,|v|v.capacity()*8)+384;
-  if bytes>self.limit || bytes>4*1024*1024 {return;}
+  if bytes>crate::resources::effective("parsed_headers",self.limit) || bytes>4*1024*1024 {return;}
   let mut s=self.state.lock().unwrap_or_else(|e|e.into_inner());let key=(id.to_owned(),part.offset);
   if s.clock==u64::MAX {*s=State::default();}
-  if let Some(old)=s.entries.remove(&key) {s.bytes-=old.bytes;s.lru.remove(&old.touched);}
-  while s.bytes+bytes>self.limit || s.entries.len()>=16384 {
+  if let Some(old)=s.entries.remove(&key) {s.bytes-=old.bytes;crate::resources::evict("parsed_headers",1);s.lru.remove(&old.touched);}
+  while s.bytes+bytes>crate::resources::effective("parsed_headers",self.limit) || s.entries.len()>=crate::resources::entry_limit("RIVER_S3_PARSED_HEADER_CACHE_ENTRIES",crate::resources::effective("parsed_headers",self.limit)) {
    let Some((_,key))=s.lru.pop_first() else{break;};
    s.bytes-=s.entries.remove(&key).unwrap().bytes;
   }

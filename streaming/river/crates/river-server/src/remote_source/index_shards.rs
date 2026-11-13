@@ -9,11 +9,11 @@ use std::sync::atomic::AtomicBool;
 #[derive(Debug)]
 pub(super) struct Lane {pub parts:Vec<TilePart>,pub cursor:u64}
 #[derive(Debug,Default)]
-pub(super) struct State {pub attempted:bool,pub lanes:Vec<Lane>}
+pub(super) struct State {pub attempted:bool,pub lanes:Vec<Lane>,pub last_calibration:u64}
 impl RemoteSource {
     pub(super) fn index_lanes(&self,index:&PartIndex,selected:&HashSet<u16>,whole_view:bool,attempted:&mut bool,context:&mut ReadContext)->Result<Option<Vec<Lane>>> {
         let native=u64::from(self.header.layout.columns)*u64::from(self.header.layout.rows);
-        let latency=self.minimum_range_latency_us();
+        let latency=self.discovery_latency_us();
         // Many small native tiles on nearby storage benefit from more independent
         // chains. Keep the same16MiB probe ceiling and bandwidth/contention guards.
         let average=self.meta.size/native.max(1);
@@ -49,14 +49,14 @@ impl RemoteSource {
         // At most a quarter of the normal compressed-read budget, reserving
         // the rest for required headers/payload. Peak probe leases <=16 MiB.
         let budget=std::env::var("RIVER_S3_INDEX_PROBE_BYTES").ok().and_then(|v|v.parse::<u64>().ok()).unwrap_or(16*1024*1024).min(16*1024*1024).min(remaining/4);
-        let pilot_bytes=64*1024;
+        let pilot_budget = 3 * 64 * 1024;
         if explicit_count.is_none() {
             let observed=index.parts.iter().rev().map(|part|part.length).filter(|length|*length>=64*1024).take(16).collect::<Vec<_>>();
-            count=learned_shard_count(count,whole_view,latency,frontier,budget.saturating_sub(pilot_bytes),
+            count=learned_shard_count(count,whole_view,latency,frontier,budget.saturating_sub(pilot_budget),
                 &observed,crate::read_policy::settings().mode==crate::read_policy::Mode::Adaptive);
         }
-        let window=(budget.saturating_sub(pilot_bytes)/count as u64).min(4*1024*1024)/self.block_size*self.block_size;
-        if window<64*1024 || context.requests_limit.saturating_sub(context.stats.requests)<(count*4+32) as u64 {return Ok(None);}
+        let window=(budget.saturating_sub(pilot_budget)/count as u64).min(4*1024*1024)/self.block_size*self.block_size;
+        if window<pilot_budget || context.requests_limit.saturating_sub(context.stats.requests)<(count*4+32) as u64 {return Ok(None);}
         let end=self.header.codestream_end.saturating_sub(2);
         // Spatial order is only a placement hint. Failed or unordered hints
         // cannot eliminate any sequential work or establish tile completeness.
@@ -74,33 +74,49 @@ impl RemoteSource {
         *attempted=true; // Cancellation must not restart a fresh probe budget on every pan.
         // A cheap timed pilot prevents 16 MiB of speculative traffic from
         // making slow links much worse. Cached hits do not estimate bandwidth.
-        let pilot=spans[0].1.start..spans[0].1.start+pilot_bytes;
+        // A longer sample is useful when a coarsest-resolution whole view
+        // risks a long serial index walk. Keep seed placement and deadlines.
+        let default_pilot = if context.wide_index_pilot { 256 * 1024 } else { 64 * 1024 };
+        let configured = env_limit("RIVER_S3_INDEX_PILOT_BYTES", default_pilot)
+            .clamp(64 * 1024, 256 * 1024) as u64;
+        let pilot_bytes = (configured.min(window / 3) / self.block_size * self.block_size)
+            .max(64 * 1024);
+        let pilot_budget = 3 * pilot_bytes;
         let before=context.stats.bytes;let started=Instant::now();let deadline=context.deadline;
+        let body_samples_before=self.read_profile.snapshot().body_throughput_samples;
         context.deadline=deadline.min(started+Duration::from_millis(500));
-        let measured=self.prefetch_ranges(&[(true,pilot)],context,usize::MAX);
-        context.deadline=deadline;
-        let leases=match measured {
-            Ok(leases)=>leases,
-            Err(error)=>{
-                context.check()?;
-                if error.chain().any(|cause|cause.to_string().contains("S3 range timed out")) {return Ok(Some(vec![]));}
-                return Err(error);
+        let measured=(|| -> Result<()> {
+            for n in 0..3 {
+                let offset=spans[0].1.start+n*pilot_bytes;
+                let leases=self.prefetch_ranges(&[(true,offset..offset+pilot_bytes)],context,usize::MAX)?;
+                context.pin_packet_blocks(leases);
             }
-        };
-        let elapsed=started.elapsed().as_micros().min(u128::from(u64::MAX)) as u64;
-        context.pin_packet_blocks(leases);
-        let expected_parts=if whole_view {native}else{fraction}.saturating_sub(index.parts.len() as u64);
-        let body_us=elapsed.saturating_sub(latency).max(if native>1024 {100}else{1000});
-        let planned=window*count as u64;
-        let transfer_us=u128::from(body_us)*u128::from(planned)/u128::from(pilot_bytes);
-        let savings_us=u128::from(expected_parts)*u128::from(latency)/2;
-        if context.stats.bytes>before && transfer_us>savings_us {
-            tracing::debug!(elapsed_us=elapsed,network_us=latency,"SOT probe skipped: bandwidth cost exceeds likely RTT saving");
-            return Ok(Some(vec![]));
+            Ok(())
+        })();
+        context.deadline=deadline;
+        if let Err(error)=measured {
+            context.check()?;
+            if error.chain().any(|cause|cause.to_string().contains("S3 range timed out")) {return Ok(Some(vec![]));}
+            return Err(error);
         }
-        // Full-image previews need every tile's prefix: keep their established
-        // full windows. Partial views can save speculative entropy traffic.
-        let staged=(selected.len() as u64)<native;
+        let elapsed=started.elapsed().as_micros().min(u128::from(u64::MAX)) as u64;
+        let expected_parts=if whole_view {native}else{fraction}.saturating_sub(index.parts.len() as u64);
+        let planned=window*count as u64;
+        let observation=self.read_profile.snapshot();
+        // The required pilot can expose the end of a connection-startup delay.
+        // Do not commit bulk traffic using the earlier, now stale latency.
+        let latency=self.discovery_latency_us();
+        let (transfer_us,estimate_source)=pilot_transfer_us(planned,pilot_budget,elapsed,latency,
+            native,body_samples_before,&observation);
+        let savings_us=u128::from(expected_parts)*u128::from(latency)/2;
+        let accepted=accept_probe(native,latency,context.stats.bytes-before,transfer_us,savings_us);
+        tracing::info!(context=context.trace_id,optimization="parallel_index_probe",estimate_source,
+            pilot_elapsed_us=elapsed,network_us=latency,transfer_us=%transfer_us,savings_us=%savings_us,
+            pilot_bytes=context.stats.bytes-before,pilot_sample_bytes=pilot_bytes,planned_bytes=planned,accepted,"Index probe cost decision");
+        if !accepted {return Ok(Some(vec![]));}
+        // Stage the speculative probe and rescue any seed beyond the initial window.
+        let staged=(selected.len() as u64)<native
+            || std::env::var("RIVER_S3_STAGE_WHOLE_INDEX_PROBES").map_or(true, |value| value=="1");
         let initial=spans.iter().map(|(_,range)| {
             let length=if staged {((range.end-range.start)*3/4)/self.block_size*self.block_size} else {range.end-range.start};
             (true,range.start..range.start+length)
@@ -143,7 +159,10 @@ impl RemoteSource {
     }
 
     pub(super) fn advance_index_lanes(&self,lanes:&mut Vec<Lane>,cursor:u64,probe:u64,selected:&HashSet<u16>,whole:bool,context:&mut ReadContext)->Result<()> {
-        let depth=self.deep_index_depth(whole,context);
+        let depth = self.deep_index_depth(whole, context);
+        let latency = self.minimum_range_latency_us().max(50);
+        let depth = depth.min((8000 / latency).max(1) as usize);
+        // Use the batched range reader when there is no multi-step work.
         if depth>1 {return self.advance_deep(lanes,cursor,probe,depth,(!whole).then(||selected.clone()),context);}
         let end=self.header.codestream_end.saturating_sub(2);
         let native=u64::from(self.header.layout.columns)*u64::from(self.header.layout.rows);
@@ -326,7 +345,7 @@ impl RemoteSource {
   let batch_selected=!std::env::var("RIVER_S3_INDEX_BATCH_SELECTED").is_ok_and(|v|v=="false" || v=="0");
   let capacity=if native>1024 {4096}else{128};let mut roots=lanes.iter().filter_map(|l|l.parts.first().map(|p|p.offset)).collect::<Vec<_>>();roots.sort_unstable();roots.dedup();
   let stop=|root:u64|roots.iter().copied().find(|p|*p>root).unwrap_or(end);
-  let latency=self.minimum_range_latency_us().max(50);let depth=depth.min((8000/latency).max(1) as usize).min((8*1024*1024/((lanes.len()+1) as u64*(probe+2*self.block_size))).max(1) as usize);
+  let depth=depth.min((8*1024*1024/((lanes.len()+1) as u64*(probe+2*self.block_size))).max(1) as usize);
   let mut jobs=vec![(None,cursor,stop(cursor),depth)];
   for (n,lane) in lanes.iter().enumerate() {
    if lane.cursor>=end || lane.parts.len()>=capacity || contains_requested(lane,stop_tiles.as_deref()) {continue;}
@@ -423,6 +442,60 @@ fn contains_requested(lane:&Lane,wanted:Option<&HashSet<u16>>)->bool {
  }
 }
 
+// Revisit a fast decision only after another batch of required network reads.
+pub(super) fn recalibration_due(last: &mut u64, reads: u64) -> bool {
+ if reads.saturating_sub(*last)<INDEX_CALIBRATION_READS {return false;}
+ *last=reads;true
+}
+
+#[cfg(test)] mod adaptation_tests {
+ use super::*;
+ #[test] fn fast_history_does_not_latch_out_a_later_slow_source() {
+  let mut last=0;
+  for reads in 0..8 {assert!(!recalibration_due(&mut last,reads));}
+  assert!(recalibration_due(&mut last,8));
+  assert_eq!(calibration(451,8,300),Calibration::Fast);
+  for reads in 8..16 {assert!(!recalibration_due(&mut last,reads));}
+  assert!(recalibration_due(&mut last,16));
+  assert_eq!(calibration(451,16,20000),Calibration::Ready);
+  assert!(!recalibration_due(&mut last,16));
+ }
+}
+
+// Header latency and payload throughput are independent costs. Require three
+// new measured body samples; missing transport boundaries keep a total-time fallback.
+fn pilot_transfer_us(planned:u64,pilot_bytes:u64,elapsed:u64,latency:u64,native:u64,
+    samples_before:u64,observation:&crate::read_policy::Observation)->(u128,&'static str) {
+    if observation.body_throughput_samples.saturating_sub(samples_before)>=3 {
+        if let (Some(average),Some(last))=(observation.body_bytes_per_second,observation.last_body_bytes_per_second) {
+            let rate=average.min(last);
+            if rate.is_finite() && rate>0.0 {
+                // Twofold transfer margin protects against short-body measurement noise.
+                let micros=(planned as f64/rate*2_000_000.0).ceil();
+                return (micros.min(u128::MAX as f64) as u128,"measured_body");
+            }
+        }
+    }
+    let floor=if native>1024 {100}else{1000};
+    (u128::from(elapsed.saturating_sub(latency.saturating_mul(3)).max(floor))
+        *u128::from(planned)/u128::from(pilot_bytes.max(1)),"total_time_fallback")
+}
+
+#[cfg(test)] mod pilot_tests {
+ use super::*;
+ #[test] fn measured_body_is_independent_of_header_delay_and_requires_new_samples() {
+  let mut o=crate::read_policy::Observation::default();
+  o.body_throughput_samples=13;o.body_bytes_per_second=Some(64_000_000.0);o.last_body_bytes_per_second=Some(32_000_000.0);
+  assert_eq!(pilot_transfer_us(16_000_000,196608,63000,10000,451,10,&o),(1_000_000,"measured_body"));
+  assert_eq!(pilot_transfer_us(16_000_000,196608,303000,100000,451,10,&o),(1_000_000,"measured_body"));
+  assert_eq!(pilot_transfer_us(16_000_000,196608,63000,10000,451,11,&o).1,"total_time_fallback");
+  o.last_body_bytes_per_second=Some(1_000_000.0);
+  assert_eq!(pilot_transfer_us(16_000_000,196608,63000,10000,451,10,&o).0,32_000_000);
+  o.last_body_bytes_per_second=Some(f64::NAN);o.body_bytes_per_second=None;
+  assert_eq!(pilot_transfer_us(16_000_000,196608,63000,10000,451,10,&o).1,"total_time_fallback");
+ }
+}
+
 // Use observed nontrivial part lengths to avoid many windows too narrow to
 // find a seed. The byte budget is unchanged. Two source lanes remain available
 // for the required walk and other reads; partial views keep their old frontier.
@@ -453,5 +526,50 @@ fn learned_shard_count(default:usize,whole:bool,latency:u64,frontier:usize,budge
  # [test] fn fine_parts_cannot_occupy_every_source_lane() {
   assert_eq!(learned_shard_count(4,true,16000,8,16*1024*1024,&[65536;3],true),6);
   assert_eq!(learned_shard_count(4,true,16000,16,16*1024*1024,&[65536;3],true),14);
+ }
+}
+
+// Mature source confidence can satisfy the eight-read calibration after at
+// least three fresh preparation reads. Never repeat a decision at one count.
+// Caller separately requires adaptive mode and three validated substantial parts.
+pub(super) fn calibration_reads(last:&mut u64,reads:u64,reuse:bool)->Option<u64> {
+ if reuse && reads>=3 && reads>*last {*last=reads;return Some(reads.max(INDEX_CALIBRATION_READS));}
+ recalibration_due(last,reads).then_some(reads)
+}
+#[cfg(test)] mod warm_calibration_tests {
+ use super::*;
+ #[test] fn fresh_sources_keep_the_full_existing_calibration() {
+  let mut last=0;for n in 0..8 {assert_eq!(calibration_reads(&mut last,n,false),None);}
+  assert_eq!(calibration_reads(&mut last,8,false),Some(8));
+ }
+ #[test] fn known_sources_need_fresh_reads_and_do_not_repeat_at_cached_offsets() {
+  let mut last=0;for n in 0..3 {assert_eq!(calibration_reads(&mut last,n,true),None);}
+  assert_eq!(calibration_reads(&mut last,3,true),Some(8));assert_eq!(calibration_reads(&mut last,3,true),None);
+  assert_eq!(calibration_reads(&mut last,4,true),Some(8));
+ }
+ #[test] fn loss_of_confidence_restores_the_required_read_spacing() {
+  let mut last=0;assert_eq!(calibration_reads(&mut last,3,true),Some(8));
+  for n in 4..11 {assert_eq!(calibration_reads(&mut last,n,false),None);}
+  assert_eq!(calibration_reads(&mut last,11,false),Some(11));
+ }
+}
+
+fn accept_probe(native:u64,latency:u64,fetched:u64,transfer:u128,savings:u128)->bool {
+ latency!=u64::MAX && latency>=minimum_latency(native) && (fetched==0 || transfer<=savings)
+}
+#[cfg(test)] mod refreshed_probe_tests {
+ use super::*;
+ #[test] fn a_now_nearby_ordinary_grid_never_spends_bulk_bytes_on_stale_latency() {
+  assert!(!accept_probe(451,300,196608,1,1000000));
+  assert!(!accept_probe(451,300,0,1,1000000));
+  assert!(!accept_probe(451,u64::MAX,196608,1,1000000));
+ }
+ #[test] fn distant_sources_still_obey_measured_bandwidth_cost() {
+  assert!(accept_probe(451,16000,196608,100000,1000000));
+  assert!(!accept_probe(451,16000,196608,2000000,1000000));
+ }
+ #[test] fn fine_grids_keep_their_existing_nearby_eligibility() {
+  assert!(accept_probe(4096,300,196608,100000,1000000));
+  assert!(!accept_probe(4096,300,196608,2000000,1000000));
  }
 }
