@@ -1,0 +1,225 @@
+{
+  "passed": true,
+  "frozenSourcesMatch": true,
+  "checks": [
+    {
+      "channel": "latest",
+      "port": 18080,
+      "version": "m1228-consolidation",
+      "ramOnly": true,
+      "cacheLearning": true
+    },
+    {
+      "channel": "stable",
+      "port": 18081,
+      "version": "m1228-consolidation",
+      "ramOnly": true,
+      "cacheLearning": true
+    },
+    {
+      "channel": "lts",
+      "port": 18082,
+      "version": "m1228-consolidation",
+      "ramOnly": true,
+      "cacheLearning": true
+    }
+  ],
+  "containers": [
+    {
+      "AutoRemove": false,
+      "Command": null,
+      "CreatedAt": "2 minutes ago",
+      "CIDFile": "",
+      "Exited": false,
+      "ExitedAt": -62135596800,
+      "ExitCode": 0,
+      "ExposedPorts": {
+        "8080": [
+          "tcp"
+        ],
+        "8443": [
+          "tcp",
+          "udp"
+        ]
+      },
+      "Id": "d8532c6619b5d84d9322f1a7363412702ebd3876f2a8eb967fc9cc97cd4824df",
+      "Image": "localhost/river:m1228-consolidation",
+      "ImageID": "e7b73ab0f2aae69f5267f1629371b221b123b0b8b7557cb201b14561cd898c7a",
+      "IsInfra": false,
+      "Labels": {
+        "PODMAN_SYSTEMD_UNIT": "podman-compose@river.service",
+        "com.docker.compose.container-number": "1",
+        "com.docker.compose.project": "river",
+        "com.docker.compose.project.config_files": "/mnt/Shared/Code/Intense/streaming/river/compose.yaml",
+        "com.docker.compose.project.working_dir": "/mnt/Shared/Code/Intense/streaming/river",
+        "com.docker.compose.service": "stable",
+        "io.buildah.version": "1.45.1",
+        "io.podman.compose.config-hash": "2e3f99c9b1422b0400ff01b0e2c8df0dfb6301ac9756374985f166ec0622c212",
+        "io.podman.compose.project": "river",
+        "io.podman.compose.service": "stable",
+        "io.podman.compose.version": "1.6.0",
+        "river.backend-slot": "stable"
+      },
+      "Mounts": [
+        "/opt/river/corpus",
+        "/var/lib/river/config"
+      ],
+      "Names": [
+        "river-stable"
+      ],
+      "Namespaces": {},
+      "Networks": [
+        "river_default"
+      ],
+      "Pid": 154766,
+      "Pod": "",
+      "PodName": "",
+      "Ports": [
+        {
+          "host_ip": "127.0.0.1",
+          "container_port": 8080,
+          "host_port": 18081,
+          "range": 1,
+          "protocol": "tcp"
+        }
+      ],
+      "Restarts": 0,
+      "Size": null,
+      "StartedAt": 1794922155,
+      "State": "running",
+      "Status": "Up 2 minutes (healthy)",
+      "Created": 1794922155
+    },
+    {
+      "AutoRemove": false,
+      "Command": null,
+      "CreatedAt": "2 minutes ago",
+      "CIDFile": "",
+      "Exited": false,
+      "ExitedAt": -62135596800,
+      "ExitCode": 0,
+      "ExposedPorts": {
+        "8080": [
+          "tcp"
+        ],
+        "8443": [
+          "tcp",
+          "udp"
+        ]
+      },
+      "Id": "9af046b6e6af40e5fb9550b9df7fbe81e7dde6c4537316ebe722e988031d2ba9",
+      "Image": "localhost/river:m1228-consolidation",
+      "ImageID": "e7b73ab0f2aae69f5267f1629371b221b123b0b8b7557cb201b14561cd898c7a",
+      "IsInfra": false,
+      "Labels": {
+        "PODMAN_SYSTEMD_UNIT": "podman-compose@river.service",
+        "com.docker.compose.container-number": "1",
+        "com.docker.compose.project": "river",
+        "com.docker.compose.project.config_files": "/mnt/Shared/Code/Intense/streaming/river/compose.yaml",
+        "com.docker.compose.project.working_dir": "/mnt/Shared/Code/Intense/streaming/river",
+        "com.docker.compose.service": "lts",
+        "io.buildah.version": "1.45.1",
+        "io.podman.compose.config-hash": "b17a0d6d54a2aa8b6dc2fcde4cd5e5b88d54e368c7734365db53a9579760aae4",
+        "io.podman.compose.project": "river",
+        "io.podman.compose.service": "lts",
+        "io.podman.compose.version": "1.6.0",
+        "river.backend-slot": "lts"
+      },
+      "Mounts": [
+        "/var/lib/river/config",
+        "/opt/river/corpus"
+      ],
+      "Names": [
+        "river-lts"
+      ],
+      "Namespaces": {},
+      "Networks": [
+        "river_default"
+      ],
+      "Pid": 154857,
+      "Pod": "",
+      "PodName": "",
+      "Ports": [
+        {
+          "host_ip": "127.0.0.1",
+          "container_port": 8080,
+          "host_port": 18082,
+          "range": 1,
+          "protocol": "tcp"
+        }
+      ],
+      "Restarts": 0,
+      "Size": null,
+      "StartedAt": 1794922155,
+      "State": "running",
+      "Status": "Up 2 minutes (healthy)",
+      "Created": 1794922155
+    },
+    {
+      "AutoRemove": false,
+      "Command": null,
+      "CreatedAt": "2 minutes ago",
+      "CIDFile": "",
+      "Exited": false,
+      "ExitedAt": -62135596800,
+      "ExitCode": 0,
+      "ExposedPorts": {
+        "8080": [
+          "tcp"
+        ],
+        "8443": [
+          "tcp",
+          "udp"
+        ]
+      },
+      "Id": "5ea60ad78ffb5dd18da078bc988bb35770e31d13c535a9ed82cc836979e14af9",
+      "Image": "localhost/river:m1228-consolidation",
+      "ImageID": "e7b73ab0f2aae69f5267f1629371b221b123b0b8b7557cb201b14561cd898c7a",
+      "IsInfra": false,
+      "Labels": {
+        "PODMAN_SYSTEMD_UNIT": "podman-compose@river.service",
+        "com.docker.compose.container-number": "1",
+        "com.docker.compose.project": "river",
+        "com.docker.compose.project.config_files": "/mnt/Shared/Code/Intense/streaming/river/compose.yaml",
+        "com.docker.compose.project.working_dir": "/mnt/Shared/Code/Intense/streaming/river",
+        "com.docker.compose.service": "replica-1",
+        "io.buildah.version": "1.45.1",
+        "io.podman.compose.config-hash": "b19dd63445fa59bc9b598bd884b2a9f0bc8532cccbac944409dcddb0a8f317f1",
+        "io.podman.compose.project": "river",
+        "io.podman.compose.service": "replica-1",
+        "io.podman.compose.version": "1.6.0",
+        "river.backend-slot": "replica-1"
+      },
+      "Mounts": [
+        "/opt/river/corpus",
+        "/var/lib/river/config",
+        "/workspace"
+      ],
+      "Names": [
+        "replica-1"
+      ],
+      "Namespaces": {},
+      "Networks": [
+        "river_default"
+      ],
+      "Pid": 154945,
+      "Pod": "",
+      "PodName": "",
+      "Ports": [
+        {
+          "host_ip": "127.0.0.1",
+          "container_port": 8080,
+          "host_port": 18080,
+          "range": 1,
+          "protocol": "tcp"
+        }
+      ],
+      "Restarts": 0,
+      "Size": null,
+      "StartedAt": 1794922155,
+      "State": "running",
+      "Status": "Up 2 minutes (healthy)",
+      "Created": 1794922155
+    }
+  ]
+}

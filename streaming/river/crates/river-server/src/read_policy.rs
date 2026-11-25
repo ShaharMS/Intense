@@ -17,9 +17,9 @@ pub struct Settings {#[serde(default,skip_serializing_if="Option::is_none")]pub 
 impl Default for Settings {fn default()->Self {Self {index_headers:None,max_source_requests:None,mode:match std::env::var("RIVER_S3_ADAPTIVE_READS").unwrap_or_else(|_|"observe".into()).as_str(){"true"|"adaptive"=>Mode::Adaptive,"false"|"disabled"=>Mode::Disabled,_=>Mode::Observe},minimum_samples:16,max_overfetch_ratio:2,serial_transport:None,refresh_payload_costs:None}}}
 impl Settings {
  pub fn effective_refresh_payload_costs(&self)->bool {self.refresh_payload_costs.unwrap_or_else(||matches!(std::env::var("RIVER_S3_REFRESH_PAYLOAD_COSTS").as_deref(),Ok("true"|"1")))}
- pub fn effective_source_requests(&self)->usize {self.max_source_requests.unwrap_or_else(||std::env::var("RIVER_S3_SOURCE_MAX_REQUESTS").ok().and_then(|v|v.parse().ok()).unwrap_or(16).clamp(1,64))}
+ pub fn effective_source_requests(&self)->usize {self.max_source_requests.unwrap_or_else(||std::env::var("RIVER_S3_SOURCE_MAX_REQUESTS").ok().and_then(|v|v.parse().ok()).unwrap_or_else(||crate::resources::plan().detected.effective_cpus.saturating_mul(32).clamp(16,1024)).clamp(1,16384))}
  pub fn effective_serial_transport(&self)->SerialTransport {self.serial_transport.unwrap_or_default()}
- pub fn validate(&self)->Result<()> {if let Some(p)=&self.index_headers {p.validate()?;}ensure!(self.max_source_requests.is_none_or(|n|(1..=64).contains(&n)),"maxSourceRequests must be 1 through 64");ensure!((8..=10000).contains(&self.minimum_samples),"minimumSamples must be 8 through 10000");ensure!((1..=4).contains(&self.max_overfetch_ratio),"maxOverfetchRatio must be 1 through 4");crate::remote_source::validate_transport_kind(self.effective_serial_transport())}
+ pub fn validate(&self)->Result<()> {if let Some(p)=&self.index_headers {p.validate()?;}ensure!(self.max_source_requests.is_none_or(|n|(1..=16384).contains(&n)),"maxSourceRequests must be 1 through 16384");ensure!((8..=10000).contains(&self.minimum_samples),"minimumSamples must be 8 through 10000");ensure!((1..=4).contains(&self.max_overfetch_ratio),"maxOverfetchRatio must be 1 through 4");crate::remote_source::validate_transport_kind(self.effective_serial_transport())}
 }
 pub fn settings_view(settings:&Settings)->serde_json::Value {let mut v=serde_json::to_value(settings).unwrap();v["maxSourceRequests"]=settings.effective_source_requests().into();v["serialTransport"]=serde_json::to_value(settings.effective_serial_transport()).unwrap();v["refreshPayloadCosts"]=settings.effective_refresh_payload_costs().into();v}
 static SETTINGS:OnceLock<Mutex<Settings>>=OnceLock::new();
@@ -28,7 +28,51 @@ pub fn settings()->Settings {SETTINGS.get_or_init(||Mutex::new(Settings::default
 pub fn apply(value:Settings) {*SETTINGS.get_or_init(||Mutex::new(Settings::default())).lock().unwrap_or_else(|e|e.into_inner())=value;}
 #[derive(Debug,Default,Clone,serde::Serialize)]
 #[serde(rename_all="camelCase")]
-pub struct Observation {#[serde(skip)]small_body_stalls:u8,pub prefix_lookahead_backoff:bool,pub prefix_lookahead_backoff_entries:u64,#[serde(skip)]header_window_us:[u64;8],#[serde(skip)]header_window_count:u64,#[serde(skip_serializing_if="Option::is_none")]pub recent_header_minimum_ms:Option<f64>,#[serde(skip_serializing_if="Option::is_none")]pub contiguous_ranges:Option<ContiguousDecision>,#[serde(skip_serializing_if="Option::is_none")]pub last_body_bytes_per_second:Option<f64>,#[serde(skip_serializing_if="Option::is_none")]pub index_header_decision:Option<IndexHeaderDecision>,pub active_reads:u64,pub active_preparations:u64,pub admission_waits:u64,pub samples:u64,pub bytes:u64,pub latency_ms:Option<f64>,pub effective_bytes_per_second:Option<f64>,pub throughput_samples:u64,pub body_bytes_per_second:Option<f64>,pub body_throughput_samples:u64,pub sdk_serial_reads:u64,pub native_serial_requests:u64,pub last_decision:Option<Decision>}
+pub struct Observation {
+ #[serde(skip)] window_start:Option<std::time::Instant>,
+ #[serde(skip)] window_last_completion:Option<std::time::Instant>,
+ #[serde(skip)] window_bytes:u64,
+ #[serde(skip)] window_peak:usize,
+ pub dispatch_window:usize,
+ pub aggregate_bytes_per_second:Option<f64>,
+ pub gap_bytes:u64,
+ pub reused_gap_bytes:u64,
+ #[serde(default)] pub actual_overfetch: Overfetch,
+ #[serde(default)] pub metadata_overfetch: Overfetch,
+#[serde(skip)]small_body_stalls:u8,pub prefix_lookahead_backoff:bool,pub prefix_lookahead_backoff_entries:u64,#[serde(skip)]header_window_us:[u64;8],#[serde(skip)]header_window_count:u64,#[serde(skip_serializing_if="Option::is_none")]pub recent_header_minimum_ms:Option<f64>,#[serde(skip_serializing_if="Option::is_none")]pub contiguous_ranges:Option<ContiguousDecision>,#[serde(skip_serializing_if="Option::is_none")]pub last_body_bytes_per_second:Option<f64>,#[serde(skip_serializing_if="Option::is_none")]pub index_header_decision:Option<IndexHeaderDecision>,pub active_reads:u64,pub active_preparations:u64,pub admission_waits:u64,pub samples:u64,pub bytes:u64,pub latency_ms:Option<f64>,pub effective_bytes_per_second:Option<f64>,pub throughput_samples:u64,pub body_bytes_per_second:Option<f64>,pub body_throughput_samples:u64,pub sdk_serial_reads:u64,pub native_serial_requests:u64,pub last_decision:Option<Decision>}
+#[derive(Debug,Default,Clone,serde::Serialize)]
+#[serde(rename_all="camelCase")]
+pub struct Overfetch {
+ pub measured_samples:u64,pub measured_origin_bytes:u64,pub needed_origin_bytes:u64,
+ pub unmeasured_samples:u64,pub unmeasured_origin_bytes:u64,pub ratio_ewma:Option<f64>,
+ pub learned_ratio_milli:Option<u64>,pub adjustment_count:u64,pub reason:String,
+ #[serde(skip)] good_windows:u32,
+}
+impl Overfetch {
+ fn record(&mut self,bytes:u64,needed:u64,reliable:bool,reason:&str,configured:u64,minimum_samples:u32) {
+  if bytes==0 && reliable{return;}
+  if !reliable || needed==0 || needed>bytes {self.unmeasured_samples+=1;self.unmeasured_origin_bytes=self.unmeasured_origin_bytes.saturating_add(bytes);self.reason=reason.into();return;}
+  self.measured_samples+=1;self.measured_origin_bytes=self.measured_origin_bytes.saturating_add(bytes);self.needed_origin_bytes=self.needed_origin_bytes.saturating_add(needed);
+  let ratio=bytes as f64/needed as f64;self.ratio_ewma=Some(self.ratio_ewma.map_or(ratio,|v|v*0.875+ratio*0.125));
+  self.reason="measured successful responses; duplicate network reads count, repeated demand and cache-only bytes do not".into();
+  if self.measured_samples<u64::from(minimum_samples) || self.measured_samples%8!=0{return;}
+  let old=self.learned_ratio_milli.unwrap_or(configured).clamp(1000,configured);let observed=self.ratio_ewma.unwrap();
+  let next=if observed>configured as f64/1000.0*1.1 {
+   self.good_windows=0;self.reason="measured amplification exceeds configured target; reduce optional gap filling".into();old.saturating_sub(125).max(1000)
+  }else if observed<configured as f64/1000.0*0.8 {
+   self.good_windows+=1;
+   if self.good_windows>=3 {self.good_windows=0;self.reason="sustained low amplification; cautiously restore optional gap budget".into();(old+125).min(configured)}else{old}
+  }else{self.good_windows=0;old};
+  if next!=old {self.adjustment_count+=1;}self.learned_ratio_milli=Some(next);
+ }
+}
+pub fn overfetch_ratio_milli(settings:&Settings,observation:&Observation)->u64 {
+ let configured=u64::from(settings.max_overfetch_ratio).min(explicit_overfetch_cap().unwrap_or(16))*1000;
+ if settings.mode==Mode::Adaptive {observation.actual_overfetch.learned_ratio_milli.unwrap_or(configured).clamp(1000,configured)}else{configured}
+}
+pub fn optional_read_budget(settings:&Settings,observation:&Observation,remaining:u64,useful:u64)->u64 {
+ remaining.min(useful.saturating_mul(overfetch_ratio_milli(settings,observation))/1000)
+}
 #[derive(Debug,Clone,serde::Serialize)]
 #[serde(rename_all="camelCase")]
 pub struct ContiguousDecision {pub reason:String,pub max_range_bytes:u64,pub body_time_budget_ms:u32,pub sample_count:u64,pub body_throughput_samples:u64,pub gap_bytes_added:u64}
@@ -106,10 +150,17 @@ impl Profile {
  pub fn active_operations(&self)->usize {self.1.load(std::sync::atomic::Ordering::Acquire)}
  pub fn active_preparations(&self)->usize {self.3.load(std::sync::atomic::Ordering::Acquire)}
  pub fn preparation(&self)->SourcePreparation<'_> {self.3.fetch_add(1,std::sync::atomic::Ordering::AcqRel);SourcePreparation(self)}
- pub async fn acquire(&self)->SourcePermit<'_> {use std::sync::atomic::Ordering;
+ pub async fn acquire(&self)->SourcePermit<'_> {self.admit(false).await}
+ pub async fn acquire_range(&self)->SourcePermit<'_> {self.admit(true).await}
+ async fn admit(&self,adaptive:bool)->SourcePermit<'_> {use std::sync::atomic::Ordering;
   let mut queued=false;
   loop {let notified=self.2.notified();tokio::pin!(notified);notified.as_mut().enable();
-   let limit=settings().effective_source_requests();
+   let settings=settings();
+   let mut limit=settings.effective_source_requests();
+   if adaptive && std::env::var_os("RIVER_S3_RANGE_CONCURRENCY").is_none() {
+       let s=self.0.lock().unwrap_or_else(|e|e.into_inner());
+       limit=limit.min(if s.dispatch_window==0 {32}else{s.dispatch_window});
+   }
    // Retry a racing update while capacity remains; a stale CAS result is not
    // evidence that the source is full and must never impose a100ms queue wait.
    if self.1.fetch_update(Ordering::AcqRel,Ordering::Acquire,|active|(active<limit).then_some(active+1)).is_ok() {return SourcePermit(self);}
@@ -119,6 +170,12 @@ impl Profile {
   }
  }
 
+ pub fn record_overfetch(&self,payload:bool,bytes:u64,needed:u64,reliable:bool,reason:&str) {
+  let settings=settings();if settings.mode==Mode::Disabled{return;}
+  let configured=u64::from(settings.max_overfetch_ratio).min(explicit_overfetch_cap().unwrap_or(16))*1000;
+  let mut state=self.0.lock().unwrap_or_else(|e|e.into_inner());
+  let feedback=if payload{&mut state.actual_overfetch}else{&mut state.metadata_overfetch};feedback.record(bytes,needed,reliable,reason,configured,settings.minimum_samples);
+ }
  pub fn serial_counts(&self,sdk_reads:u64,native_requests:u64) {let mut s=self.0.lock().unwrap_or_else(|e|e.into_inner());s.sdk_serial_reads=s.sdk_serial_reads.saturating_add(sdk_reads);s.native_serial_requests=s.native_serial_requests.saturating_add(native_requests);}
  pub fn snapshot(&self)->Observation {let mut s=self.0.lock().unwrap_or_else(|e|e.into_inner()).clone();s.active_reads=self.active_operations() as u64;s.active_preparations=self.active_preparations() as u64;s}
  pub fn record(&self,bytes:u64,headers:Duration,total:Duration) {
@@ -127,6 +184,7 @@ impl Profile {
  pub fn record_transfer(&self,bytes:u64,headers:Option<Duration>,total:Duration) {
   if settings().mode==Mode::Disabled {return;}
   let mut s=self.0.lock().unwrap_or_else(|e|e.into_inner());s.samples=s.samples.saturating_add(1);s.bytes=s.bytes.saturating_add(bytes);
+  Self::observe_window(&mut s,bytes,total,self.active_operations());
   s.record_prefix_body(bytes,headers,total);
   let ewma=|old:Option<f64>,new:f64|Some(old.map_or(new,|old|old*0.875+new*0.125));
   if let Some(headers)=headers {s.record_header_timing(headers);s.latency_ms=ewma(s.latency_ms,headers.as_secs_f64()*1000.0);}
@@ -141,6 +199,62 @@ impl Profile {
     s.body_bytes_per_second=ewma(s.body_bytes_per_second,rate);
    }
   }
+ }
+ pub fn gap_bytes(&self,bytes:u64,reused:bool) {
+    let mut s=self.0.lock().unwrap_or_else(|e|e.into_inner());
+    if reused {s.reused_gap_bytes=s.reused_gap_bytes.saturating_add(bytes);} else {s.gap_bytes=s.gap_bytes.saturating_add(bytes);}
+ }
+ pub fn dispatch(&self,count:usize,bytes:u64)->usize {
+    let s=self.snapshot();
+    let window=if s.dispatch_window==0 {32} else {s.dispatch_window};
+    let rtt=s.recent_header_minimum_ms.unwrap_or(4.0)/1000.0;
+    // Sparse header bursts contain little data by design. Their aggregate completion
+    // rate alone would collapse a fast endpoint to two lanes on its first payload.
+    let rate=s.aggregate_bytes_per_second.unwrap_or(0.0).max(s.body_bytes_per_second.unwrap_or(0.0));
+    let bdp=(s.body_throughput_samples>=3 && rate>0.0).then_some(rate*rtt);
+    let avg=bytes as f64/count.max(1) as f64;
+    // Large reads already fill the link. Small reads can exploit the full measured window.
+    let lanes=bdp.map_or(window,|bdp|(2.0+2.0*bdp/avg.max(1.0)).ceil() as usize);
+    window.min(lanes).min(settings().effective_source_requests().saturating_sub(s.active_reads as usize)).clamp(1,count.max(1))
+ }
+ pub fn congested(&self) {
+    let mut s=self.0.lock().unwrap_or_else(|e|e.into_inner());
+    let window=if s.dispatch_window==0 {32} else {s.dispatch_window};
+    s.dispatch_window=window.div_ceil(2).max(2);
+ }
+ fn observe_window(s:&mut Observation,bytes:u64,total:Duration,active:usize) {
+    let now=std::time::Instant::now();
+    Self::observe_completion(s,bytes,now-total,now,active);
+ }
+ fn observe_completion(s:&mut Observation,bytes:u64,start:std::time::Instant,now:std::time::Instant,active:usize) {
+    // Measure completed bytes in disjoint wall-clock windows. Backdating every
+    // new window to the next GET's start counts the same RTT many times when
+    // a batch completes together, collapsing admission on a healthy source.
+    let began=s.window_start.get_or_insert(start);
+    if let Some(last)=s.window_last_completion {
+        *began+=start.saturating_duration_since(last);
+    }
+    s.window_last_completion=Some(now);
+    s.window_bytes=s.window_bytes.saturating_add(bytes);
+    s.window_peak=s.window_peak.max(active);
+    let elapsed=now.saturating_duration_since(*began);
+    if elapsed<Duration::from_millis(12) {return;}
+    s.window_start=Some(now);
+    if s.window_bytes<THROUGHPUT_SAMPLE_BYTES {
+        s.window_bytes=0;s.window_peak=0;return;
+    }
+    let rate=s.window_bytes as f64/elapsed.as_secs_f64();
+    let previous=s.aggregate_bytes_per_second.unwrap_or(rate);
+    let window=if s.dispatch_window==0 {32} else {s.dispatch_window};
+    if s.window_peak>=window/2 {
+        if rate>=previous*0.65 {
+            s.dispatch_window=(window+window.div_ceil(4)).min(16384);
+        } else if s.window_peak>=window {
+            s.dispatch_window=window.div_ceil(2).max(2);
+        }
+    }
+    s.aggregate_bytes_per_second=Some(previous*0.75+rate*0.25);
+    s.window_bytes=0;s.window_peak=0;
  }
  pub fn decision(&self,value:Decision) {self.0.lock().unwrap_or_else(|e|e.into_inner()).last_decision=Some(value);}
  pub fn contiguous_decision(&self,value:ContiguousDecision) {self.0.lock().unwrap_or_else(|e|e.into_inner()).contiguous_ranges=Some(value);}
@@ -231,7 +345,26 @@ pub fn estimated_ms(requests:usize,bytes:u64,concurrency:usize,latency_ms:f64,by
   permits.pop();let permit=tokio::time::timeout(Duration::from_millis(100),p.acquire()).await.unwrap();drop(permit);drop(permits);
   assert_eq!(p.1.load(std::sync::atomic::Ordering::Acquire),0);
  }
- #[test] fn source_limit_rejects_zero_and_unbounded_values() {let mut s=Settings::default();s.max_source_requests=Some(0);assert!(s.validate().is_err());s.max_source_requests=Some(65);assert!(s.validate().is_err());s.max_source_requests=Some(4);assert!(s.validate().is_ok());}
+ #[test]
+ fn simultaneous_completions_share_one_rtt_and_exclude_idle_time() {
+    let mut s=Observation::default();
+    let t=std::time::Instant::now();
+    let end=t+Duration::from_millis(16);
+    for _ in 0..32 {Profile::observe_completion(&mut s,65536,t,end,32);}
+    assert_eq!(s.window_bytes,31*65536);
+    assert_eq!(s.dispatch_window,40);
+    let next=end+Duration::from_secs(1);
+    Profile::observe_completion(&mut s,65536,next,next+Duration::from_millis(16),32);
+    assert_eq!(s.window_bytes,0);
+    assert!(s.aggregate_bytes_per_second.unwrap()>32e6);
+ }
+ #[test] fn dispatch_is_continuous_and_trades_concurrency_for_transfer_size() {
+    let p=Profile::default();
+    {let mut s=p.0.lock().unwrap();s.dispatch_window=64;s.recent_header_minimum_ms=Some(4.0);s.aggregate_bytes_per_second=Some(128e6);s.body_throughput_samples=3;}
+    assert_eq!(p.dispatch(64,1024*1024),p.dispatch(64,1024*1024+1));
+    assert!(p.dispatch(64,1024*1024)>p.dispatch(64,64*1024*1024));
+ }
+ #[test] fn source_limit_rejects_zero_and_unbounded_values() {let mut s=Settings::default();s.max_source_requests=Some(0);assert!(s.validate().is_err());s.max_source_requests=Some(16385);assert!(s.validate().is_err());s.max_source_requests=Some(500);assert!(s.validate().is_ok());s.max_source_requests=Some(4);assert!(s.validate().is_ok());}
  #[test] fn cost_accounts_for_parallel_waves_and_extra_bytes() {assert!(estimated_ms(8,1000,4,10.0,1e6)<estimated_ms(16,1000,4,10.0,1e6));assert!(estimated_ms(8,1000000,4,10.0,1e6)>estimated_ms(16,1000,4,10.0,1e6));}
 }
 
@@ -286,4 +419,16 @@ impl Profile {pub fn index_header_decision(&self,d:IndexHeaderDecision) {self.0.
  #[test] fn index_header_policy_roundtrips_and_bounds_bandwidth() {
   let mut s:Settings=serde_json::from_value(serde_json::json!({"mode":"adaptive","minimumSamples":8,"maxOverfetchRatio":2,"indexHeaders":{"mode":"adaptive","windowBytes":1048576,"maxExtraBytes":33554432}})).unwrap();assert!(s.validate().is_ok());assert!(serde_json::to_value(&s).unwrap().get("indexHeaders").is_some());s.index_headers.as_mut().unwrap().max_extra_bytes=100;assert!(s.validate().is_err());
  }
+}
+
+#[cfg(test)]mod measured_overfetch_tests {
+ use super::*;
+ #[test]fn feedback_is_bounded_and_recovers_with_hysteresis(){
+  let mut o=Overfetch::default();for _ in 0..80{o.record(4000,1000,true,"",2000,8);}
+  assert_eq!(o.learned_ratio_milli,Some(1000));let adjustments=o.adjustment_count;
+  for _ in 0..200{o.record(1000,1000,true,"",2000,8);}assert_eq!(o.learned_ratio_milli,Some(2000));assert!(o.adjustment_count>adjustments);
+  let before=o.measured_samples;o.record(9999,1,false,"truncated",2000,8);assert_eq!(o.measured_samples,before);assert_eq!(o.unmeasured_origin_bytes,9999);
+ }
+ #[test]fn configured_warmup_is_respected(){let mut o=Overfetch::default();for _ in 0..31{o.record(4000,1000,true,"",2000,32);}assert_eq!(o.learned_ratio_milli,None);o.record(4000,1000,true,"",2000,32);assert_eq!(o.learned_ratio_milli,Some(1875));}
+ #[test]fn observe_mode_and_explicit_ceiling_win(){let mut o=Observation::default();o.actual_overfetch.learned_ratio_milli=Some(1500);let mut s=Settings::default();s.mode=Mode::Observe;assert_eq!(overfetch_ratio_milli(&s,&o),2000);s.mode=Mode::Adaptive;assert_eq!(overfetch_ratio_milli(&s,&o),1500);s.max_overfetch_ratio=1;assert_eq!(overfetch_ratio_milli(&s,&o),1000);}
 }

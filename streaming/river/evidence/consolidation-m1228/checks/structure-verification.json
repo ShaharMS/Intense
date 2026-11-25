@@ -1,0 +1,125 @@
+{
+  "passed": true,
+  "rows": [
+    {
+      "file": "synthetic-terrain-plain-d4.jp2",
+      "tlm": false,
+      "plt": false,
+      "tileParts": 64,
+      "waveletLevels": 4,
+      "reversible": true
+    },
+    {
+      "file": "synthetic-terrain-tlm-d4.jp2",
+      "tlm": true,
+      "plt": false,
+      "tileParts": 64,
+      "waveletLevels": 4,
+      "reversible": true
+    },
+    {
+      "file": "synthetic-terrain-tlm-plt-d5.jp2",
+      "tlm": true,
+      "plt": true,
+      "tileParts": 64,
+      "waveletLevels": 5,
+      "reversible": true
+    },
+    {
+      "file": "synthetic-terrain-tlm-plt-d6-layers.jp2",
+      "tlm": true,
+      "plt": true,
+      "tileParts": 16,
+      "waveletLevels": 6,
+      "reversible": true
+    },
+    {
+      "file": "synthetic-terrain-tlm-plt-d6-single.jp2",
+      "tlm": true,
+      "plt": true,
+      "tileParts": 1,
+      "waveletLevels": 6,
+      "reversible": true
+    },
+    {
+      "file": "synthetic-urban-plain-d4.jp2",
+      "tlm": false,
+      "plt": false,
+      "tileParts": 64,
+      "waveletLevels": 4,
+      "reversible": true
+    },
+    {
+      "file": "synthetic-urban-tlm-d4.jp2",
+      "tlm": true,
+      "plt": false,
+      "tileParts": 64,
+      "waveletLevels": 4,
+      "reversible": true
+    },
+    {
+      "file": "synthetic-urban-tlm-plt-d5.jp2",
+      "tlm": true,
+      "plt": true,
+      "tileParts": 64,
+      "waveletLevels": 5,
+      "reversible": true
+    },
+    {
+      "file": "synthetic-urban-tlm-plt-d6-layers.jp2",
+      "tlm": true,
+      "plt": true,
+      "tileParts": 16,
+      "waveletLevels": 6,
+      "reversible": true
+    },
+    {
+      "file": "synthetic-urban-tlm-plt-d6-single.jp2",
+      "tlm": true,
+      "plt": true,
+      "tileParts": 1,
+      "waveletLevels": 6,
+      "reversible": true
+    },
+    {
+      "file": "synthetic-texture-plain-d4.jp2",
+      "tlm": false,
+      "plt": false,
+      "tileParts": 64,
+      "waveletLevels": 4,
+      "reversible": true
+    },
+    {
+      "file": "synthetic-texture-tlm-d4.jp2",
+      "tlm": true,
+      "plt": false,
+      "tileParts": 64,
+      "waveletLevels": 4,
+      "reversible": true
+    },
+    {
+      "file": "synthetic-texture-tlm-plt-d5.jp2",
+      "tlm": true,
+      "plt": true,
+      "tileParts": 64,
+      "waveletLevels": 5,
+      "reversible": true
+    },
+    {
+      "file": "synthetic-texture-tlm-plt-d6-layers.jp2",
+      "tlm": true,
+      "plt": true,
+      "tileParts": 16,
+      "waveletLevels": 6,
+      "reversible": true
+    },
+    {
+      "file": "synthetic-texture-tlm-plt-d6-single.jp2",
+      "tlm": true,
+      "plt": true,
+      "tileParts": 1,
+      "waveletLevels": 6,
+      "reversible": true
+    }
+  ]
+}

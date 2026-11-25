@@ -1,0 +1,99 @@
+{
+  "version": "m1230",
+  "imageId": "sha256:bd910980c28ee709b8a7a6d4b6b4e31b05102ab7a4db2dd60873adf397dee60c",
+  "baselineImageId": "sha256:894e09893fafe1a593e31ba286a6893d58185cf175163f1f307c775aae2ae613",
+  "sourceManifestSha256": "ead2ebdadbe6d001742ea177b83090519252cd32eafb97516793a9a373d16377",
+  "platform": "linux/amd64",
+  "qualifiedForRelease": true,
+  "channels": [
+    "stable",
+    "lts",
+    "latest"
+  ],
+  "exactWmtsResponses": {
+    "m1229": 336,
+    "m1230": 336
+  },
+  "generatedFixtures": [
+    "terrain10-plain.j2k",
+    "terrain10-tlm.j2k",
+    "terrain10wide-plain.j2k",
+    "terrain10wide-tlm.j2k",
+    "terrain11-plain.j2k",
+    "terrain11-tlm.j2k",
+    "terrain12-plain.j2k",
+    "terrain12-tlm.j2k",
+    "texture12-plain.j2k",
+    "texture12-tlm.j2k",
+    "urban11-plain.j2k",
+    "urban11-tlm.j2k"
+  ],
+  "timingConditions": "2 fresh starts per image, 4 ms loopback origin delay at 512 MiB/s. Client elapsed time after manifest lookup.",
+  "readOnlyRootArbitraryUidWithoutShm": {
+    "memoryLimitMiB": 1024,
+    "cacheLearning": true,
+    "results": [
+      {
+        "mode": "native",
+        "backend": "openjpeg",
+        "route": "s3-ram-compatibility",
+        "exact": true
+      },
+      {
+        "mode": "native",
+        "backend": "jp2grok-native",
+        "route": "s3-ram-compatibility",
+        "exact": true
+      },
+      {
+        "mode": "cli",
+        "backend": "openjpeg",
+        "route": "s3-ram-compatibility",
+        "exact": true
+      },
+      {
+        "mode": "cli",
+        "backend": "jp2grok-cli",
+        "route": "s3-ram-compatibility",
+        "exact": true
+      }
+    ]
+  },
+  "openHtWorkerSelfTest": true,
+  "debugSourceHeaders": true,
+  "largeObjectSelectiveRead": [
+    [
+      "native-default",
+      "200"
+    ],
+    [
+      "compact-512MiB",
+      "422"
+    ],
+    [
+      "explicit-64",
+      "422"
+    ],
+    [
+      "native-128MiB",
+      "200"
+    ]
+  ],
+  "limitations": [
+    "Local CPU tests only. OpenShift, production S3, and NVIDIA hardware were not exercised."
+  ],
+  "noDiskMemoryLimits": [
+    {
+      "memoryLimitMiB": 256,
+      "peakMiB": 118.4,
+      "exactTiles": 35,
+      "oomKills": 0
+    },
+    {
+      "memoryLimitMiB": 512,
+      "peakMiB": 172.6,
+      "exactTiles": 35,
+      "oomKills": 0
+    }
+  ]
+}

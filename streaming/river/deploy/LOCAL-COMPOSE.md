@@ -29,8 +29,7 @@ python tools/river-compose.py target replica-2 --runtime
 python tools/river-compose.py target replica-1 --runtime
 ```
 
-`target --runtime` reloads Nginx without restarting backend containers. Refresh
-an open viewer to reconnect its WebSocket. The selected target is saved locally.
+`target --runtime` reloads Nginx without restarting backend containers. The selected target is saved locally.
 Without `--runtime`, `target` also recreates the old/new backend slots to apply
 the default telemetry producer selection. Their configuration/cache survives.
 

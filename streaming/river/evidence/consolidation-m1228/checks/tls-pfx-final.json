@@ -1,0 +1,14 @@
+{
+  "passed": true,
+  "identity": "mounted PFX and password file",
+  "rows": [
+    {
+      "protocol": "HTTP/1.1",
+      "status": 200
+    },
+    {
+      "protocol": "HTTP/2",
+      "status": 200
+    }
+  ]
+}

@@ -4,16 +4,17 @@ use super::*;
 use std::sync::OnceLock;
 type PrefixKey=(String,u8,Vec<u16>);
 #[derive(Default)]
-struct PrefixCache {lru:BTreeMap<u64,PrefixKey>,entries:HashMap<PrefixKey,(PreparedSubset,usize,u64)>,bytes:usize,clock:u64}
+struct PrefixCache {lru:BTreeMap<u64,PrefixKey>,entries:HashMap<PrefixKey,(PreparedSubset,usize,u64,u64)>,bytes:usize,clock:u64}
 impl PrefixCache {
  fn trim(&mut self,limit:usize)->crate::resources::Occupancy {while self.bytes>limit||self.entries.len()>crate::resources::entry_limit("RIVER_S3_PREPARED_PREFIX_CACHE_ENTRIES",limit){let Some((_,key))=self.lru.pop_first()else{break;};if let Some(old)=self.entries.remove(&key){self.bytes-=old.1;crate::resources::evict("prepared_prefixes",1);}}crate::resources::Occupancy{bytes:self.bytes,entries:self.entries.len(),..Default::default()}}
- fn get(&mut self,key:&PrefixKey)->Option<PreparedSubset>{self.clock+=1;let now=self.clock;let Some(entry)=self.entries.get_mut(key)else{crate::resources::miss("prepared_prefixes");return None;};let old=entry.2;entry.2=now;let result=entry.0.clone();let bytes=entry.1;self.lru.remove(&old);self.lru.insert(now,key.clone());crate::resources::hit("prepared_prefixes",bytes);Some(result)}
- fn put(&mut self,key:PrefixKey,value:&PreparedSubset,limit:usize){if value.route!="s3-multipart-compact-lowest-prefix"||value.bytes.len()>4*1024*1024{return;}let limit=crate::resources::effective("prepared_prefixes",limit);let bytes=value.bytes.len()+key.0.len()+key.2.len()*2+256;if bytes>limit{return;}if let Some(old)=self.entries.remove(&key){self.bytes-=old.1;self.lru.remove(&old.2);}let _=self.trim(limit.saturating_sub(bytes));self.clock+=1;self.bytes+=bytes;self.lru.insert(self.clock,key.clone());self.entries.insert(key,(value.clone(),bytes,self.clock));}
+ fn get(&mut self,key:&PrefixKey)->Option<PreparedSubset>{self.clock+=1;let now=self.clock;let Some(entry)=self.entries.get_mut(key)else{crate::resources::miss("prepared_prefixes");return None;};let old=entry.2;entry.2=now;let result=entry.0.clone();let bytes=entry.1;crate::resources::reused_cost("prepared_prefixes",entry.3);self.lru.remove(&old);self.lru.insert(now,key.clone());crate::resources::hit("prepared_prefixes",bytes);Some(result)}
+ fn put(&mut self,key:PrefixKey,value:&PreparedSubset,limit:usize){self.put_measured(key,value,limit,0)}
+ fn put_measured(&mut self,key:PrefixKey,value:&PreparedSubset,limit:usize,work_ns:u64){if value.route!="s3-multipart-compact-lowest-prefix"||value.bytes.len()>4*1024*1024{return;}let limit=crate::resources::effective("prepared_prefixes",limit);let bytes=value.bytes.len()+key.0.len()+key.2.len()*2+256;if bytes>limit{return;}if let Some(old)=self.entries.remove(&key){self.bytes-=old.1;self.lru.remove(&old.2);}let _=self.trim(limit.saturating_sub(bytes));self.clock+=1;self.bytes+=bytes;self.lru.insert(self.clock,key.clone());self.entries.insert(key,(value.clone(),bytes,self.clock,work_ns));}
 }
 fn prefix_cache()->&'static Mutex<PrefixCache>{static C:OnceLock<Mutex<PrefixCache>>=OnceLock::new();static REGISTER:std::sync::Once=std::sync::Once::new();let cache=C.get_or_init(||Mutex::new(PrefixCache::default()));REGISTER.call_once(||crate::resources::register("prepared_prefixes",move|limit|cache.lock().unwrap_or_else(|e|e.into_inner()).trim(limit)));cache}
 fn prefix_cache_budget(value:Option<&str>)->usize{value.and_then(|v|v.parse().ok()).unwrap_or_else(||crate::resources::budget("prepared_prefixes"))}
 fn prefix_cache_limit()->usize{prefix_cache_budget(None)}
-struct Part {sot_offset:u64,header:Vec<u8>,range:Range<u64>,packets:usize,selected:usize}
+struct Part {inline:bool,sot_offset:u64,header:Vec<u8>,range:Range<u64>,packets:usize,selected:usize}
 struct Tile {entries:Vec<(u64,u32)>,wanted:usize,total:usize,covered:usize,parts:Vec<Part>,
  states:BTreeMap<(u8,u64,u64,u8),(layered_packets::State,usize)>}
 fn cached_part_bytes(range:Range<u64>,block:u64,mut cached:impl FnMut(u64)->Option<Arc<[u8]>>)->Option<Vec<u8>> {
@@ -196,7 +197,19 @@ impl RemoteSource {
  fn prepare_multipart_prefix_plan(&self,selected:&HashSet<u16>,payload:&HeaderPayload,reduction:u8,layers:u32,
     context:&mut ReadContext,first_parts_only:bool)->Result<Option<PreparedSubset>> {
   let h=&self.header;
-  let profile=std::env::var_os("RIVER_PROFILE_SOURCE").is_some();
+  let detailed=crate::tile_diagnostics::active();
+  let legacy_profile=std::env::var_os("RIVER_PROFILE_SOURCE").is_some();
+  let profile=detailed || legacy_profile;
+  // Measure a batch, including failed I/O, before propagating its result.
+  // Named samples aggregate across parts and waves in this request only.
+  macro_rules! phase {
+   ($name:literal,$work:expr) => {{
+    let mut mark=detailed.then(||SourceProfile::new(context));
+    let result=$work;
+    if let Some(mark)=&mut mark {profile_stage($name,context,mark);}
+    result
+   }};
+  }
   let (mut order_ns,mut read_ns,mut parse_ns,mut attempts,mut empty_headers,mut buffered_parts)=(0u128,0u128,0u128,0u64,0u64,0u64);
   if !resolution_prefix(h,layers) || reduction==0 {return Ok(None);}
   // A complete TPix table supplies the same ordered tile/length information
@@ -219,6 +232,20 @@ impl RemoteSource {
     return Ok(Some(prepared));
    }
   }
+  let measured_build_started=Instant::now();
+  let mut waves=0usize;
+  let mut prefetched_inline_parts=0usize;
+  let mut plt_parts=0usize;
+  let mut rejected_plt_parts=0usize;
+  let mut inline_parts=0usize;
+  let mut probe_io=ReadStats::default();
+  let mut max_probe_ns=0;
+  let mut probe_calls=0u64;
+  let mut probe_curl_requests=0;
+  let layout=||format!("source_bytes={} image={}x{} native_tile={}x{} grid={}x{} selected_tiles={} levels={} reduction={} source_layers={} requested_layers={} progression={} index_entries={} range_block_bytes={}",
+   self.meta.size,h.width,h.height,h.layout.width,h.layout.height,h.layout.columns,h.layout.rows,selected.len(),
+   h.levels,reduction,h.layers,layers,match h.progression {0=>"LRCP",1=>"RLCP",2=>"RPCL",_=>"other"},tile_index.len(),self.block_size);
+  if detailed {crate::tile_diagnostics::prefix(format!("{} outcome=attempted",layout()));}
   let scale=1u32<<reduction;
   let eligible=h.layers>1 && !h.is_ht && h.cod[9]==1 && h.cod[8]&0xc0==0 && h.cod[0]&6==0
    && h.image_origin==(0,0) && h.layout.origin_x==0 && h.layout.origin_y==0
@@ -252,6 +279,15 @@ impl RemoteSource {
   let metadata=entries.values().map(|parts|parts.capacity().saturating_mul(std::mem::size_of::<(u64,u32)>())).sum::<usize>()
    .saturating_add(selected.len().saturating_mul(std::mem::size_of::<Tile>()+std::mem::size_of::<Part>()+64));
   if !context.admit_metadata(metadata) {return Ok(None);}
+  // Only speculate when even the entire selected native tiles fit comfortably in
+  // the remaining input budget. Preserve narrow reads under explicit operator caps.
+  let selected_extent:u64=entries.values().flatten().map(|&(_,length)|u64::from(length)).sum();
+  let settings=crate::read_policy::settings();
+  let allow_inline_wave=settings.mode!=crate::read_policy::Mode::Disabled
+   && settings.max_overfetch_ratio>1 && crate::read_policy::explicit_overfetch_cap()!=Some(1)
+   && !context.explicit_request_limit && !context.cache_only
+   && std::env::var_os("RIVER_S3_REQUEST_BYTES").is_none()
+   && selected_extent<=context.limit.saturating_sub(context.stats.bytes)/2;
   let wanted=h.levels-1-reduction;let mut tiles=BTreeMap::new();
   for (tile,entries) in entries {
    ensure!(entries.len()<=256,"multipart prefix tile exceeds ordinal capacity");
@@ -270,13 +306,14 @@ impl RemoteSource {
     let proposal=vec![(true,range.clone())];
     if range.end-range.start+self.block_size*2<=context.limit.saturating_sub(context.stats.bytes)
      && context.can_pin_ranges(self.block_size,&proposal) {
-     let leases=self.prefetch_ranges(&proposal,context,ADAPTIVE_PREFIX_RANGES)?;context.pin_packet_blocks(leases);
+     let leases=phase!("source_prefix_cluster_fetch",self.prefetch_ranges(&proposal,context,ADAPTIVE_PREFIX_RANGES))?;context.pin_packet_blocks(leases);
     }
    }
   }
   loop {
    context.check()?;
    let mut probes=vec![];let mut ahead=vec![];
+   let mut inline_ranges=Vec::new();
    for tile in tiles.values().filter(|t|t.covered<t.wanted) {
     let &(offset,length)=tile.entries.get(tile.parts.len()).context("multipart prefix does not cover requested resolution")?;
     // A small part's complete extent is bounded by TLM. Fuse its header and
@@ -295,20 +332,42 @@ impl RemoteSource {
     let previous=tile.parts.last().map(|part|part.range.start.saturating_sub(part.sot_offset));
     let header_probe=learned_header_probe(previous,settings.mode==crate::read_policy::Mode::Adaptive && h.layers>1,
      u64::from(settings.max_overfetch_ratio).min(crate::read_policy::explicit_overfetch_cap().unwrap_or(16)),self.planning_latency_us(),self.block_size);
+    // Packet locations within an inline part depend on all preceding headers.
+    // Once a tile exhibits that layout, fetch its next modest part in the same
+    // wave as the other tiles. The parser still validates every boundary and
+    // may stop before the end. Never advance to an unrequested part.
+    let preceding_inline=tile.parts.last().is_some_and(|p|p.inline
+     && p.selected==p.packets && tile.wanted-tile.covered>=p.selected);
+    if allow_inline_wave && preceding_inline && length>16*1024 && length<=256*1024 {
+     inline_ranges.push((ahead.len(),offset..offset+u64::from(length)));
+    }
     ahead.push((true,if cached_header {offset..offset+16}else{small_prefix_probe_with_header(&tile.entries,tile.parts.len(),lookahead,header_probe)}));
    }
    if probes.is_empty() {break;}
-   let ahead_bytes:u64=ahead.iter().map(|(_,r)|r.end-r.start).sum();
-   let rounded_bound=ahead_bytes.saturating_add(ahead.len() as u64*self.block_size*2);
-   if ahead_bytes<=8*1024*1024 && rounded_bound<=context.limit.saturating_sub(context.stats.bytes)
-    && context.can_pin_ranges(self.block_size,&ahead) {probes=ahead;}
-   let leases=self.prefetch_ranges(&probes,context,ADAPTIVE_PREFIX_RANGES)?;context.pin_packet_blocks(leases);
+   waves+=1;
+   let fits_wave=|ranges:&[(bool,Range<u64>)]| {
+    let bytes:u64=ranges.iter().map(|(_,r)|r.end-r.start).sum();
+    let rounded=bytes.saturating_add(ranges.len() as u64*self.block_size*2);
+    bytes<=8*1024*1024 && rounded<=context.limit.saturating_sub(context.stats.bytes)
+     && context.can_pin_ranges(self.block_size,ranges)
+   };
+   // Keep the ordinary header lookahead when a wider wave would exceed the
+   // request's lease or byte allowance.
+   if !inline_ranges.is_empty() {
+    let mut wider=ahead.clone();
+    for (i,range) in &inline_ranges {wider[*i].1=range.clone();}
+    if fits_wave(&wider) {
+     probes=wider;
+     prefetched_inline_parts+=inline_ranges.len();
+    } else if fits_wave(&ahead) {probes=ahead;}
+   } else if fits_wave(&ahead) {probes=ahead;}
+   let leases=phase!("source_prefix_wave_fetch",self.prefetch_ranges(&probes,context,ADAPTIVE_PREFIX_RANGES))?;context.pin_packet_blocks(leases);
    for (&tile_id,tile) in tiles.iter_mut().filter(|(_,t)|t.covered<t.wanted) {
-    let (offset,length)=tile.entries[tile.parts.len()];let sot=self.part_at(offset,context)?;
+    let (offset,length)=tile.entries[tile.parts.len()];let sot=phase!("source_prefix_part_headers",self.part_at(offset,context))?;
     ensure!(sot.tile==tile_id && sot.length==u64::from(length),"tile-part index does not match SOT");
     ensure!(usize::from(sot.ordinal)==tile.parts.len(),"multipart prefix ordinals are missing or duplicated");
     ensure!(first_parts_only || sot.total==0 || usize::from(sot.total)==tile.entries.len(),"multipart prefix total disagrees with tile-part index");
-    let (header,start,lengths,compatible)=self.tile_header(&sot,context)?;
+    let (header,start,lengths,compatible)=phase!("source_prefix_part_headers",self.tile_header(&sot,context))?;
     // SOT identity is validated above and the plan retains its exact offset.
     // A second request-cache copy is not needed by subsequent prefix phases.
     if context.validated.remove(&sot.offset).is_some() {
@@ -325,9 +384,14 @@ impl RemoteSource {
     // Some encoders put a tile-wide PLT in the first tile-part. It cannot
     // address this part's bytes. Use independently parsed inline headers,
     // rather than trusting lengths that run into the next SOT/header.
+    let had_table=lengths.is_some();
     let lengths=lengths.filter(|lengths|lengths.iter().all(|&n|n>0)
      && lengths.iter().try_fold(start,|at,&n|at.checked_add(n))==Some(sot.offset+sot.length));
     let inline=lengths.is_none();
+    if inline {
+     inline_parts+=1;
+     if had_table {rejected_plt_parts+=1;}
+    } else {plt_parts+=1;}
     let lengths=if let Some(lengths)=lengths {lengths} else {
      // With inline headers, carry tag-tree and codeblock state through every
      // quality layer. TLM locates parts; parsed packets prove the exact prefix.
@@ -350,7 +414,7 @@ impl RemoteSource {
      if minimum>16*1024 {
       let required=vec![(true,start..start+minimum)];
       if context.can_pin_ranges(self.block_size,&required) {
-       let leases=self.prefetch_ranges(&required,context,usize::MAX)?;context.pin_packet_blocks(leases);
+       let leases=phase!("source_prefix_inline_fetch",self.prefetch_ranges(&required,context,usize::MAX))?;context.pin_packet_blocks(leases);
       }
      }
      let began=profile.then(Instant::now);
@@ -390,12 +454,24 @@ impl RemoteSource {
          if !cached {
           let required=vec![(true,cursor..cursor+minimum)];
           if context.can_pin_ranges(self.block_size,&required) {
-           let leases=self.prefetch_ranges(&required,context,usize::MAX)?;context.pin_packet_blocks(leases);
+           let leases=phase!("source_prefix_inline_fetch",self.prefetch_ranges(&required,context,usize::MAX))?;context.pin_packet_blocks(leases);
           }
          }
         }
         let began=profile.then(Instant::now);
-        owned=self.read(cursor..end,context)?;if let Some(t)=began {read_ns+=t.elapsed().as_nanos();}&owned[..]
+        let before=detailed.then(||(context.stats.clone(),context.curl_requests));
+        owned=self.read(cursor..end,context)?;
+        if let Some(t)=began {
+         let elapsed=t.elapsed().as_nanos();
+         read_ns+=elapsed;max_probe_ns=max_probe_ns.max(elapsed);probe_calls+=1;
+        }
+        if let Some((before,curl_before))=before {
+         probe_curl_requests+=context.curl_requests-curl_before;
+         probe_io.requests+=context.stats.requests-before.requests;
+         probe_io.bytes+=context.stats.bytes-before.bytes;
+         probe_io.cache_bytes+=context.stats.cache_bytes-before.cache_bytes;
+        }
+        &owned[..]
        };
        let began=profile.then(Instant::now);let parsed=if buffered.is_some() {state.length_from_complete_part(bytes,packet.layer)}else{state.length(bytes,packet.layer)};
        if let Some(t)=began {parse_ns+=t.elapsed().as_nanos();attempts+=1;if parsed.is_ok() && bytes.first().is_some_and(|b|b&0x80==0) {empty_headers+=1;}}
@@ -443,14 +519,15 @@ impl RemoteSource {
      if !context.admit_metadata(additional.saturating_mul(std::mem::size_of::<Part>())) {return Ok(None);}
      tile.parts.reserve_exact(additional);
     }
-    tile.covered=end_packet;tile.parts.push(Part {sot_offset:sot.offset,header,range:start..selected_end,packets:packet_count,selected});
+    tile.covered=end_packet;tile.parts.push(Part {inline,sot_offset:sot.offset,header,range:start..selected_end,packets:packet_count,selected});
    }
   }
   // Fetch the still-missing prefix packets across tiles together. Most small
   // resolution parts were already acquired in the fused first-header wave.
   let required=tiles.values().flat_map(|t|t.parts.iter().filter(|p|!p.range.is_empty()).map(|p|(true,p.range.clone()))).collect::<Vec<_>>();
-  let leases=self.prefetch_ranges(&required,context,usize::MAX)?;context.pin_packet_blocks(leases);
+  let leases=phase!("source_prefix_payload_fetch",self.prefetch_ranges(&required,context,usize::MAX))?;context.pin_packet_blocks(leases);
   let build_began=profile.then(Instant::now);
+  let mut build_mark=detailed.then(||SourceProfile::new(context));
   // Low-resolution reversible views need only their original
   // resolution-prefix packets. Preserve every quality layer, project geometry
   // and quantization, and omit the millions of synthetic high-band packets.
@@ -488,12 +565,20 @@ impl RemoteSource {
   }
   stream.extend([0xff,0xd9]);let jp2=!payload.container.is_empty();
   let bytes=if jp2 {let mut bytes=payload.container.clone();if compact {resize_jp2(&mut bytes,h.width.div_ceil(scale),h.height.div_ceil(scale))?;}bytes.extend(u32::try_from(stream.len()+8)?.to_be_bytes());bytes.extend(b"jp2c");bytes.extend(stream);bytes}else{stream};
-  if let Some(t)=build_began {tracing::info!(target:"river_server::remote_source::multipart_profile",packet_order_ms=order_ns as f64/1e6,cached_probe_read_ms=read_ns as f64/1e6,packet_parse_ms=parse_ns as f64/1e6,stream_build_ms=(t.elapsed().as_nanos()+projection_ns) as f64/1e6,parse_attempts=attempts,empty_headers,buffered_parts,tiles=tiles.len(),"multilayer prefix CPU profile");}
+  if let Some(mark)=&mut build_mark {profile_stage("source_prefix_build",context,mark);}
+  if legacy_profile {let t=build_began.unwrap();tracing::info!(target:"river_server::remote_source::multipart_profile",packet_order_ms=order_ns as f64/1e6,cached_probe_read_ms=read_ns as f64/1e6,packet_parse_ms=parse_ns as f64/1e6,stream_build_ms=(t.elapsed().as_nanos()+projection_ns) as f64/1e6,parse_attempts=attempts,empty_headers,buffered_parts,tiles=tiles.len(),"multilayer prefix CPU profile");}
   // Sparse projected views keep the ordinary ROI decoder. The parallel
   // renderer requires a complete native grid and must not claim their workers.
   let route=if !compact {"s3-multipart-prefix-ranges"}else if complete_grid {"s3-multipart-compact-lowest-prefix"}else{"s3-multipart-partial-compact-prefix"};
-  let prepared=PreparedSubset {view_reduction:if compact {reduction}else{0},technical_origin:None,bytes,jp2,route,width:h.width,height:h.height,layout:h.layout,offset_x:0,offset_y:0};
-  prefix_cache().lock().unwrap_or_else(|e|e.into_inner()).put(cache_key,&prepared,prefix_cache_limit());
+  if detailed {
+   crate::tile_diagnostics::source("source_prefix_probe_read",read_ns as f64/1e6,probe_io,probe_curl_requests,None);
+   let useful:u64=required.iter().map(|(_,r)|r.end-r.start).sum();
+   crate::tile_diagnostics::prefix(format!(
+    "{} outcome=built waves={} prefetched_inline_parts={} plt_parts={} rejected_plt_parts={} inline_parts={} buffered_parts={} parse_attempts={} empty_headers={} packet_order_ms={:.3} probe_calls={} probe_read_ms={:.3} max_probe_ms={:.3} packet_parse_ms={:.3} prefix_payload_bytes={} prepared_bytes={} prepared_prefix_cache_eligible={}",
+    layout(),waves,prefetched_inline_parts,plt_parts,rejected_plt_parts,inline_parts,buffered_parts,attempts,empty_headers,order_ns as f64/1e6,probe_calls,read_ns as f64/1e6,max_probe_ns as f64/1e6,parse_ns as f64/1e6,useful,bytes.len(),route=="s3-multipart-compact-lowest-prefix" && bytes.len()<=4*1024*1024));
+  }
+  let prepared=PreparedSubset {view_reduction:if compact {reduction}else{0},technical_origin:None,bytes: bytes.into(),jp2,route,width:h.width,height:h.height,layout:h.layout,offset_x:0,offset_y:0};
+  prefix_cache().lock().unwrap_or_else(|e|e.into_inner()).put_measured(cache_key,&prepared,prefix_cache_limit(),measured_build_started.elapsed().as_nanos().min(u64::MAX as u128) as u64);
   Ok(Some(prepared))
  }
 }
@@ -574,15 +659,15 @@ impl RemoteSource {
   assert_eq!(prefix_cache_budget(Some("999999999")),999999999);
  }
  #[test] fn complete_quality_prefix_cache_bounds_versions_geometry_and_owned_bytes() {
-  let prepared=PreparedSubset {view_reduction:3,technical_origin:None,bytes:vec![7;100],route:"s3-multipart-compact-lowest-prefix",jp2:false,width:128,height:128,layout:NativeTileLayoutHint {width:128,height:128,columns:1,rows:1,origin_x:0,origin_y:0},offset_x:0,offset_y:0};
+  let prepared=PreparedSubset {view_reduction:3,technical_origin:None,bytes: (vec![7;100]).into(),route:"s3-multipart-compact-lowest-prefix",jp2:false,width:128,height:128,layout:NativeTileLayoutHint {width:128,height:128,columns:1,rows:1,origin_x:0,origin_y:0},offset_x:0,offset_y:0};
   let key=("version-a".into(),3,vec![0]);let mut cache=PrefixCache::default();
   cache.put(key.clone(),&prepared,500);assert!(cache.bytes<=500);
-  let mut copy=cache.get(&key).unwrap();copy.bytes[0]=99;assert_eq!(cache.get(&key).unwrap().bytes[0],7);
+  let lease=cache.get(&key).unwrap();assert_eq!(lease.bytes.as_ptr(), prepared.bytes.as_ptr());
   assert!(cache.get(&("version-b".into(),3,vec![0])).is_none());
   assert!(cache.get(&("version-a".into(),2,vec![0])).is_none());
   assert!(cache.get(&("version-a".into(),3,vec![1])).is_none());
   let other=("other".into(),3,vec![0]);cache.put(other.clone(),&prepared,500);
-  assert!(cache.get(&key).is_none());assert!(cache.get(&other).is_some());assert!(cache.bytes<=500);
+  assert!(cache.get(&key).is_none());assert!(cache.get(&other).is_some());assert!(cache.bytes<=500);assert_eq!(lease.bytes[0],7);
   let mut partial=prepared.clone();partial.route="s3-multipart-partial-compact-prefix";
   cache.put(key.clone(),&partial,500);assert!(cache.get(&key).is_none());
   cache.put(key.clone(),&prepared,0);assert!(cache.get(&key).is_none());
@@ -610,10 +695,10 @@ impl RemoteSource {
  }
  #[test] fn lazy_counts_match_materialized_orders_in_shifted_clipped_grids() {
   for progression in 0..5 {for image_origin in [(0,0),(13,29)] {
-   let h=Header {image_origin,width:1703,height:1301,components:3,display_rgb_only:false,bit_depth:8,levels:6,layers:1,
+   let h=Header {image_origin,width:1703,height:1301,components:3,display_rgb_only:false,band_fallback:None,bit_depth:8,levels:6,layers:1,
     layout:NativeTileLayoutHint {origin_x:0,origin_y:0,width:1024,height:1024,columns:2,rows:2},
     progression,is_ht:false,cod:vec![1,progression,0,1,0,5,3,3,0,1,0x22,0x33,0x44,0x55,0x66,0x77],
-    first_part:0,codestream_end:100,packet_compatible:true,prefix_compatible:true,payload_digest:[0;32]};
+    first_part:0,codestream_end:100,packet_compatible:true,prefix_compatible:true,component_specs:Vec::new(), payload_digest:[0;32]};
    for tile in 0..4 {for wanted in 0..h.levels {
     let (prefix,total)=counts(&h,tile,wanted).unwrap();let (packets,expected)=packet_order(&h,tile,Some(wanted)).unwrap();
     assert_eq!((prefix,total),(packets.len(),expected));
@@ -621,10 +706,10 @@ impl RemoteSource {
   }}
  }
  #[test] fn multilayer_resolution_prefix_retains_all_layers_for_decoder_layer_limits() {
-  let mut h=Header {image_origin:(0,0),width:128,height:128,components:3,display_rgb_only:false,bit_depth:8,levels:7,layers:10,
+  let mut h=Header {image_origin:(0,0),width:128,height:128,components:3,display_rgb_only:false,band_fallback:None,bit_depth:8,levels:7,layers:10,
    layout:NativeTileLayoutHint {origin_x:0,origin_y:0,width:128,height:128,columns:1,rows:1},
    progression:2,is_ht:false,cod:vec![0,2,0,10,1,6,4,4,0,1],first_part:0,codestream_end:100,
-   packet_compatible:true,prefix_compatible:false,payload_digest:[0;32]};
+   packet_compatible:true,prefix_compatible:false,component_specs:Vec::new(), payload_digest:[0;32]};
   assert_eq!(counts(&h,0,0).unwrap(),(30,210));
   assert!(resolution_prefix(&h,0));assert!(resolution_prefix(&h,10));
   assert!(resolution_prefix(&h,1));assert!(resolution_prefix(&h,5));

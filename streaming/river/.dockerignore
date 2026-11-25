@@ -2,7 +2,7 @@
 target/
 
 # Downloaded benchmark corpus is runtime input, not application source.
-corpus/cache/
+corpus/
 
 # Generated reports and local VCS metadata do not belong in the image.
 reports/

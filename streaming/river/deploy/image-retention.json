@@ -1,9 +1,7 @@
 {
   "repository": "river",
-  "keepNewest": 2,
-  "maxVersions": 4,
+  "keepNewest": 1,
+  "maxVersions": 1,
   "pinnedTags": [],
-  "ownedTestContainerPrefix": "river-goal-",
-  "channelPolicy": "Retain Latest, Stable and LTS, allowing overlap. Retain the immediate Stable rollback when there is room. Preserve volumes, exports, build cache and evidence.",
-  "minimumSupportedCheckpoint": 1037
+  "channelPolicy": "Stable/LTS/Latest share one qualified digest. Retire superseded images after inspecting all container references. Preserve source, configuration, volumes, exports and evidence."
 }

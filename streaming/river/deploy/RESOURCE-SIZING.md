@@ -12,11 +12,6 @@ Adaptive source planning opens a bounded initial prefix window on eligible coars
 
 Eligible classic TLM previews can combine the tile-part header and initial LL payload under projected range-request pressure. Set `RIVER_S3_TLM_LL_FUSED_BYTES=0` to disable the fused read. Explicit LL-window settings take precedence.
 
-Adaptive whole-view progressive previews can start index discovery after four reads when observed latency is at least 7 ms. Set RIVER_S3_PROGRESSIVE_EARLY_DISCOVERY=0 to disable. Explicit range limits and existing probe budgets apply.
-
-Whole-view Grok progressive previews share preparation with the final viewport where supported. Set RIVER_GROK_PROGRESSIVE_PREFIX=0 to disable.
-
-Progressive lookahead can sample a bounded range during stall backoff. Set RIVER_PREFIX_RECOVERY_PROBE=0 to disable recovery probing. Existing cache, transfer-cost, and range limits still apply.
 
 Stable and LTS m1148 stage whole-image speculative index probes and fetch the remaining window when a seed is absent. Set `RIVER_S3_STAGE_WHOLE_INDEX_PROBES=0` in the backend environment to restore full windows for whole-image probes. On the cold 979 MB PNG overview, staging reduced origin traffic from 19.64 MB to 16.88 MB. Matched tests did not establish a latency speedup.
 

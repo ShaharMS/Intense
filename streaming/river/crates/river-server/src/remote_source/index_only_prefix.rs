@@ -106,7 +106,7 @@ impl RemoteSource {
      main.extend(sot);main.extend(headers);main.extend([0xff,0x93]);main.extend(bytes);main.extend([0xff,0xd9]);
      let jp2=!payload.container.is_empty();
      let bytes=if jp2 {let mut c=payload.container.clone();resize_jp2(&mut c,width,height)?;c.extend(u32::try_from(main.len()+8)?.to_be_bytes());c.extend(b"jp2c");c.extend(main);c}else{main};
-     return Ok(Some(PreparedSubset {view_reduction:reduction,technical_origin:None,bytes,jp2,route:"s3-index-only-prefix",width:h.width,height:h.height,layout:h.layout,offset_x:0,offset_y:0}));
+     return Ok(Some(PreparedSubset {view_reduction:reduction,technical_origin:None,bytes: bytes.into(),jp2,route:"s3-index-only-prefix",width:h.width,height:h.height,layout:h.layout,offset_x:0,offset_y:0}));
     }
    }
    let next=part.offset+part.length;

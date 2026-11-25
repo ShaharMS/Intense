@@ -46,7 +46,7 @@ impl RemoteSource {
   }
   main.extend([0xff,0xd9]);let jp2=!payload.container.is_empty();
   let bytes=if jp2 {let mut container=payload.container.clone();resize_jp2(&mut container,h.width.div_ceil(scale),h.height.div_ceil(scale))?;container.extend(u32::try_from(main.len()+8)?.to_be_bytes());container.extend(b"jp2c");container.extend(main);container}else{main};
-  Ok(Some(PreparedSubset {view_reduction:reduction,technical_origin:None,bytes,jp2,route:"s3-reduced-resolution-view",width:h.width,height:h.height,layout:h.layout,offset_x:0,offset_y:0}))
+  Ok(Some(PreparedSubset {view_reduction:reduction,technical_origin:None,bytes: bytes.into(),jp2,route:"s3-reduced-resolution-view",width:h.width,height:h.height,layout:h.layout,offset_x:0,offset_y:0}))
  }
 }
 pub(super) fn project(bytes:&[u8],h:&Header,reduction:u8,main:bool)->Result<Option<Vec<u8>>> {
@@ -77,9 +77,9 @@ pub(super) fn project(bytes:&[u8],h:&Header,reduction:u8,main:bool)->Result<Opti
  use super::*;
  #[test] fn reduced_headers_preserve_tile_grid_and_retained_quantization() {
   for style in 0..64 {
-  let h=Header {image_origin:(0,0),width:4091,height:3079,components:3,display_rgb_only:false,bit_depth:16,levels:7,layers:1,
+  let h=Header {image_origin:(0,0),width:4091,height:3079,components:3,display_rgb_only:false,band_fallback:None,bit_depth:16,levels:7,layers:1,
    layout:NativeTileLayoutHint {origin_x:0,origin_y:0,width:1024,height:1024,columns:4,rows:4},progression:2,is_ht:false,
-   cod:vec![1,2,0,1,1,6,4,4,style,1,0x44,0x44,0x44,0x44,0x44,0x44,0x44],first_part:0,codestream_end:100,packet_compatible:true,prefix_compatible:true,payload_digest:[0;32]};
+   cod:vec![1,2,0,1,1,6,4,4,style,1,0x44,0x44,0x44,0x44,0x44,0x44,0x44],first_part:0,codestream_end:100,packet_compatible:true,prefix_compatible:true,component_specs:Vec::new(), payload_digest:[0;32]};
   let mut siz=vec![0,0];for n in [h.width,h.height,0,0,1024,1024,0,0] {siz.extend(n.to_be_bytes());}siz.extend([0,3,15,1,1,15,1,1,15,1,1]);
   let mut main=vec![];
   for (code,v) in [(0xff51u16,siz),(0xff52,h.cod.clone()),(0xff5c,vec![0x40;20])] {main.extend(code.to_be_bytes());main.extend(((v.len()+2) as u16).to_be_bytes());main.extend(v);}

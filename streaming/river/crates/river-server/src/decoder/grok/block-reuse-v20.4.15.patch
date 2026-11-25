@@ -1,0 +1,331 @@
+diff --git a/mercury/src/capi.rs b/mercury/src/capi.rs
+index 1949767..c8541ef 100644
+--- a/mercury/src/capi.rs
++++ b/mercury/src/capi.rs
+@@ -403,6 +403,26 @@ pub struct MercuryPlan {
+     src: Arc<dyn ReadAt>,
+ }
+ 
++pub type RiverBlockFn = unsafe extern "C" fn(*const c_void, *const u32, *mut i32, usize, i32) -> i32;
++
++/// Register on this plan alone. Weave joins its workers before the caller's
++/// session can be released. The original coordinate map is for one native tile.
++#[unsafe(no_mangle)]
++pub unsafe extern "C" fn mercury_river_blocks(plan: *mut MercuryPlan, session: *const c_void, access: RiverBlockFn) {
++    let plan = unsafe { &mut (*plan).plan };
++    if plan.tiles.len() == 1 {
++        for tile in plan.tiles.iter_mut().flatten() {
++            for (component, resolutions) in tile.comps.iter_mut().enumerate() {
++                for (resolution, res) in resolutions.iter_mut().enumerate() {
++                    for band in &mut res.bands {
++                        band.river = Some((session as usize, access, component as u32, resolution as u32));
++                    }
++                }
++            }
++        }
++    }
++}
++
+ struct CallbackReader {
+     read_at: MercuryReadAtFn,
+     ctx: *mut c_void,
+@@ -644,6 +664,20 @@ unsafe fn extern_t1_weave(blk: &MercuryStripeBlockInfo) -> Option<Vec<i32>> {
+     let f: MercuryT1Fn = unsafe { std::mem::transmute(EXTERN_T1.load(Ordering::Relaxed)) };
+     let stripes = (blk.num_rows + 3) >> 2;
+     let mut out = vec![0i32; ((stripes as usize) << 2) * (blk.num_cols as usize)];
++    let count = blk.num_cols as usize * blk.num_rows as usize;
++    let cache = blk.river.filter(|_| count > 0 && count <= 4096 && blk.num_passes > 0);
++    let mut key = [0u32; 10];
++    if let Some((session, access, comp, res)) = cache {
++        // Mercury stores sign-magnitude samples aligned to k_max_prime;
++        // keep its keys disjoint from the classic Grok representation.
++        key = [comp | (1 << 31), res, blk.orientation as u32, blk.block_x, blk.block_y,
++               blk.num_cols as u32, blk.num_rows as u32,
++               (blk.k_max_prime as u32) << 16 | blk.missing_msbs as u32,
++               blk.num_passes as u32, blk.coded_length as u32];
++        if unsafe { access(session as *const c_void, key.as_ptr(), out.as_mut_ptr(), count, 0) } != 0 {
++            return Some(out);
++        }
++    }
+     let ok = f(
+         blk.coded_data,
+         blk.coded_length,
+@@ -658,7 +692,21 @@ unsafe fn extern_t1_weave(blk: &MercuryStripeBlockInfo) -> Option<Vec<i32>> {
+         blk.num_segments,
+         out.as_mut_ptr(),
+     );
+-    (ok != 0).then_some(out)
++    if ok != 0 {
++        if let Some((session, access, _, _)) = cache {
++            if blk.num_segments == 1 && blk.coded_length > 0 {
++                #[repr(C)]
++                struct Codeword { samples: *mut i32, bytes: *const u8 }
++                let mut word = Codeword { samples: out.as_mut_ptr(), bytes: blk.coded_data };
++                unsafe { access(session as *const c_void, key.as_ptr(), (&mut word as *mut Codeword).cast(), count, 2); }
++            } else {
++                unsafe { access(session as *const c_void, key.as_ptr(), out.as_mut_ptr(), count, 1); }
++            }
++        }
++        Some(out)
++    } else {
++        None
++    }
+ }
+ 
+ /// DWT-only benchmark: run a full multi-level inverse synthesis pyramid on
+diff --git a/mercury/src/decode/graph.rs b/mercury/src/decode/graph.rs
+index 8235d8a..3952117 100644
+--- a/mercury/src/decode/graph.rs
++++ b/mercury/src/decode/graph.rs
+@@ -202,6 +202,9 @@ impl SubbandDecodeNode {
+                 std::ptr::null()
+             };
+             infos.push(MercuryStripeBlockInfo {
++                river: band.river,
++                block_x: bx,
++                block_y: row,
+                 coded_data: unsafe { scratch.as_ptr().add(offsets[i]) },
+                 coded_length: rec.bolt_len() as i32,
+                 num_passes: rec.num_passes as i32,
+diff --git a/mercury/src/decode/plan.rs b/mercury/src/decode/plan.rs
+index 71706ca..283832d 100644
+--- a/mercury/src/decode/plan.rs
++++ b/mercury/src/decode/plan.rs
+@@ -99,6 +99,7 @@ impl BlockRec {
+ 
+ /// Everything needed to decode one subband independently.
+ pub struct BandPlan {
++    pub(crate) river: Option<(usize, crate::capi::RiverBlockFn, u32, u32)>,
+     /// 0=LL, 1=HL, 2=LH, 3=HH (T1 context orientation).
+     pub band_type: u8,
+     /// Band rectangle in band-domain canvas coordinates. The code-block grid
+@@ -1190,6 +1191,7 @@ fn comb_tile(
+                     let wide = rect.x1 - rect.x0;
+                     let high = rect.y1 - rect.y0;
+                     Ok(BandPlan {
++                        river: None,
+                         band_type: sb.band_type,
+                         x0: sb.dims.x0,
+                         y0: sb.dims.y0,
+diff --git a/mercury/src/decode/stripe_decoder.rs b/mercury/src/decode/stripe_decoder.rs
+index fe83444..6560f4b 100644
+--- a/mercury/src/decode/stripe_decoder.rs
++++ b/mercury/src/decode/stripe_decoder.rs
+@@ -7,6 +7,9 @@
+ 
+ /// One code-block of a stripe row.
+ pub struct MercuryStripeBlockInfo {
++    pub(crate) river: Option<(usize, crate::capi::RiverBlockFn, u32, u32)>,
++    pub(crate) block_x: u32,
++    pub(crate) block_y: u32,
+     /// Pointer to coded byte data.
+     pub coded_data: *const u8,
+     /// Total coded data length.
+diff --git a/src/lib/core/codestream/CodingParams.h b/src/lib/core/codestream/CodingParams.h
+index 011b279..4735816 100644
+--- a/src/lib/core/codestream/CodingParams.h
++++ b/src/lib/core/codestream/CodingParams.h
+@@ -457,6 +457,11 @@ class TileCache;
+  */
+ struct CodingParams
+ {
++  void* riverOriginal = nullptr;
++  grk_river_read_at riverReadAt = nullptr;
++  uint64_t riverLength = 0;
++  const void* riverSession = nullptr;
++  grk_river_block_fn riverAccess = nullptr;
+   CodingParams();
+   ~CodingParams();
+   Rect32 getTileBounds(Rect32 imageBounds, uint16_t tile_x, uint16_t tile_y) const;
+diff --git a/src/lib/core/codestream/decompress/CodeStreamDecompress.cpp b/src/lib/core/codestream/decompress/CodeStreamDecompress.cpp
+index 2d87e43..7801b9b 100644
+--- a/src/lib/core/codestream/decompress/CodeStreamDecompress.cpp
++++ b/src/lib/core/codestream/decompress/CodeStreamDecompress.cpp
+@@ -64,6 +64,37 @@ struct ITileProcessor;
+ #include "CodeStreamDecompress.h"
+ #include "SelectiveFetchRanges.h"
+ 
++static thread_local void* riverOriginal;
++static thread_local grk_river_read_at riverReadAt;
++static thread_local uint64_t riverLength;
++extern "C" void grk_river_original_session(void* context, grk_river_read_at read_at, uint64_t length)
++{
++  riverOriginal = context;
++  riverReadAt = read_at;
++  riverLength = length;
++}
++static thread_local const void* riverSession;
++static thread_local grk_river_block_fn riverAccess;
++
++struct RiverLegacy { const void* context; grk_river_block_fn fn; };
++static thread_local RiverLegacy riverLegacy;
++static int riverLegacyAccess(const void* context, const uint32_t* key, int32_t* ptr, size_t n, int mode)
++{
++  auto legacy = static_cast<const RiverLegacy*>(context);
++  if(mode == 2) return legacy->fn(legacy->context, key, reinterpret_cast<grk_river_codeword*>(ptr)->samples, n, 1);
++  return legacy->fn(legacy->context, key, ptr, n, mode);
++}
++extern "C" void grk_river_block_session(const void* session, grk_river_block_fn access)
++{
++  riverLegacy = {session, access};
++  grk_river_block_session_v2(&riverLegacy, access ? riverLegacyAccess : nullptr);
++}
++extern "C" void grk_river_block_session_v2(const void* session, grk_river_block_fn access)
++{
++  riverSession = session;
++  riverAccess = access;
++}
++
+ namespace grk
+ {
+ 
+@@ -150,6 +181,11 @@ void CodeStreamDecompress::init(grk_decompress_parameters* parameters)
+   assert(parameters);
+   if(cp_.init(parameters, tileCache_))
+     compositeDecompressed_ = false;
++  cp_.riverOriginal = riverOriginal;
++  cp_.riverReadAt = riverReadAt;
++  cp_.riverLength = riverLength;
++  cp_.riverSession = riverSession;
++  cp_.riverAccess = riverAccess;
+   auto core = &parameters->core;
+   tileCache_->setStrategy(core->tile_cache_strategy);
+   tileCache_->setMaxActiveTiles(core->max_active_tiles);
+diff --git a/src/lib/core/grok.h b/src/lib/core/grok.h
+index 56b17ba..03e904f 100644
+--- a/src/lib/core/grok.h
++++ b/src/lib/core/grok.h
+@@ -696,6 +696,16 @@ typedef struct _grk_stream_params
+ /**
+  * @brief Grok tile cache strategy
+  */
++/* River extension for synchronous full-layer Part 1 decodes. */
++#define GRK_RIVER_BLOCK_CACHE 1
++typedef int (*grk_river_block_fn)(const void*, const uint32_t*, int32_t*, size_t, int);
++typedef int32_t (*grk_river_read_at)(void*, uint8_t*, uint64_t, uint64_t);
++GRK_API void grk_river_original_session(void* context, grk_river_read_at read_at, uint64_t length);
++#define GRK_RIVER_CODEWORDS 1
++typedef struct { int32_t* samples; const uint8_t* bytes; } grk_river_codeword;
++GRK_API void grk_river_block_session_v2(const void* session, grk_river_block_fn access);
++GRK_API void grk_river_block_session(const void* session, grk_river_block_fn access);
++
+ #define GRK_TILE_CACHE_NONE 0 /* no tile caching */
+ #define GRK_TILE_CACHE_IMAGE 1 /* cache final tile image */
+ #define GRK_TILE_CACHE_ALL 2 /* cache everything */
+diff --git a/src/lib/core/mercury_fastpath.cpp b/src/lib/core/mercury_fastpath.cpp
+index 15ab6ff..94119d9 100644
+--- a/src/lib/core/mercury_fastpath.cpp
++++ b/src/lib/core/mercury_fastpath.cpp
+@@ -69,6 +69,7 @@ struct ITileProcessor;
+ #include "CodeStreamDecompress.h"
+ 
+ #include "mercury_capi.h"
++extern "C" void mercury_river_blocks(MercuryPlan*, const void*, grk_river_block_fn);
+ 
+ /* grok's part-1 block coder behind mercury's BlockCoder contract —
+  * compiled into libgrokj2k on this branch (t1/part1/mercury_t1_shim.cpp). */
+@@ -675,7 +676,10 @@ bool mercuryFastPath(CodeStreamDecompress& cs)
+ #if defined(_WIN32)
+   Win32PositionedReader win32reader;
+ #endif
+-  if(!path.empty())
++  if(cs.cp_.riverReadAt)
++    plan = mercury_warp_loom(&mhdr, &mparams, cs.cp_.riverReadAt, cs.cp_.riverOriginal,
++                             cs.cp_.riverLength, err, sizeof err);
++  else if(!path.empty())
+   {
+ #if defined(_WIN32)
+     // POSIX fds don't reach mercury's fd entry, drive it through the read_at
+@@ -755,6 +759,9 @@ bool mercuryFastPath(CodeStreamDecompress& cs)
+   // components already carry the reduced dimensions (SIZMarker reduces
+   // headerImage_, which the composite is copied from), so this also confirms
+   // mercury reduced the canvas the same way grok did.
++  if(cs.cp_.riverAccess && (dec.layersToDecompress_ == 0 ||
++      dec.layersToDecompress_ >= headerTcp->numLayers_))
++    mercury_river_blocks(plan, cs.cp_.riverSession, cs.cp_.riverAccess);
+   MercuryImageInfo info;
+   if(mercury_loom_info(plan, &info) != MERCURY_OK || info.num_comps != img->numcomps)
+   {
+diff --git a/src/lib/core/scheduling/standard/DecompressScheduler.cpp b/src/lib/core/scheduling/standard/DecompressScheduler.cpp
+index 35f5a99..b61eef5 100644
+--- a/src/lib/core/scheduling/standard/DecompressScheduler.cpp
++++ b/src/lib/core/scheduling/standard/DecompressScheduler.cpp
+@@ -234,6 +234,12 @@ bool DecompressScheduler::scheduleT1(ITileProcessor* tileProcessor)
+           auto scheduleBlock = [&](uint32_t cblkno) {
+             auto cblk = precinct->getDecompressBlock(cblkno);
+             auto block = std::make_shared<t1::DecompressBlockExec>(cacheAll);
++            if(finalLayer && !cacheAll) {
++              auto cp = tileProcessor->getCodingParams();
++              block->riverSession = cp->riverSession;
++              block->riverAccess = cp->riverAccess;
++              block->riverComponent = compno;
++            }
+             block->x = cblk->x0();
+             block->y = cblk->y0();
+             bool htBlock = tcp->isHT() && !cblk->isPart1Block();
+diff --git a/src/lib/core/t1/BlockExec.h b/src/lib/core/t1/BlockExec.h
+index ff9ea6b..69789d4 100644
+--- a/src/lib/core/t1/BlockExec.h
++++ b/src/lib/core/t1/BlockExec.h
+@@ -102,6 +102,9 @@ struct DecompressBlockExec : public BlockExec
+   ICoder* cachedCoder_ = nullptr;
+   bool shouldCacheCoder_ = false;
+   bool finalLayer_ = false;
++  const void* riverSession = nullptr;
++  grk_river_block_fn riverAccess = nullptr;
++  uint16_t riverComponent = 0;
+ 
+ private:
+   // Delete copy constructor and assignment operator
+diff --git a/src/lib/core/t1/part1/Coder.cpp b/src/lib/core/t1/part1/Coder.cpp
+index c0dbb54..1c86295 100644
+--- a/src/lib/core/t1/part1/Coder.cpp
++++ b/src/lib/core/t1/part1/Coder.cpp
+@@ -159,8 +159,45 @@ bool Coder::decompress(DecompressBlockExec* block)
+   blockCoder_->setFinalLayer(block->finalLayer_);
+   auto cblk = block->cblk;
+   // 2. decompress
+-  if(!blockCoder_->decompress_cblk(cblk, block->bandOrientation, block->cblk_sty))
+-    return false;
++  bool hit = false;
++  const size_t n = size_t(cblk->width()) * cblk->height();
++  const bool reuse = block->riverAccess && block->finalLayer_ && n && n <= 4096 &&
++                     !cblk->dataChunksEmpty() && cblk->getNumDataParsedSegments();
++  uint32_t key[10]{};
++  if(reuse) {
++    key[0] = block->riverComponent;
++    key[1] = block->resno;
++    key[2] = block->bandOrientation;
++    key[3] = cblk->x0();
++    key[4] = cblk->y0();
++    key[5] = cblk->width();
++    key[6] = cblk->height();
++    key[7] = cblk->numbps();
++    for(uint16_t i = 0; i < cblk->getNumDataParsedSegments(); ++i) {
++      auto segment = cblk->getSegment(i);
++      key[8] += segment->totalPasses_;
++      key[9] += segment->totalBytes_;
++    }
++    if(block->riverAccess(block->riverSession, key, nullptr, n, -1)) {
++      if(!blockCoder_->alloc(cblk->width(), cblk->height()))
++        return false;
++      hit = block->riverAccess(block->riverSession, key, blockCoder_->getUncompressedData(), n, 0);
++    }
++  }
++  if(!hit) {
++    if(!blockCoder_->decompress_cblk(cblk, block->bandOrientation, block->cblk_sty))
++      return false;
++    if(reuse) {
++      auto seg = cblk->getSegment(0);
++      if(cblk->getNumDataParsedSegments() == 1 && seg->data_chunks_.size() == 1 &&
++         seg->data_chunks_[0]->num_elts() == key[9] && key[9]) {
++        grk_river_codeword word{blockCoder_->getUncompressedData(),seg->data_chunks_[0]->buf()};
++        block->riverAccess(block->riverSession,key,reinterpret_cast<int32_t*>(&word),n,2);
++      } else {
++        block->riverAccess(block->riverSession,key,blockCoder_->getUncompressedData(),n,1);
++      }
++    }
++  }
+   // 3. post process
+   if(block->postProcessor_)
+     block->postProcessor_(blockCoder_->getUncompressedData(), block, 0);

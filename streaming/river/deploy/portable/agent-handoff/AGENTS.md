@@ -1,11 +1,10 @@
 # River deployment handoff
 
 Scope: deploying or testing River from this extracted bundle only.
-Read ORGANIZATIONAL-DEPLOYMENT.txt before running the starter scripts.
+Read DEPLOYMENT.md and UPGRADE-FROM-M1230.md in the current deployment bundle before running starter scripts. Historical profile notes are context, not current release pins.
 Use BUILD-MANIFEST.json for the exact image tag and ID; verify SHA256SUMS.
 Use release.json, when present, for recorded release-channel metadata.
-For the 32 CPU / approximately 62 GB nearby-S3 deployment, read POD-32CORE-TESTING.md.
-Treat its profile as a tuning starting point, not an established optimum.
+Read SETTINGS.md for source, decoder, cache, logging and TLS controls. Treat profiles as starting points, not established optima.
 
 ## Preserve the existing installation
 
@@ -28,7 +27,7 @@ Treat its profile as a tuning starting point, not an established optimum.
 - For an existing deployment, GET read-policy and PUT the same settings with only mode changed
   to adaptive. Preserve its other values unless an additional change is explicitly recorded.
 - The supplied JSON and environment examples are FRESH-INSTALL presets, never merge commands.
-- Persisted API settings override environment fallbacks. Confirm effective settings after restart.
+- Startup precedence is JSON then ENV. Live dedicated API changes win during the process lifetime; confirm persistence and restart behavior for the setting being changed.
 - Use bounded source-read diagnostics for one operation, then disable them; check evicted/partial.
 - Compare identical images/regions, driver, output size/format and resource budgets.
 - Keep cold, learned-source cold-object, repeated, frame-arrival and browser-paint timings separate.
@@ -36,4 +35,4 @@ Treat its profile as a tuning starting point, not an established optimum.
 
 ## Release channels and image retention
 
-Latest is the current experiment; Stable is any verified improvement that is stable; LTS advances on a verified concrete >=10% improvement in a substantial matched workload. Verify pixels and investigate regressions. Read deploy/releases.json from the owning source for current channel IDs; old checkpoint numbers in historical reports are not current pins. Update aliases, release metadata, benchmark policy, retention pins and deployment metadata together. Retire superseded images promptly, preserving existing configuration/cache volumes, exports and evidence. Do not force-remove externally referenced images.
+Stable, LTS and Latest refer to one image and one source implementation. The m1231 release was explicitly packaged without a new qualification run. Do not reintroduce frozen channel forks. Qualify exact digests with matched pixels and performance comparisons; never infer speedups from larger caches. Keep historical measurements labeled with their original build and settings. Update aliases, release metadata, Compose defaults, documentation, retention and deployment metadata together. Retire superseded images after inspecting references; preserve configurations, volumes, exports and evidence.

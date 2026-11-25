@@ -1,0 +1,602 @@
+warning: unused field `repository` in `workspace.package`
+  --> Cargo.toml:12:1
+   |
+12 | repository = "https://github.com/ShaharMS/Intense"
+   | ^^^^^^^^^^
+   |
+   = note: `cargo::unused_workspace_package_fields` is set to `warn` by default
+help: consider removing the field `workspace.package.repository`
+warning: workspace (manifest) generated 1 warning
+warning: openjpeg-sys@1.0.12: vendor/src/lib/openjp2/pi.c: In function 'opj_pi_create_decode':
+warning: openjpeg-sys@1.0.12: vendor/src/lib/openjp2/pi.c:1415:23: warning: variable 'l_tccp' set but not used [-Wunused-but-set-variable=]
+warning: openjpeg-sys@1.0.12:  1415 |     const opj_tccp_t *l_tccp = 00;
+warning: openjpeg-sys@1.0.12:       |                       ^~~~~~
+warning: openjpeg-sys@1.0.12: vendor/src/lib/openjp2/pi.c: In function 'opj_pi_initialise_encode':
+warning: openjpeg-sys@1.0.12: vendor/src/lib/openjp2/pi.c:1638:23: warning: variable 'l_tccp' set but not used [-Wunused-but-set-variable=]
+warning: openjpeg-sys@1.0.12:  1638 |     const opj_tccp_t *l_tccp = 00;
+warning: openjpeg-sys@1.0.12:       |                       ^~~~~~
+warning: openjpeg-sys@1.0.12: vendor/src/lib/openjp2/tcd.c: In function 'opj_tcd_dc_level_shift_encode':
+warning: openjpeg-sys@1.0.12: vendor/src/lib/openjp2/tcd.c:2517:24: warning: variable 'l_img_comp' set but not used [-Wunused-but-set-variable=]
+warning: openjpeg-sys@1.0.12:  2517 |     opj_image_comp_t * l_img_comp = 00;
+warning: openjpeg-sys@1.0.12:       |                        ^~~~~~~~~~
+warning: use of deprecated constant `std::u32::MIN`: replaced by the `MIN` associated constant on this type
+   --> crates/river-jpeg2k/src/j2k_image.rs:356:23
+    |
+356 |       .fold(std::u32::MIN, |max, c| max.max(c.precision()));
+    |                       ^^^
+    |
+    = note: `#[warn(deprecated)]` on by default
+
+warning: `jpeg2k` (lib) generated 1 warning
+   Compiling river-server v0.1.0 (/mnt/Shared/Code/Intense/streaming/river/crates/river-server)
+warning: unnecessary parentheses around closure body
+   --> crates/river-server/src/runtime/resources.rs:336:33
+    |
+336 |                 .is_none_or(|v| (v.trim().is_empty() || v.trim().eq_ignore_ascii_case("auto")))
+    |                                 ^                                                            ^
+    |
+    = note: `#[warn(unused_parens)]` (part of `#[warn(unused)]`) on by default
+help: remove these parentheses
+    |
+336 -                 .is_none_or(|v| (v.trim().is_empty() || v.trim().eq_ignore_ascii_case("auto")))
+336 +                 .is_none_or(|v| v.trim().is_empty() || v.trim().eq_ignore_ascii_case("auto"))
+    |
+
+warning: use of deprecated method `std::sync::atomic::Atomic::<usize>::fetch_update`: renamed to `try_update` for consistency
+   --> crates/river-server/src/runtime/adaptation.rs:138:28
+    |
+138 |             if self.active.fetch_update(Ordering::AcqRel, Ordering::Acquire,
+    |                            ^^^^^^^^^^^^
+    |
+    = note: `#[warn(deprecated)]` on by default
+help: replace the use of the deprecated method
+    |
+138 -             if self.active.fetch_update(Ordering::AcqRel, Ordering::Acquire,
+138 +             if self.active.try_update(Ordering::AcqRel, Ordering::Acquire,
+    |
+
+warning: use of deprecated method `std::sync::atomic::Atomic::<usize>::fetch_update`: renamed to `try_update` for consistency
+   --> crates/river-server/src/read_policy.rs:151:14
+    |
+151 |    if self.1.fetch_update(Ordering::AcqRel,Ordering::Acquire,|active|(active<limit).then_some(active+1)).is_ok() {return SourcePerm...
+    |              ^^^^^^^^^^^^
+    |
+help: replace the use of the deprecated method
+    |
+151 -    if self.1.fetch_update(Ordering::AcqRel,Ordering::Acquire,|active|(active<limit).then_some(active+1)).is_ok() {return SourcePermit(self);}
+151 +    if self.1.try_update(Ordering::AcqRel,Ordering::Acquire,|active|(active<limit).then_some(active+1)).is_ok() {return SourcePermit(self);}
+    |
+
+warning: use of deprecated method `std::sync::atomic::Atomic::<usize>::fetch_update`: renamed to `try_update` for consistency
+   --> crates/river-server/src/runtime/resources.rs:778:22
+    |
+778 |                     .fetch_update(Ordering::AcqRel, Ordering::Acquire, |n| {
+    |                      ^^^^^^^^^^^^
+    |
+help: replace the use of the deprecated method
+    |
+778 -                     .fetch_update(Ordering::AcqRel, Ordering::Acquire, |n| {
+778 +                     .try_update(Ordering::AcqRel, Ordering::Acquire, |n| {
+    |
+
+warning: use of deprecated method `std::sync::atomic::Atomic::<usize>::fetch_update`: renamed to `try_update` for consistency
+   --> crates/river-server/src/runtime/storage_mode.rs:102:27
+    |
+102 |     let result = RESERVED.fetch_update(Ordering::AcqRel, Ordering::Acquire, |used| {
+    |                           ^^^^^^^^^^^^
+    |
+help: replace the use of the deprecated method
+    |
+102 -     let result = RESERVED.fetch_update(Ordering::AcqRel, Ordering::Acquire, |used| {
+102 +     let result = RESERVED.try_update(Ordering::AcqRel, Ordering::Acquire, |used| {
+    |
+
+warning: use of deprecated method `std::sync::atomic::Atomic::<usize>::fetch_update`: renamed to `try_update` for consistency
+  --> crates/river-server/src/runtime/adaptation.rs:89:27
+   |
+89 |         let _ = RAM_SCALE.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |scale| Some(scale.saturating_sub(100).max(250)));
+   |                           ^^^^^^^^^^^^
+   |
+help: replace the use of the deprecated method
+   |
+89 -         let _ = RAM_SCALE.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |scale| Some(scale.saturating_sub(100).max(250)));
+89 +         let _ = RAM_SCALE.try_update(Ordering::Relaxed, Ordering::Relaxed, |scale| Some(scale.saturating_sub(100).max(250)));
+   |
+
+warning: use of deprecated method `std::sync::atomic::Atomic::<usize>::fetch_update`: renamed to `try_update` for consistency
+  --> crates/river-server/src/runtime/adaptation.rs:91:27
+   |
+91 |         let _ = RAM_SCALE.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |scale| Some((scale + 50).min(800)));
+   |                           ^^^^^^^^^^^^
+   |
+help: replace the use of the deprecated method
+   |
+91 -         let _ = RAM_SCALE.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |scale| Some((scale + 50).min(800)));
+91 +         let _ = RAM_SCALE.try_update(Ordering::Relaxed, Ordering::Relaxed, |scale| Some((scale + 50).min(800)));
+   |
+
+warning: use of deprecated method `std::sync::atomic::Atomic::<u64>::fetch_update`: renamed to `try_update` for consistency
+   --> crates/river-server/src/caching/shared_cache.rs:151:22
+    |
+151 |         self.pending.fetch_update(Ordering::Relaxed, Ordering::Relaxed,
+    |                      ^^^^^^^^^^^^
+    |
+help: replace the use of the deprecated method
+    |
+151 -         self.pending.fetch_update(Ordering::Relaxed, Ordering::Relaxed,
+151 +         self.pending.try_update(Ordering::Relaxed, Ordering::Relaxed,
+    |
+
+warning: use of deprecated method `std::sync::atomic::Atomic::<u64>::fetch_update`: renamed to `try_update` for consistency
+  --> crates/river-server/src/remote_source/wire_budget.rs:10:13
+   |
+10 |   self.used.fetch_update(Ordering::Relaxed,Ordering::Relaxed,|n|(n<self.limit.load(Ordering::Relaxed)).then(||n+1))
+   |             ^^^^^^^^^^^^
+   |
+help: replace the use of the deprecated method
+   |
+10 -   self.used.fetch_update(Ordering::Relaxed,Ordering::Relaxed,|n|(n<self.limit.load(Ordering::Relaxed)).then(||n+1))
+10 +   self.used.try_update(Ordering::Relaxed,Ordering::Relaxed,|n|(n<self.limit.load(Ordering::Relaxed)).then(||n+1))
+   |
+
+warning: use of deprecated method `std::sync::atomic::Atomic::<usize>::fetch_update`: renamed to `try_update` for consistency
+  --> crates/river-server/src/caching/preview_pixels.rs:17:14
+   |
+17 |         USED.fetch_update(Ordering::AcqRel,Ordering::Acquire,|used|used.checked_add(charge).filter(|total|*total<=limit())).ok()?;
+   |              ^^^^^^^^^^^^
+   |
+help: replace the use of the deprecated method
+   |
+17 -         USED.fetch_update(Ordering::AcqRel,Ordering::Acquire,|used|used.checked_add(charge).filter(|total|*total<=limit())).ok()?;
+17 +         USED.try_update(Ordering::AcqRel,Ordering::Acquire,|used|used.checked_add(charge).filter(|total|*total<=limit())).ok()?;
+   |
+
+warning: exclusive range missing `u64::MAX`
+    --> crates/river-server/src/remote_source.rs:2260:17
+     |
+2260 |                 12_000..u64::MAX => 16,
+     |                 ^^^^^^^^^^^^^^^^
+     |                 |
+     |                 this range doesn't match `u64::MAX` because `..` is an exclusive range
+     |                 help: use an inclusive range instead: `12000_u64..=u64::MAX`
+     |
+     = note: `#[warn(non_contiguous_range_endpoints)]` on by default
+
+warning: fields `predecoded_origin`, `overlapped_decode_ms`, and `predecoded` are never read
+  --> crates/river-server/src/decoder.rs:45:9
+   |
+40 | pub struct PreparedIo {
+   |            ---------- fields in this struct
+...
+45 |     pub predecoded_origin:(u32,u32),
+   |         ^^^^^^^^^^^^^^^^^
+46 |     /// Work already performed concurrently with source preparation.
+47 |     pub overlapped_decode_ms:f64,
+   |         ^^^^^^^^^^^^^^^^^^^^
+48 |     pub predecoded:Option<std::sync::Arc<image::RgbaImage>>,
+   |         ^^^^^^^^^^
+   |
+   = note: `PreparedIo` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: method `decode_tiles` is never used
+   --> crates/river-server/src/decoder.rs:156:12
+    |
+ 96 | impl Jpeg2000Source {
+    | ------------------- method in this implementation
+...
+156 |     pub fn decode_tiles(
+    |            ^^^^^^^^^^^^
+
+warning: function `sample_path` is never used
+   --> crates/river-server/src/decoder.rs:622:8
+    |
+622 | pub fn sample_path(corpus_root: &Path) -> PathBuf {
+    |        ^^^^^^^^^^^
+
+warning: struct `ScratchDirectory` is never constructed
+   --> crates/river-server/src/runtime/storage_mode.rs:232:19
+    |
+232 | pub(crate) struct ScratchDirectory {
+    |                   ^^^^^^^^^^^^^^^^
+
+warning: associated items `create` and `path` are never used
+   --> crates/river-server/src/runtime/storage_mode.rs:237:12
+    |
+236 | impl ScratchDirectory {
+    | --------------------- associated items in this implementation
+237 |     pub fn create(bytes: u64) -> Result<Self> {
+    |            ^^^^^^
+...
+247 |     pub fn path(&self) -> &Path { self.directory.path() }
+    |            ^^^^
+
+warning: field `ready` is never read
+   --> crates/river-server/src/remote_source.rs:277:45
+    |
+277 | struct AutoSerial {misses:u32,disabled:bool,ready:bool}
+    |        ---------- field in this struct      ^^^^^
+
+warning: fields `serial_transport`, `auto_serial`, and `cache_only` are never read
+   --> crates/river-server/src/remote_source.rs:313:5
+    |
+300 | pub struct ReadContext {
+    |            ----------- fields in this struct
+...
+313 |     serial_transport:crate::read_policy::SerialTransport,
+    |     ^^^^^^^^^^^^^^^^
+314 |     auto_serial:AutoSerial,
+    |     ^^^^^^^^^^^
+315 |     cache_only:bool,
+    |     ^^^^^^^^^^
+
+warning: field `key` is never read
+   --> crates/river-server/src/remote_source.rs:517:9
+    |
+511 | pub struct RemoteSource {
+    |            ------------ field in this struct
+...
+517 |     pub key: String,
+    |         ^^^
+    |
+    = note: `RemoteSource` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: method `native_parent` is never used
+  --> crates/river-server/src/remote_source/read_trace.rs:78:9
+   |
+65 | impl Read {
+   | --------- method in this implementation
+...
+78 |  pub fn native_parent(&mut self) {if let Some(e)=&mut self.event {let e=Arc::make_mut(e);e.kind="logicalRead";e.transport="curl";}}
+   |         ^^^^^^^^^^^^^
+
+warning: `river-server` (bin "river-server" test) generated 20 warnings (run `cargo fix --bin "river-server" -p river-server --tests` to apply 10 suggestions)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 5.98s
+     Running unittests src/main.rs (target/build-baseline/debug/build/river-server/21f5dc88455c1b4f/out/river_server-21f5dc88455c1b4f)
+
+running 342 tests
+test cache_learning::tests::cold_churn_without_reuse_cannot_take_budget ... ok
+test cache_learning::tests::workload_moves_only_bounded_automatic_budget_and_respects_floors ... ok
+test cache_learning::benefit_tests::measured_value_beats_raw_hit_count_and_unknown_is_protected ... ok
+test compatibility::geometry_tests::independent_pyramid_and_density ... ok
+test compatibility::default_pyramid_tests::invalid_extents_fail_and_explicit_geometry_remains_independent ... ok
+test compatibility::default_pyramid_tests::image_extent_defines_external_zoom_independently_of_codestream_levels ... ok
+test compatibility::geometry_tests::rejects_incomplete_invalid_and_overflowing_geometry ... ok
+test compatibility::tests::maps_connected_object_urls_without_arbitrary_url_fetches ... ok
+test cors::tests::hosting_defaults_and_explicit_origins_parse ... ok
+test cors::tests::malformed_restrictions_fail_closed ... ok
+test decoder::native::tests::memory_stream_checks_bounds_and_releases_its_buffer_lease ... ok
+test decoder::empty_precinct_tests::fully_empty_zero_dwt_rgb_is_midgray ... ok
+test decoder::native::tests::normalizes_unsigned_16_bit_native_samples ... ok
+test configuration::tests::versioned_document_rejects_unknown_fields_and_future_versions ... ok
+test configuration::tests::redacted_exports_and_duplicate_sources_cannot_replace_configuration ... ok
+test decoder::pixels::tests::decoded_rgb12_conversion_benchmark ... ignored, Conversion-only release benchmark; decoded12bit diagnostic,not end-to-end latency
+test decoder::pixels::tests::decoded_rgb16_conversion_benchmark ... ignored, Requires the hash-pinned RGB16 JP2 diagnostic; release conversion benchmark only
+test decoder::pixels::tests::rgb_planes_preserve_channel_order_alpha_and_legacy_scaling ... ok
+test decoder::reduced_tiles::tests::codec_groups_do_not_cross_rows_gaps_or_configured_limits ... ok
+test decoder::native::tests::oversized_native_tiles_choose_roi_before_opening_the_source ... ok
+test decoder::opaque_png_tests::opaque_crop_omits_alpha_and_preserves_exact_pixels ... ok
+test decoder::openht_policy::tests::explicit_threshold_and_legacy_mode_keep_their_contract ... ok
+test decoder::openht_policy::tests::large_rasters_need_direct_compatible_metadata_to_lower_the_threshold ... ok
+test decoder::openht_policy::coarse_tests::coarse_worker_respects_region_cost_and_explicit_override ... ok
+test decoder::native::tests::locates_only_the_native_tiles_touched_by_a_window ... ok
+test decoder::opaque_png_tests::transparent_padding_stays_rgba_and_black_padding_can_be_rgb ... ok
+test decoder::pixels::tests::mismatched_planes_never_produce_a_partial_raster ... ok
+test decoder::reduced_tiles::tests::rejects_inconsistent_part_totals_before_decoder_creation ... ok
+test decoder::reduced_tiles::tests::sparse_grids_require_only_tiles_intersecting_the_requested_rectangle ... ok
+test decoder::reduced_tiles::tests::rejects_missing_native_tiles_before_decoder_creation ... ok
+test decoder::reduced_tiles::tests::rejects_nonconsecutive_parts_before_decoder_creation ... ok
+test decoder::opaque_png_tests::partial_and_zero_alpha_are_preserved ... ok
+test decoder::reduced_tiles::tests::sparse_stitch_clips_all_edges_without_moving_pixels ... ok
+test decoder::tests::keeps_a_preview_pixel_for_a_rounded_down_pyramid_edge ... ok
+test decoder::tests::normalizes_full_range_u16_components_to_u8 ... ok
+test decoder::tests::grayscale_16_bit_rasters_are_opaque_and_real_alpha_is_preserved ... ok
+test decoder::thread_budget::tests::preview_workers_do_not_expand_moderate_tile_budgets ... ok
+test decoder::thread_budget::tests::automatic_caps_scale_without_spending_small_machine_cpus ... ok
+test decoder::tests::contiguous_rasters_are_borrowed_and_strided_png_crops_preserve_alpha ... ok
+test decoder::thread_budget::tests::queued_jobs_share_only_runnable_decode_slots ... ok
+test decoder::thread_budget::tests::tiny_whole_image_outputs_account_for_native_tile_work ... ok
+test decoder::thread_budget::tests::tiny_work_does_not_consume_spare_cpu_or_ignore_explicit_one ... ok
+test display::tests::multispectral_extras_are_not_opacity ... ok
+test decoder::thread_budget::tests::work_ticket_clones_count_one_job_and_unwind_releases_activity ... ok
+test decoder::thread_budget::tests::simultaneous_claims_cannot_oversubscribe_spare_workers ... ok
+test encoding_settings::tests::render_snapshot_is_thread_local_nested_and_released ... ok
+test engine::compact_gpu_tests::compact_preview_uses_encoded_geometry_and_preserves_output_coordinates ... ok
+test engine::compact_gpu_tests::gpu_guard_uses_native_grid_and_accepts_compact_geometry ... ok
+test engine::compact_gpu_tests::compact_preview_rejects_misalignment_and_excessive_reduction ... ok
+test engine::compact_gpu_tests::sparse_compact_gpu_views_use_cpu_even_after_projection ... ok
+test engine::compact_gpu_tests::large_complete_compact_grids_use_bounded_cpu_before_gpu_rebasing ... ok
+test engine::compact_gpu_tests::cpu_fallback_requires_a_proven_classical_roi_view ... ok
+test decoder::pixels::tests::rgb12_matches_legacy_normalization_for_every_value_and_wrapping_edges ... ok
+test engine::tests::direct_engine_has_a_stable_operational_identity ... ok
+test errors::tests::every_known_code_has_actionable_message ... ok
+test grok_cancellation_tests::tests::failed_decode_does_not_cancel_the_next_request_on_a_reused_thread ... ok
+test grok_cancellation_tests::tests::nested_requests_restore_their_own_cancellation_state ... ok
+test identity_tests::discovery_and_loading_accept_raw_codestream_aliases ... ok
+test identity_tests::loading_requires_only_an_object_key ... ok
+test image_state::tests::mutable_metadata_is_charged_once_across_aliases_and_released ... ok
+test identity_tests::remote_identity_preserves_nested_and_unicode_keys ... ok
+test edges::tests::padding_preserves_pixels_alpha_and_scope_between_jobs ... ok
+test image_state::tests::public_version_ids_stay_in_the_existing_api_contract ... ok
+test lease_pool::tests::error_unwinding_returns_the_buffer_without_poisoning_the_pool ... ok
+test identity_tests::file_version_identity_is_stable_and_tracks_size_and_path_without_content_hashing ... ok
+test decoder::thread_budget::tests::active_jobs_share_cpu_capacity_and_release_all_leases ... ok
+test lease_pool::tests::buffers_return_and_preserve_their_grown_capacity ... ok
+test packed_view_parser_tests::tests::complete_empty_grid_packs_without_modifying_input ... ok
+test packed_view_parser_tests::coarse_tests::coarse_rct_multi_block_envelope_is_bounded_and_immutable ... ok
+test packed_view_parser_tests::tests::tiny_precincts_keep_legal_nominal_codeblocks ... ok
+test packed_view_parser_tests::tests::unsafe_color_and_mismatched_container_geometry_fall_back ... ok
+test packed_view_parser_tests::tests::one_native_single_resolution_view_rejects_every_truncation ... ok
+test preview_pixels::tests::missing_raw_pixels_and_unsupported_alignment_fall_back ... ok
+test raster_cache::output_key_tests::explicit_output_geometry_is_in_cache_and_singleflight_identity ... ok
+test preview_plan::tests::first_batch_is_small_and_every_batch_stays_rectangular_and_in_order ... ok
+test preview_plan::tests::native_row_patches_keep_the_existing_frame_bound_and_layout_fallback ... ok
+test raster_cache::tests::cropped_gpu_subsets_classify_restored_positions_using_local_bounds ... ok
+test raster_cache::tests::declared_full_bounds_do_not_alias_a_smaller_decoded_raster ... ok
+test raster_cache::disk::tests::restart_reuse_is_snapshot_specific_and_corruption_is_repaired ... ok
+test raster_cache::tests::encoded_cache_never_retains_transient_capture_buffers ... ok
+test raster_cache::tests::full_tiles_share_payload_and_inflight_work_across_edge_modes ... ok
+test raster_cache::tests::never_reuses_another_snapshot_driver_quality_or_format ... ok
+test raster_cache::tests::eviction_and_hit_accounting_remain_bounded_and_honest ... ok
+test raster_cache::tests::mixed_batches_share_interiors_but_keep_three_distinct_edge_payloads ... ok
+test configuration::tests::environment_configuration_is_fileless ... ok
+test read_policy::index_header_tests::adaptive_headers_require_measurements_and_reject_slow_bandwidth ... ok
+test raster_cache::tests::tiles_are_reused_across_batch_shapes_without_duplicate_payload_admission ... ok
+test read_policy::index_header_tests::distant_fast_source_can_batch_headers_without_double_charging_rtt ... ok
+test raster_cache::tests::prepared_source_does_not_reuse_pre_fix_pixels_after_remote_handle_is_consumed ... ok
+test read_policy::index_header_tests::index_header_policy_roundtrips_and_bounds_bandwidth ... ok
+test read_policy::measured_overfetch_tests::configured_warmup_is_respected ... ok
+test read_policy::measured_overfetch_tests::observe_mode_and_explicit_ceiling_win ... ok
+test read_policy::measured_overfetch_tests::feedback_is_bounded_and_recovers_with_hysteresis ... ok
+test read_policy::tests::bulk_transfers_train_rate_without_inventing_native_header_latency ... ok
+test read_policy::tests::contiguous_chunks_need_learning_and_back_off_to_the_latest_slow_transfer ... ok
+test read_policy::tests::cost_accounts_for_parallel_waves_and_extra_bytes ... ok
+test read_policy::tests::legacy_policy_keeps_implicit_transport_but_explicit_sdk_is_persisted ... ok
+test read_policy::tests::payload_refresh_option_roundtrips_and_legacy_documents_remain_valid ... ok
+test read_policy::tests::planner_separates_round_trip_latency_from_measured_body_transfer ... ok
+test packed_view_parser_tests::tests::every_truncation_and_duplicate_tile_falls_back ... ok
+test read_policy::tests::range_cost_uses_current_slow_body_rate_instead_of_stale_fast_average ... ok
+test read_policy::tests::settings_reject_unbounded_learning_and_overfetch ... ok
+test raster_cache::disk::tests::concurrent_admission_and_restart_obey_disk_budget ... ok
+test read_policy::tests::transport_counters_are_available_without_latency_learning ... ok
+test read_policy::tests::source_limit_rejects_zero_and_unbounded_values ... ok
+test api_docs::tests::specification_covers_public_routes ... ok
+test preview_pixels::tests::stitches_original_rgba_with_edges_and_alpha_without_lossy_round_trip ... ok
+test read_policy::tests::unknown_zero_or_inverted_body_intervals_do_not_train_body_rate ... ok
+test remote_source::auto_serial_tests::contention_disables_switching_even_after_other_work_finishes ... ok
+test remote_source::auto_serial_tests::small_indexed_and_high_latency_sources_keep_sdk ... ok
+test read_policy::tests::transport_choice_roundtrips_and_rejects_unknown_values ... ok
+test remote_source::auto_serial_tests::sustained_isolated_discovery_can_switch_after_required_reads ... ok
+test read_policy::tests::admission_identity_is_shared_above_128_sources ... ok
+test remote_source::index_shards::adaptation_tests::fast_history_does_not_latch_out_a_later_slow_source ... ok
+test remote_source::index_cache::tests::rejects_wrong_snapshots_corruption_and_impossible_extents ... ok
+test remote_source::index_cache::tests::hot_index_budget_identity_and_checkpoint_coalescing ... ok
+test remote_source::index_shards::covered_tests::committing_a_longer_suffix_drops_the_covered_primary_chunk ... ok
+test remote_source::index_shards::learned_seed_tests::fine_parts_cannot_occupy_every_source_lane ... ok
+test remote_source::index_shards::learned_seed_tests::observed_large_parts_bound_the_frontier_inside_the_same_byte_budget ... ok
+test remote_source::index_cache::tests::disk_round_trip_evicts_only_owned_files_and_ignores_corruption ... ok
+test remote_source::index_shards::learned_seed_tests::partial_nearby_observe_and_uncalibrated_sources_keep_their_frontier ... ok
+test remote_source::index_shards::partial_stop_tests::a_retained_lane_stops_even_when_the_requested_part_is_not_last ... ok
+test remote_source::index_shards::pilot_tests::measured_body_is_independent_of_header_delay_and_requires_new_samples ... ok
+test remote_source::index_shards::refreshed_probe_tests::a_now_nearby_ordinary_grid_never_spends_bulk_bytes_on_stale_latency ... ok
+test remote_source::index_shards::refreshed_probe_tests::distant_sources_still_obey_measured_bandwidth_cost ... ok
+test remote_source::index_shards::refreshed_probe_tests::fine_grids_keep_their_existing_nearby_eligibility ... ok
+test remote_source::index_shards::selected_stop_tests::primary_stops_at_the_last_pending_id_without_counting_duplicates ... ok
+test remote_source::index_shards::selected_stop_tests::single_target_and_whole_walk_stop_behavior_is_preserved ... ok
+test remote_source::index_shards::selected_stop_tests::speculative_and_fragmented_parts_keep_the_earlier_stop ... ok
+test remote_source::index_shards::tests::clipped_row_and_column_use_area_and_respect_reference_origins ... ok
+test packed_view_parser_tests::tests::clipped_single_and_precinct_aligned_non_power_native_grids_pack_exactly ... ok
+test remote_source::index_shards::tests::false_embedded_markers_cannot_be_committed ... ok
+test remote_source::index_shards::tests::merges_only_the_connected_suffix_and_preserves_its_offsets ... ok
+test remote_source::index_shards::tests::rescue_can_recover_a_seed_crossing_the_prefix_boundary ... ok
+test remote_source::index_shards::tests::startup_delay_cannot_trigger_bulk_probes_before_fast_required_reads_arrive ... ok
+test remote_source::index_shards::tests::retained_lanes_resume_after_the_bounded_prefix ... ok
+test remote_source::index_shards::tests::sustained_latency_and_large_grids_still_become_eligible_after_required_reads ... ok
+test remote_source::index_shards::warm_calibration_tests::fresh_sources_keep_the_full_existing_calibration ... ok
+test remote_source::index_shards::warm_calibration_tests::known_sources_need_fresh_reads_and_do_not_repeat_at_cached_offsets ... ok
+test remote_source::index_shards::warm_calibration_tests::loss_of_confidence_restores_the_required_read_spacing ... ok
+test remote_source::jpip_index::tests::bounded_versions_offsets_padding_and_complete_coverage ... ok
+test remote_source::jpip_index::tests::oversized_required_child_is_rejected_before_body_fetch ... ok
+test remote_source::jpip_index::tests::independent_openjpeg15_index_matches_every_source_sot ... ok
+test remote_source::jpip_index::tests::rejects_overlaps_gaps_offset_overflow_and_unbounded_tables ... ok
+test remote_source::jpip_index::tests::supports_extended_boxes_but_rejects_duplicate_pointers ... ok
+test remote_source::jpip_index::tests::rejects_truncation_pointer_mismatch_and_wrong_geometry ... ok
+test remote_source::known_header_probe_tests::cached_headers_and_multipart_parts_keep_bounded_probes ... ok
+test remote_source::layered_packets::tests::bypass_continues_a_partly_filled_segment_from_an_earlier_layer ... ok
+test remote_source::layered_packets::tests::empty_layer_after_inclusion_preserves_every_codeblock_and_tree_state ... ok
+test remote_source::layered_packets::tests::included_codeblocks_keep_passes_and_lblock_across_layers_and_failed_probes ... ok
+test remote_source::layered_packets::tests::empty_layers_advance_and_short_probes_do_not_mutate_state ... ok
+test remote_source::layered_packets::tests::terminated_passes_have_separate_lengths ... ok
+test remote_source::layered_packets::tests::lazy_empty_layers_allocate_no_band_state_and_failed_probes_remain_lazy ... ok
+test read_policy::tests::bursts_within_capacity_do_not_enter_the_wait_queue ... ok
+test remote_source::layered_packets::tests::complete_buffers_match_transactional_lengths_for_all_classical_styles ... ok
+test remote_source::multipart::tests::malformed_chains_have_specific_errors ... ok
+test remote_source::multipart::tests::packet_position_continues_across_arbitrary_part_boundaries ... ok
+test remote_source::multipart_prefix::learned_header_tests::learned_probe_is_clipped_to_current_part_and_preserves_small_part_fusion ... ok
+test remote_source::multipart_prefix::learned_header_tests::validated_header_size_guides_only_latency_sensitive_adaptive_reads ... ok
+test remote_source::multipart_prefix::tests::clustered_first_parts_require_a_complete_bounded_physical_run ... ok
+test remote_source::multipart_prefix::tests::cached_part_copy_keeps_exact_offsets_tail_and_missing_block_fallback ... ok
+test remote_source::multipart_prefix::tests::complete_quality_prefix_cache_bounds_versions_geometry_and_owned_bytes ... ok
+test remote_source::multipart_prefix::tests::multilayer_resolution_prefix_retains_all_layers_for_decoder_layer_limits ... ok
+test remote_source::multipart_prefix::tests::prefix_cache_configuration_accepts_zero_and_caps_budget ... ok
+test remote_source::multipart_prefix::tests::small_read_ahead_is_bounded_contiguous_and_never_infers_packet_boundaries ... ok
+test decoder::empty_precinct_tests::missing_precincts_are_zero_coefficients_before_dc_shift ... ok
+test decoder::native::tests::native_cache_coalesces_misses_and_preserves_active_evicted_tiles ... ok
+test remote_source::multipart_prefix::tests::seekable_openjpeg_handles_short_reads_and_reports_failed_io ... ok
+test remote_source::discovery_retention_tests::recent_retention_reuses_arcs_and_never_fills_missing_blocks ... ok
+test remote_source::payload_live::tests::intersections_stay_inside_unstarted_coverage_and_preserve_gaps ... ok
+test remote_source::payload_live::tests::lower_byte_cost_cannot_override_attempt_or_memory_caps ... ok
+test remote_source::precinct_roi::exact_tests::odd_image_boundary_support_is_clipped_without_empty_bands ... ok
+test remote_source::precinct_roi::exact_tests::small_region_omits_unrelated_precincts_at_each_resolution ... ok
+test remote_source::precinct_roi::tests::small_geometry_stays_on_existing_automatic_path ... ok
+test remote_source::precinct_roi::tests::sparse_windows_do_not_fetch_intervening_precincts ... ok
+test remote_source::precinct_roi::tests::spatial_mask_uses_reference_grid_at_every_resolution ... ok
+test remote_source::precinct_roi::tests::window_alignment_preserves_support_and_bounds_huge_geometry ... ok
+test remote_source::progressive_prefix::tests::byte_memory_and_unknown_timing_bounds_are_not_relaxed ... ok
+test remote_source::progressive_prefix::tests::distant_fast_sources_can_prefetch_but_slow_or_nearby_sources_do_not ... ok
+test remote_source::progressive_prefix::tests::observed_slowdown_and_contended_lane_allowance_back_off ... ok
+test remote_source::progressive_prefix::tests::only_a_scheduled_finer_low_resolution_final_can_supply_a_hint ... ok
+test remote_source::precinct_roi::tests::exact_cost_gate_requires_material_precinct_savings ... ok
+test remote_source::progressive_prefix::tests::policy_unknown_measurements_and_cache_limits_preserve_baseline ... ok
+test remote_source::read_feedback::tests::aborted_transfer_marks_sample_unreliable ... ok
+test remote_source::index_only_prefix::tests::pointers_in_empty_parts_project_later_packet_data_and_reject_late_coding_changes ... ok
+test remote_source::read_feedback::tests::completed_transfer_keeps_sample_eligible ... ok
+test remote_source::read_feedback::tests::overlapping_demands_and_repeated_fetches_are_not_hidden ... ok
+test remote_source::read_feedback::tests::successful_retry_does_not_disguise_unknown_partial_bytes ... ok
+test remote_source::read_trace::tests::scope_shares_context_and_finalization_keeps_retained_snapshot_immutable ... ok
+test remote_source::read_trace::tests::timing_boundaries_omit_unknown_or_invalid_phases ... ok
+test remote_source::read_trace::tests::summary_does_not_double_count_native_parents_or_index_records ... ok
+test remote_source::ready_parts_tests::reused_index_validation_benchmark ... ignored, Release-only metadata microbenchmark; not HTTP latency evidence
+test remote_source::recent_reads::tests::adjacent_reads_survive_shared_eviction_with_a_bounded_working_set ... ok
+test remote_source::read_feedback::tests::bounded_ledger_does_not_train_on_incomplete_accounting ... ok
+test remote_source::recent_reads::tests::block_geometry_and_large_reads_do_not_break_the_memory_bound ... ok
+test remote_source::retry_delay_tests::closed_cancellation_channel_does_not_wait_for_backoff ... ok
+test remote_source::resolution_view::tests::reduced_headers_preserve_tile_grid_and_retained_quantization ... ok
+test remote_source::seekable_probe::decoder_driven_http_range_probe ... ignored, Requires the immutable generated14MBHTTPdiagnostic origin on18969
+test remote_source::seekable_probe::discovered_prefix_http_range_probe ... ignored, Requires the immutable generated14MBHTTPdiagnostic origin on18969
+test remote_source::seekable_probe::next_level_large_unindexed_prefix_probe ... ignored, Requires hash-pinned virtual14GBunindexed HTTP origin on18968
+test remote_source::read_trace::tests::bounded_records_keep_indices_outcomes_and_disclose_eviction ... ok
+test remote_source::single_prefix::tests::intermediate_projection_keeps_needed_bands_precincts_and_end_header_markers ... ok
+test remote_source::single_prefix::tests::projection_preserves_source_and_component_quantization ... ok
+test remote_source::single_prefix::tests::sequential_plt_packet_accounting_stops_at_the_requested_prefix ... ok
+test remote_source::single_prefix::tests::sequential_plt_real_prefix_matches_independent_reduced_reference ... ignored, Requires frozen79MB12bit diagnostic and RIVER_S3_SINGLE_PREFIX=true; local IO correctness only
+test read_policy::tests::source_limit_is_shared_cancellable_and_releases_after_drop ... ok
+test decoder::pixels::tests::rgb16_matches_legacy_for_every_unsigned_value_and_wrapping_edges ... ok
+test remote_source::single_tag_tree_tests::inline_leaf_matches_general_tree_with_retries_and_stuffed_bytes ... ok
+test remote_source::streamed_header::tests::requested_body_prefix_can_be_reused_without_retaining_the_tail ... ok
+test remote_source::single_roi::tests::rebuilt_plt_preserves_variable_lengths_and_sequence_across_segments ... ok
+test remote_source::structure::tests::cod_offsets_distinguish_codeblock_style_from_wavelet_transform ... ok
+test remote_source::structure::tests::selective_diagnostic_tracks_the_actual_main_header_gate ... ok
+test packed_view_parser_tests::tests::marked_ll_packets_pack_identically_and_reject_bad_envelopes ... ok
+test remote_source::tests::a_merged_gap_does_not_throttle_a_small_remote_batch ... ok
+test remote_source::tests::adaptive_plt_lookahead_is_bounded_and_skips_nearby_or_small_headers ... ok
+test remote_source::tests::cache_block_sizes_have_independent_alignment_and_shared_identity ... ok
+test decoder::pixels::tests::decoded_rgb12_mct_variants_match_the_wrapper_pixel_path ... ok
+test remote_source::packet_plan_cache::tests::disabled_and_evicted_plans_remain_bounded_and_active_leases_survive ... ok
+test remote_source::tests::classic_segments_follow_pass_termination_and_reject_truncated_lengths ... ok
+test remote_source::streamed_header::tests::marker_blocks_are_chunk_independent_and_payload_signatures_are_not_trusted ... ok
+test remote_source::tests::compact_prefix_placeholder_budget_probe ... ignored, Requires independently validated sparse fine-precinct diagnostic
+test remote_source::tests::cached_sot_discovery_does_not_extend_the_prefix_before_packet_planning ... ok
+test remote_source::tests::compact_range_parallelism_does_not_raise_bulk_transfer_admission ... ok
+test remote_source::tests::compatibility_cache_evicts_idle_files_and_preserves_active_decoder_leases ... ok
+test engine::tests::abandoned_preparation_keeps_io_admission_until_worker_exits ... ok
+test remote_source::tests::component_overrides_require_identical_geometry_and_coding_style ... ok
+test remote_source::retry_delay_tests::supersession_interrupts_retry_backoff ... ok
+test remote_source::tests::contiguous_growth_retains_transfer_lanes ... ok
+test remote_source::tests::active_small_object_leases_survive_shared_cache_eviction_and_are_bounded ... ok
+test remote_source::tests::distant_single_tile_payload_parallelism_keeps_other_workloads_conservative ... ok
+test remote_source::tests::final_tile_lengths_are_bounded_to_the_codestream_and_support_large_extents ... ok
+test remote_source::tests::header_cache_evicts_idle_payloads_but_preserves_active_leases ... ok
+test remote_source::tests::header_digest_covers_container_and_tile_index_metadata ... ok
+test remote_source::tests::discovery_fetches_a_split_mandatory_sot_in_one_range ... ok
+test remote_source::tests::contended_ordinary_grid_skips_speculative_source_io ... ok
+test remote_source::tests::ht_packet_lengths_keep_cleanup_and_refinement_segments_separate ... ok
+test remote_source::tests::index_allowance_honors_explicit_caps_and_small_sources ... ok
+test remote_source::tests::index_allowance_preserves_remaining_payload_requests ... ok
+test remote_source::tests::index_retention_releases_capacity_not_just_elements ... ok
+test remote_source::tests::compatibility_reuse_preserves_bytes_for_fragmented_partial_and_versioned_blocks ... ok
+test lease_pool::tests::admission_waits_until_an_exclusive_buffer_is_returned ... ok
+test remote_source::tests::inline_ll_windows_preserve_tiny_tiles_and_bound_growth_and_tail ... ok
+test remote_source::tests::cancelled_fetch_waiter_does_not_block_the_next_payload ... ok
+test remote_source::tests::large_validated_prefix_allowance_preserves_byte_deadline_and_explicit_caps ... ok
+test remote_source::tests::larger_contiguous_chunks_preserve_exact_required_bytes_and_holes ... ok
+test remote_source::tests::initial_get_seeds_versioned_header_parsing_without_duplicate_reads ... ok
+test remote_source::streamed_header::tests::retention_is_bounded_and_short_tail_blocks_are_not_cached ... ok
+test remote_source::tests::coarse_packet_order_bounds_materialized_prefix_not_unrequested_resolutions ... ok
+test remote_source::tests::late_tile_cod_after_plt_cannot_become_a_main_geometry_packet_index ... ok
+test remote_source::tests::local_multipart_rpcl_preparation_benchmark ... ignored, Release-mode local multipart preparation A/B; not S3 latency
+test remote_source::tests::local_multipart_temporary_order_matches_original_pixels ... ignored, Requires the hash-pinned local multipart PLT fixture
+test engine::tests::an_interior_tile_rendered_black_first_is_reused_by_crop_and_transparent ... ok
+test remote_source::tests::local_plt_window_reuses_only_covered_header_bytes ... ok
+test remote_source::tests::local_rpcl_plt_stream_plan_matches_original_pixels ... ignored, Requires the hash-pinned local organizational-style diagnostic fixture
+test remote_source::tests::main_tlm_lookahead_is_optional_bounded_and_not_used_for_other_markers ... ok
+test remote_source::tests::marker_discovery_allowance_is_bounded_and_preserves_admin_caps ... ok
+test remote_source::tests::measured_amplification_changes_subsequent_optional_ranges ... ok
+test remote_source::tests::multilayer_multipart_roi_io_comparison ... ignored, Isolated same-source multipart ROI byte accounting, not HTTP timing
+test remote_source::tests::multilayer_multipart_spatial_roi_matches_full_decode ... ignored, Hash-pinned synthetic ten-layer ROI; explicit isolated process only
+test remote_source::tests::multipart_prefix_metadata_budget_probe ... ignored, Scaled metadata-pressure diagnostic on a hash-pinned valid multipart file
+test remote_source::tests::ordinary_prefix_requests_keep_the_existing_payload_allowance ... ok
+test remote_source::tests::local_header_probe_reads_bounded_version_pinned_ranges ... ok
+test remote_source::tests::packet_lengths_reject_truncation_and_overflow ... ok
+test remote_source::tests::packet_marker_envelopes_preserve_lengths_and_require_eph ... ok
+test remote_source::tests::header_working_set_preserves_weak_leases_within_the_byte_budget ... ok
+test remote_source::tests::payload_learning_uses_only_required_ranges_and_respects_cold_source_limits ... ok
+test remote_source::tests::main_component_overrides_only_share_the_default_packet_geometry_when_identical ... ok
+test remote_source::tests::prefix_bootstrap_never_adds_probes_or_ignores_sample_and_request_limits ... ok
+test remote_source::tests::prefix_leases_keep_requested_blocks_without_pinning_overfetched_gaps ... ok
+test remote_source::multipart_prefix::tests::lazy_counts_match_materialized_orders_in_shifted_clipped_grids ... ok
+test remote_source::tests::published_prefix_requires_every_declared_part_of_each_requested_tile ... ok
+test remote_source::tests::parsed_multitile_headers_skip_discovery_when_byte_cache_is_disabled ... ok
+test remote_source::tests::indexed_header_batches_are_not_reread_without_a_shared_cache ... ok
+test remote_source::tests::range_merging_preserves_sparse_reads_and_respects_hard_limits ... ok
+test remote_source::tests::request_drop_propagates_to_a_blocking_reader ... ok
+test remote_source::tests::learned_prefix_range_size_shrinks_for_a_slow_source ... ok
+test remote_source::tests::rpcl_plt_planner_benchmark ... ignored, Isolated release-mode RPCL planner benchmark, not server latency
+test remote_source::tests::packet_leases_merge_without_double_charging_or_exceeding_request_retention ... ok
+test remote_source::tests::shared_cache_evicts_to_its_byte_budget ... ok
+test remote_source::tests::small_packet_batches_consider_one_read_without_forcing_overfetch_on_parallel_waves ... ok
+test remote_source::tests::tlm_offsets_reject_short_overflowing_and_out_of_codestream_extents ... ok
+test remote_source::tests::learned_observe_plan_handles_more_than_4096_prefixes_without_changing_reads ... ok
+test remote_source::tests::serial_index_admission_follows_actual_tlm_headers_across_quality_models ... ok
+test remote_source::tile_header_cache::tests::eviction_is_bounded_and_active_leases_survive ... ok
+test remote_source::tile_header_cache::tests::immutable_lengths_are_shared_and_version_and_extent_mismatches_miss ... ok
+test remote_source::wire_budget::tests::exhausted_budget_reports_usage_without_claiming_another_send ... ok
+test remote_source::wire_budget::tests::nested_scopes_restore_outer_budget ... ok
+test remote_source::tests::large_plt_headers_preserve_bounds_with_and_without_shared_cache ... ok
+test remote_source::wire_budget::tests::parallel_claims_never_exceed_shared_limit ... ok
+test requests::tests::invalid_batch_is_rejected_atomically ... ok
+test requests::patch_wire_tests::camel_case_patch_opt_in_is_not_silently_ignored ... ok
+test requests::tests::partial_edge_tiles_are_valid ... ok
+test requests::tests::rectangular_batch_matches_viewport_jobs ... ok
+test requests::tests::sparse_unsorted_duplicates_and_mixed_zoom_are_bounded ... ok
+test requests::tests::whole_grid_coverage_is_geometric_and_sparse_batches_stay_partial ... ok
+test resources::tests::explicit_process_allowance_does_not_charge_unrelated_group_memory ... ok
+test resources::tests::allocations_reserve_headroom_and_preserve_explicit_caps ... ok
+test resources::tests::pressure_hysteresis_and_growth_are_bounded ... ok
+test resources::tests::nested_v2_limits_and_fractional_cpu_quota ... ok
+test resources::tests::v1_cpu_memory_and_missing_cgroup_fallback ... ok
+test shared_cache::routing_tests::fill_budget_is_global_and_releases_dropped_work ... ok
+test shared_cache::routing_tests::invalid_membership_is_rejected ... ok
+test remote_source::packet_plan_cache::tests::immutable_geometry_is_shared_but_distinct_orders_miss ... ok
+test shared_cache::routing_tests::real_redis_valkey_restart_routing_and_failed_replacement ... ignored, requires controlled Redis and Valkey services on localhost ports 16379 and 16380
+test source_admission::tests::failed_worker_unwinds_without_leaking_admission_into_next_request ... ok
+test source_admission::tests::index_completion_releases_only_index_admission ... ok
+test source_admission::tests::nested_worker_operations_preserve_outer_admission ... ok
+test source_admission::tests::preparation_activity_is_released_after_nested_work_and_unwind ... ok
+test remote_source::index_cache::tests::catalog_churn_exceeds_4096_without_scans_or_premature_eviction ... ok
+test source_cache::tests::revalidates_persisted_copies_and_detects_corruption ... ok
+test remote_source::tests::uncontended_fetch_fast_path_cannot_barge_a_queued_payload ... ok
+test source_cache::tests::verifies_copies_and_preserves_active_leases_during_eviction ... ok
+test remote_source::tests::retained_local_reader_rejects_changed_uncached_source_ranges ... ok
+test remote_source::tests::pin_budget_counts_only_selected_blocks_and_still_enforces_its_limit ... ok
+test source_cache::tests::ready_lookup_never_waits_for_pending_fill_or_verification ... ok
+test source_retry_tests::legacy_source_json_does_not_require_a_retry_field ... ok
+test websocket_auto_contract_tests::auto_is_explicit_and_does_not_change_legacy_omission ... ok
+test worker_sizing::tests::buffers_track_admission_including_small_instances ... ok
+test worker_sizing::tests::each_state_is_exclusive_until_its_wave_finishes ... ok
+test worker_sizing::tests::fewer_workers_do_not_reserve_unreachable_buffers ... ok
+test worker_sizing::tests::pool_remains_within_native_resource_limits ... ok
+test remote_source::tests::progressing_bodies_keep_bounds_and_an_outer_deadline ... ok
+test remote_source::tests::wide_prefix_merges_reduce_requests_without_exceeding_byte_or_range_limits ... ok
+test remote_source::jpip_index::tests::reads_required_tables_without_consuming_large_unused_children ... ok
+test remote_source::multipart_prefix::tests::unindexed_first_parts_require_real_packet_coverage ... ok
+test remote_source::ready_parts_tests::grouped_validation_preserves_reference_acceptance_and_order ... ok
+test remote_source::tests::queued_ranges_keep_their_network_timeout_after_admission ... ok
+test engine::tests::mixed_batches_prepare_and_decode_only_missing_tiles ... ok
+test edges::output_tests::resamples_before_padding_and_restores_scope ... ok
+test remote_source::jpip_index::tests::advertised_index_and_unusable_metadata_keep_selected_tiles_correct ... ok
+test source_retry_tests::explicit_retry_limits_are_validated_and_canonicalized_without_source_io ... ok
+test source_connections::tests::sdk_https_policy_is_not_weakened_by_a_shared_http_transport ... ok
+test shared_cache::routing_tests::adding_node_only_moves_its_share ... ok
+test shared_cache::routing_tests::order_and_credentials_do_not_move_keys ... ok
+test cache_inventory::tests::six_thousand_local_records_survive_restart_then_evict_in_lru_order ... ok
+test engine::tests::concurrent_identical_renders_decode_once_and_quality_stays_independent ... ok
+test remote_source::tests::range_body_progress_can_exceed_one_idle_interval_but_stalls_fail ... ok
+test remote_source::seekable_probe::tiny_group_clipped_u16_matches_independent_kakadu_planes ... ok
+test source_connections::tests::sdk_retries_are_visible_as_separate_transport_attempts ... ok
+test source_connections::tests::configured_sdk_retry_limits_bound_physical_attempts ... ok
+test remote_source::tests::heap_range_planner_matches_scan_planner ... ok
+test remote_source::tests::compact_prefix_plan_preserves_packet_order_and_omitted_count ... ok
+
+test result: ok. 326 passed; 0 failed; 16 ignored; 0 measured; 0 filtered out; finished in 1.36s
+

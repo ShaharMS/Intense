@@ -9,10 +9,37 @@ struct Plane {
     width: u32, height: u32, stride: u32, x: u32, y: u32,
     precision: u8, signed_samples: u8, sample_bytes: u8,
 }
+type ReadAt = unsafe extern "C" fn(*mut c_void, *mut u8, u64, u64) -> i32;
+type DecodeOriginal = unsafe extern "C" fn(*mut c_void, ReadAt, u64, u32, u32, u32, u32, u8, u16) -> *mut c_void;
+struct Original<'a> {
+    source: &'a crate::remote_source::RemoteSource,
+    read: &'a crate::remote_source::original_reader::OriginalRead,
+    error: std::sync::Mutex<Option<String>>,
+}
+unsafe extern "C" fn read_original(ctx: *mut c_void, out: *mut u8, offset: u64, length: u64) -> i32 {
+    if length == 0 { return 1; }
+    if ctx.is_null() || out.is_null() || length > isize::MAX as u64 { return 0; }
+    let original = unsafe { &*ctx.cast::<Original<'_>>() };
+    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let result = original.source.read_at(offset, unsafe { std::slice::from_raw_parts_mut(out, length as usize) },
+            &mut original.read.0.lock().unwrap_or_else(|e| e.into_inner()));
+        match result {
+            Ok(n) => i32::from(n as u64 == length),
+            Err(e) => {
+                *original.error.lock().unwrap_or_else(|e| e.into_inner()) = Some(format!("{e:#}"));
+                0
+            }
+        }
+    })).unwrap_or(0)
+}
 type Decode = unsafe extern "C" fn(*const i8, *const u8, usize, u32, u32, u32, u32, u8, u16) -> *mut c_void;
 struct Api {
     _library: libloading::Library,
     decode: Decode,
+    last_failure: Option<unsafe extern "C" fn() -> *const std::ffi::c_char>,
+    original: Option<DecodeOriginal>,
+    block_session: Option<super::super::block_reuse::SetSession>,
+    decompress_ms: Option<unsafe extern "C" fn(*const c_void) -> f64>,
     release: unsafe extern "C" fn(*mut c_void),
     components: unsafe extern "C" fn(*const c_void) -> u16,
     plane: unsafe extern "C" fn(*const c_void, u16, *mut Plane) -> bool,
@@ -23,19 +50,28 @@ impl Api {
         let path = std::env::var("RIVER_GROK_NATIVE_LIBRARY").unwrap_or_else(|_| "/usr/local/lib/libriver_grok.so".into());
         let library = libloading::Library::new(path).context("native Grok bridge unavailable")?;
         let initialize = *library.get::<unsafe extern "C" fn(u32)>(b"river_grok_initialize\0")?;
-        let api = Self { decode: *library.get(b"river_grok_decode\0")?, release: *library.get(b"river_grok_release\0")?,
+        let api = Self { last_failure: library.get(b"river_grok_last_failure\0").ok().map(|f| *f), original: library.get(b"river_grok_decode_original\0").ok().map(|f| *f), block_session: library.get(b"river_grok_block_session_v2\0").or_else(|_| library.get(b"river_grok_block_session\0")).ok().map(|f| *f), decompress_ms: library.get(b"river_grok_decompress_ms\0").ok().map(|f| *f), decode: *library.get(b"river_grok_decode\0")?, release: *library.get(b"river_grok_release\0")?,
             components: *library.get(b"river_grok_components\0")?, plane: *library.get(b"river_grok_plane\0")?, _library: library };
-        let threads = std::env::var("RIVER_GROK_NATIVE_THREADS").ok().and_then(|v| v.parse().ok()).unwrap_or(2u32).clamp(1, 64);
-        initialize(threads);
+        initialize(pool_threads());
+        if let Ok(enable) = api._library.get::<unsafe extern "C" fn(bool)>(b"river_grok_enable_diagnostics\0") {
+            enable(tracing::enabled!(tracing::Level::DEBUG));
+        }
         Ok(api)
         }
     }
 }
+pub(crate) fn pool_threads() -> u32 {
+    std::env::var("RIVER_GROK_NATIVE_THREADS").ok().and_then(|v| v.parse().ok()).unwrap_or(2u32).clamp(1, 64)
+}
 static API: OnceLock<Result<Api, String>> = OnceLock::new();
+pub(super) fn has_original_reader() -> bool {
+    API.get_or_init(|| unsafe { Api::load().map_err(|e| format!("{e:#}")) })
+        .as_ref().is_ok_and(|api| api.original.is_some())
+}
 struct Handle<'a> { ptr: *mut c_void, api: &'a Api }
 impl Drop for Handle<'_> { fn drop(&mut self) { unsafe { (self.api.release)(self.ptr) } } }
 
-pub(super) fn decode(source: &Jpeg2000Source, region: (u32,u32,u32,u32), reduction: u8, layers: u32, prefer_openht:bool) -> Result<(image::RgbaImage,&'static str)> {
+pub(super) fn decode(source: &Jpeg2000Source, region: (u32,u32,u32,u32), reduction: u8, layers: u32, prefer_openht:bool, stages: &mut Option<super::super::GrokStages>) -> Result<(image::RgbaImage,&'static str)> {
     if prefer_openht {
         if let Some(image)=source.prepared.as_ref().and_then(|info|info.predecoded.as_ref()) {
             let scale=1u32<<reduction;let (x0,y0,x1,y1)=region;
@@ -86,9 +122,35 @@ pub(super) fn decode(source: &Jpeg2000Source, region: (u32,u32,u32,u32), reducti
     };
     let (bytes, length) = rgb_view.as_ref().map_or((bytes, length), |view| (view.as_ptr(), view.len()));
     let (x0,y0,x1,y1)=area;
-    let ptr = unsafe { (api.decode)(path.as_ptr(),bytes,length,x0,y0,x1,y1,level,u16::try_from(layers)?) };
-    ensure!(!ptr.is_null(), "native Grok decode failed");
+    // Drop the codec handle (and join its workers) before unregistering.
+    let scope = api.block_session.filter(|_| view.is_none() && rgb_view.is_none() && !prefer_openht)
+        .and_then(|setter| super::super::block_reuse::enter(source, layers, true, setter));
+    let started = std::time::Instant::now();
+    let original = source.stable_source.as_deref().zip(source.original_read.as_deref())
+        .filter(|_| view.is_none() && rgb_view.is_none())
+        .map(|(source,read)| Original {source,read,error:Default::default()});
+    let layer_limit = u16::try_from(layers)?;
+    let ptr = if let (Some(reader),Some(input)) = (api.original, original.as_ref()) {
+        unsafe { reader(std::ptr::from_ref(input).cast_mut().cast(),read_original,input.source.meta.size,
+                        x0,y0,x1,y1,level,layer_limit) }
+    } else {
+        unsafe { (api.decode)(path.as_ptr(),bytes,length,x0,y0,x1,y1,level,layer_limit) }
+    };
+    if let Some(error) = original.as_ref().and_then(|i| i.error.lock().unwrap_or_else(|e| e.into_inner()).take()) {
+        if !ptr.is_null() { unsafe { (api.release)(ptr) }; }
+        anyhow::bail!(error);
+    }
+    if ptr.is_null() {
+        let reason=api.last_failure.and_then(|f| {
+            let msg=unsafe { f() };
+            if msg.is_null() {return None;}
+            unsafe {std::ffi::CStr::from_ptr(msg)}.to_str().ok()
+        }).unwrap_or("bridge supplied no error text");
+        anyhow::bail!("native Grok failed at {reason}; area=({x0},{y0})..({x1},{y1}), reduction={level}, layers={layer_limit}");
+    }
     let handle = Handle { ptr, api };
+    let native_ms = super::super::elapsed_ms(started);
+    let conversion = std::time::Instant::now();
     let components = unsafe { (api.components)(handle.ptr) };
     let components = if source.display_rgb_only {
         ensure!((4..=16).contains(&components), "unsupported native Grok multispectral components");
@@ -132,5 +194,8 @@ pub(super) fn decode(source: &Jpeg2000Source, region: (u32,u32,u32,u32), reducti
         };
         rgba.extend_from_slice(&pixel);
     } }
-    image::RgbaImage::from_raw(width,height,rgba).context("native Grok raster size mismatch").map(|image|(image,"jp2grok-native"))
+    let image = image::RgbaImage::from_raw(width,height,rgba).context("native Grok raster size mismatch")?;
+    *stages = Some(super::super::GrokStages { block_counts: scope.as_ref().map(|s| s.counts()), native_ms, decompress_ms: api.decompress_ms.map(|f| unsafe { f(handle.ptr) }),
+        conversion_ms: super::super::elapsed_ms(conversion) });
+    Ok((image, "jp2grok-native"))
 }

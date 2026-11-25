@@ -115,6 +115,8 @@ Reset the states of all the context of the coder/decoder
 (each context is set to a state where 0 and 1 are more or less equiprobable)
 @param mqc MQC handle
 */
+void river_mqc_save_contexts(const opj_mqc_t *mqc, OPJ_UINT32 *states);
+void river_mqc_restore_contexts(opj_mqc_t *mqc, const OPJ_UINT32 *states);
 void opj_mqc_resetstates(opj_mqc_t *mqc);
 /**
 Set the state of a particular context

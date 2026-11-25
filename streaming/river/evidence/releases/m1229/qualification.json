@@ -1,0 +1,113 @@
+{
+  "version": "m1229",
+  "qualifiedForRelease": true,
+  "imageId": "sha256:894e09893fafe1a593e31ba286a6893d58185cf175163f1f307c775aae2ae613",
+  "sourceManifestSha256": "37c98f9efeb7f502caeebb5412f4d731d0d0a45adfb0569faa2f1c3af59560f4",
+  "platform": "linux/amd64",
+  "channels": [
+    "lts",
+    "stable",
+    "latest"
+  ],
+  "testConditions": {
+    "origin": "controlled 4 ms delay, shared 512 MiB/s, loopback",
+    "images": "six original single- and multilayer synthetic JP2 fixtures, no re-encoding",
+    "repetitionsPerImagePerBuild": 3,
+    "driver": "openjpeg",
+    "order": "separate release runs",
+    "timings": "client response arrival",
+    "candidateContainer": "arbitrary UID 12345, read-only root, no-disk, shared memory scratch"
+  },
+  "originalArchiveM1227ConfigId": "sha256:a1f48cbf9a11cd56a2d6b7833e1748d4f2a2cac8ac437e8183095d541a83bf46",
+  "exactWmtsResponses": {
+    "m1227": 72,
+    "m1229": 72
+  },
+  "additionalGrokExactTiles": 6,
+  "openHtWorkerSelfTest": true,
+  "resources": {
+    "diskFallbackAllowed": false,
+    "mode": "ram-only",
+    "ramLocatorBytes": 0,
+    "ramLocatorEntries": 0,
+    "ramLocatorLimitBytes": 16777216,
+    "reason": "explicit no-disk constraint",
+    "scratchLimitBytes": 3063508480,
+    "scratchReservedBytes": 0,
+    "scratchRoot": "/dev/shm"
+  },
+  "drivers": [
+    {
+      "id": "openjpeg",
+      "name": "OpenJPEG",
+      "available": true,
+      "progressiveQuality": true
+    },
+    {
+      "id": "jp2grok",
+      "name": "JP2Grok",
+      "available": true,
+      "progressiveQuality": true
+    },
+    {
+      "id": "openhtj2k",
+      "name": "OpenHTJ2K + Grok fallback",
+      "available": true,
+      "progressiveQuality": true
+    },
+    {
+      "id": "nvjpeg2000",
+      "name": "nvJPEG2000",
+      "available": false,
+      "progressiveQuality": false,
+      "reason": "nvJPEG2000 sidecar is not configured or failed its health check"
+    }
+  ],
+  "medianMs": {
+    "layers": {
+      "preview": {
+        "m1227": 50.11,
+        "m1229": 47.66
+      },
+      "full request": {
+        "m1227": 149.67,
+        "m1229": 42.88
+      },
+      "preview to full": {
+        "m1227": 206.04,
+        "m1229": 91.97
+      },
+      "neighbor": {
+        "m1227": 116.91,
+        "m1229": 39.9
+      },
+      "preview to neighbor": {
+        "m1227": 320.29,
+        "m1229": 131.73
+      }
+    },
+    "single": {
+      "preview": {
+        "m1227": 72.35,
+        "m1229": 64.01
+      },
+      "full request": {
+        "m1227": 567.2,
+        "m1229": 75.91
+      },
+      "preview to full": {
+        "m1227": 631.64,
+        "m1229": 142.25
+      },
+      "neighbor": {
+        "m1227": 421.93,
+        "m1229": 69.26
+      },
+      "preview to neighbor": {
+        "m1227": 1073.4,
+        "m1229": 211.53
+      }
+    }
+  },
+  "scope": "Synthetic CPU workload. OpenShift cluster, GPU hardware and production network not exercised."
+}

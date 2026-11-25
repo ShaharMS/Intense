@@ -1158,10 +1158,10 @@ impl NativeFine {
         for ((tile_x, tile_y), (w, h, rgba)) in request.tiles.iter().zip(rasters) {
             let encode = Instant::now();
             let bytes = encode_crop_rgba(&rgba, w, 0, 0, w, h, request.format)?;
-            output.push(DecodedTile { rgba:crate::decoder::take_pixel_capture(),
+            output.push(DecodedTile {
                 tile_x: *tile_x,
                 tile_y: *tile_y,
-                raster: DecodedRaster {
+                raster: DecodedRaster { block_counts: None, grok_stages: None,
                     width: w,
                     height: h,
                     bytes: bytes.into_boxed_slice().into(),

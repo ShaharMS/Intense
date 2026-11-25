@@ -76,8 +76,7 @@ balancer forwards UDP as well as TCP for native HTTP/3. Keep the existing
 internal readiness probe on HTTP port 8080 and avoid publicly exposing that
 port when the public API should use HTTPS only. With HTTP/3 alone, expose UDP
 and use an explicit HTTP/3 client. Browser discovery via Alt-Svc needs an
-initial HTTPS TCP connection. The progressive viewer uses WebSockets over
-HTTP/1.1 or HTTP/2. Select at least one of them for that viewer.
+initial HTTPS TCP connection.
 
 ## Verification and rollback
 
@@ -88,8 +87,7 @@ HTTP/1.1 or HTTP/2. Select at least one of them for that viewer.
   `curl --http3-only -w '%{http_version}\n' https://HOST/health`. Confirm
   the negotiated versions. For a private CA, pass `--cacert` with its PEM
   file. For HTTP/3, check the external UDP path as well as local health.
-- From the actual viewer origin, verify CORS, tile-info, a raster tile and a
-  progressive WebSocket. Confirm existing storage sources and driver
+- From the actual viewer origin, verify CORS, tile-info and a raster tile. Confirm existing storage sources and driver
   availability through their API endpoints without exporting credentials.
 - For rollback, restore the previous image and its TLS settings or Compose
   override, recreate only the backend, and verify health and a representative

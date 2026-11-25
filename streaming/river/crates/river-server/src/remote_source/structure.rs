@@ -1,6 +1,34 @@
 //! On-demand diagnostics from already parsed metadata. Never fetch source bytes.
 use super::*;
 use serde_json::{Value,json};
+// Only traverse the already resident JP2 header. ICC profiles may be large:
+ // record their method and size without copying their payload.
+fn resident_boxes(mut bytes:&[u8])->impl Iterator<Item=([u8;4], &[u8])> {
+ std::iter::from_fn(move || {
+  let (size,header,kind)=jpip_index::box_header(bytes,0).ok()?;
+  let size=usize::try_from(size).ok()?;
+  let data=bytes.get(header..size)?;
+  bytes=&bytes[size..];
+  Some((kind,data))
+ })
+}
+pub(super) fn channel_metadata(container:&[u8])->Value {
+ let mut colors=Vec::new();
+ let mut channels=Vec::new();
+ for (_,header) in resident_boxes(container).filter(|(kind,_)|kind==b"jp2h") {
+  for (kind,data) in resident_boxes(header) {
+   if &kind==b"colr" && data.len()>=3 {
+    colors.push(json!({"method":data[0],"precedence":data[1],"approximation":data[2],"payloadBytes":data.len()-3,
+       "enumeratedColorSpace":if data[0]==1 {be32(data,3).ok()} else {None}}));
+   } else if &kind==b"cdef" && data.len()>=2 {
+    for entry in data[2..].chunks_exact(6).take(usize::from(u16::from_be_bytes([data[0],data[1]]))) {
+     channels.push(json!({"channel":be16(entry,0).ok(),"type":be16(entry,2).ok(),"association":be16(entry,4).ok()}));
+    }
+   }
+  }
+ }
+ json!({"colorSpecifications":colors,"channelDefinitions":channels})
+}
 impl Header {
  pub(crate) fn structure_summary(&self)->Value {
   let style=self.cod.get(8).copied();let transform=self.cod.get(9).copied();
@@ -15,7 +43,8 @@ impl Header {
   let enabled=|name:&str|std::env::var(name).is_ok_and(|v|v=="true" || v=="1");
   json!({"schemaVersion":1,"inspectionDoesNotFetchSource":true,"scope":"Already parsed main header. Tile headers and packet lengths are not inspected; candidate eligibility is not a guarantee of successful selective serving.",
    "width":self.width,"height":self.height,"imageOrigin":{"x":self.image_origin.0,"y":self.image_origin.1},
-   "components":self.components,"displayComponents":if self.display_rgb_only{3}else{self.components},"extraBandsAreAlpha":!self.display_rgb_only,"maximumComponentPrecisionBits":self.bit_depth,
+   "components":self.components,"displayComponents":if self.display_rgb_only{3}else{self.components},"extraBandsAreAlpha":if self.display_rgb_only{Some(false)}else{None},"rgbOnlyDisplay":self.display_rgb_only,"assumedDisplayLayout":self.band_fallback.map(|v|format!("{v:?}")),
+   "componentLayout":self.component_specs.iter().enumerate().map(|(i,c)|json!({"index":i,"precisionBits":(c[0]&127)+1,"signed":c[0]&128!=0,"xSampling":c[1],"ySampling":c[2]})).collect::<Vec<_>>(),"maximumComponentPrecisionBits":self.bit_depth,
    "nativeTiles":{"width":self.layout.width,"height":self.layout.height,"columns":self.layout.columns,"rows":self.layout.rows,
     "count":u64::from(self.layout.columns)*u64::from(self.layout.rows)},
    "resolutionLevels":self.levels,"qualityLayers":self.layers,
@@ -39,6 +68,7 @@ impl RemoteSource {
   let payload=self.header_payload.lock().unwrap_or_else(|e|e.into_inner()).upgrade()
    .or_else(||HeaderCache::shared().get(&self.id));
   result["tilePartIndex"]=if let Some(payload)=payload {
+   result["jp2ChannelMetadata"]=channel_metadata(&payload.container);
    let mut per_tile=BTreeMap::<u16,usize>::new();let mut anonymous=0usize;
    for (tile,_) in &payload.tlm {if let Some(tile)=tile {*per_tile.entry(*tile).or_default()+=1;}else{anonymous+=1;}}
    let bytes=payload.tlm.iter().map(|(_,n)|u64::from(*n)).sum::<u64>();
@@ -52,10 +82,10 @@ impl RemoteSource {
 }
 #[cfg(test)] mod tests {
  use super::*;
- fn header()->Header {Header {image_origin:(0,0),width:2048,height:2048,components:3,display_rgb_only:false,bit_depth:12,levels:7,layers:10,
+ fn header()->Header {Header {image_origin:(0,0),width:2048,height:2048,components:3,display_rgb_only:false,band_fallback:None,bit_depth:12,levels:7,layers:10,
   layout:NativeTileLayoutHint {origin_x:0,origin_y:0,width:128,height:128,columns:16,rows:16},progression:2,is_ht:false,
   cod:vec![1,2,0,10,1,6,4,2,4,1,0x11,0x22,0x33,0x44,0x55,0x66,0x77],first_part:120000,codestream_end:1000000,
-  packet_compatible:true,prefix_compatible:false,payload_digest:[0;32]}}
+  packet_compatible:true,prefix_compatible:false,component_specs:Vec::new(), payload_digest:[0;32]}}
  #[test] fn cod_offsets_distinguish_codeblock_style_from_wavelet_transform() {
   let h=header();let s=h.structure_summary();
   assert_eq!(s["coding"]["codeblockWidth"],64);assert_eq!(s["coding"]["codeblockHeight"],16);

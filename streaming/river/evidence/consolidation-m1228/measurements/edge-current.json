@@ -1,0 +1,543 @@
+{
+  "label": "current",
+  "rows": [
+    {
+      "file": "synthetic-edge-gray.jp2",
+      "requestedDriver": "openjpeg",
+      "ms": 18.51629000157118,
+      "size": [
+        256,
+        256
+      ],
+      "exact": true,
+      "differingChannels": 0,
+      "maxChannelDifference": 0,
+      "pixelSha256": "71da89dfa5f6f5424e375d62ccbf94812b05d01209f82e2b92574d72ba038214",
+      "headers": {
+        "x-river-trace-id": "0245e95ce9a2cbc6621385838ecaa540",
+        "x-river-decoder-route": "s3-tile-part-ranges",
+        "x-river-selected-driver": "openjpeg",
+        "x-river-decoder-backend": "openjpeg",
+        "x-river-queue-ms": "0.008",
+        "x-river-decode-ms": "1.138",
+        "x-river-encode-ms": "0.194",
+        "x-river-server-ms": "9.231",
+        "x-river-source-cache": "s3-range-miss",
+        "x-river-source-cache-ms": "7.711",
+        "x-river-source-read-bytes": "1024",
+        "x-river-source-range-requests": "1",
+        "x-river-source-cache-hit-bytes": "10297"
+      }
+    },
+    {
+      "file": "synthetic-edge-gray.jp2",
+      "requestedDriver": "jp2grok",
+      "ms": 3.893179000442615,
+      "size": [
+        256,
+        256
+      ],
+      "exact": true,
+      "differingChannels": 0,
+      "maxChannelDifference": 0,
+      "pixelSha256": "71da89dfa5f6f5424e375d62ccbf94812b05d01209f82e2b92574d72ba038214",
+      "headers": {
+        "x-river-trace-id": "c090c408a31a928d1dd79b90a9021a42",
+        "x-river-decoder-route": "s3-tile-part-ranges",
+        "x-river-selected-driver": "jp2grok",
+        "x-river-decoder-backend": "jp2grok-native",
+        "x-river-queue-ms": "0.008",
+        "x-river-decode-ms": "1.954",
+        "x-river-encode-ms": "0.192",
+        "x-river-server-ms": "2.454",
+        "x-river-source-cache": "s3-range-hit",
+        "x-river-source-cache-ms": "0.040",
+        "x-river-source-read-bytes": "0",
+        "x-river-source-range-requests": "0",
+        "x-river-source-cache-hit-bytes": "11321"
+      }
+    },
+    {
+      "file": "synthetic-edge-gray.jp2",
+      "requestedDriver": "openhtj2k",
+      "ms": 2.73505899895099,
+      "size": [
+        256,
+        256
+      ],
+      "exact": true,
+      "differingChannels": 0,
+      "maxChannelDifference": 0,
+      "pixelSha256": "71da89dfa5f6f5424e375d62ccbf94812b05d01209f82e2b92574d72ba038214",
+      "headers": {
+        "x-river-trace-id": "5cda5c2127803cd780aa134d6b7ed772",
+        "x-river-decoder-route": "openht-fallback-s3-tile-part-ranges",
+        "x-river-selected-driver": "openhtj2k",
+        "x-river-decoder-backend": "jp2grok-native",
+        "x-river-queue-ms": "0.006",
+        "x-river-decode-ms": "1.342",
+        "x-river-encode-ms": "0.177",
+        "x-river-server-ms": "1.666",
+        "x-river-source-cache": "s3-range-hit",
+        "x-river-source-cache-ms": "0.030",
+        "x-river-source-read-bytes": "0",
+        "x-river-source-range-requests": "0",
+        "x-river-source-cache-hit-bytes": "11321"
+      }
+    },
+    {
+      "file": "synthetic-edge-gray.jp2",
+      "requestedDriver": "auto",
+      "ms": 1.1359520030964632,
+      "size": [
+        256,
+        256
+      ],
+      "exact": true,
+      "differingChannels": 0,
+      "maxChannelDifference": 0,
+      "pixelSha256": "71da89dfa5f6f5424e375d62ccbf94812b05d01209f82e2b92574d72ba038214",
+      "headers": {
+        "x-river-trace-id": "2a909e046b09c06c339bf1b438b272c5",
+        "x-river-decoder-route": "encoded-raster-cache",
+        "x-river-selected-driver": "openjpeg",
+        "x-river-decoder-backend": "openjpeg",
+        "x-river-queue-ms": "0.000",
+        "x-river-decode-ms": "0.000",
+        "x-river-encode-ms": "0.000",
+        "x-river-server-ms": "0.017",
+        "x-river-source-cache": "encoded-raster-hit",
+        "x-river-source-cache-ms": "0.008",
+        "x-river-source-read-bytes": "0",
+        "x-river-source-range-requests": "0",
+        "x-river-source-cache-hit-bytes": "0"
+      }
+    },
+    {
+      "file": "synthetic-edge-alpha.jp2",
+      "requestedDriver": "openjpeg",
+      "ms": 29.42271400024765,
+      "size": [
+        256,
+        256
+      ],
+      "exact": true,
+      "differingChannels": 0,
+      "maxChannelDifference": 0,
+      "pixelSha256": "dc42ce81d0aa4735a7e235af49945f09a847a056b1ffa0e41e65b503d6dded49",
+      "headers": {
+        "x-river-trace-id": "2719aee3483b925af808cf19c4ac9c96",
+        "x-river-decoder-route": "s3-tile-part-ranges",
+        "x-river-selected-driver": "openjpeg",
+        "x-river-decoder-backend": "openjpeg",
+        "x-river-queue-ms": "0.008",
+        "x-river-decode-ms": "9.529",
+        "x-river-encode-ms": "0.309",
+        "x-river-server-ms": "18.207",
+        "x-river-source-cache": "s3-range-miss",
+        "x-river-source-cache-ms": "8.200",
+        "x-river-source-read-bytes": "54272",
+        "x-river-source-range-requests": "1",
+        "x-river-source-cache-hit-bytes": "116820"
+      }
+    },
+    {
+      "file": "synthetic-edge-alpha.jp2",
+      "requestedDriver": "jp2grok",
+      "ms": 11.042388003261294,
+      "size": [
+        256,
+        256
+      ],
+      "exact": true,
+      "differingChannels": 0,
+      "maxChannelDifference": 0,
+      "pixelSha256": "dc42ce81d0aa4735a7e235af49945f09a847a056b1ffa0e41e65b503d6dded49",
+      "headers": {
+        "x-river-trace-id": "25490cb8f0854ad8904dc8ae15424048",
+        "x-river-decoder-route": "openjpeg-declared-alpha-fallback",
+        "x-river-selected-driver": "jp2grok",
+        "x-river-decoder-backend": "openjpeg",
+        "x-river-queue-ms": "0.005",
+        "x-river-decode-ms": "9.076",
+        "x-river-encode-ms": "0.280",
+        "x-river-server-ms": "9.590",
+        "x-river-source-cache": "s3-range-hit",
+        "x-river-source-cache-ms": "0.079",
+        "x-river-source-read-bytes": "0",
+        "x-river-source-range-requests": "0",
+        "x-river-source-cache-hit-bytes": "171092"
+      }
+    },
+    {
+      "file": "synthetic-edge-alpha.jp2",
+      "requestedDriver": "openhtj2k",
+      "ms": 10.743599999841535,
+      "size": [
+        256,
+        256
+      ],
+      "exact": true,
+      "differingChannels": 0,
+      "maxChannelDifference": 0,
+      "pixelSha256": "dc42ce81d0aa4735a7e235af49945f09a847a056b1ffa0e41e65b503d6dded49",
+      "headers": {
+        "x-river-trace-id": "f9120a9e1178528ec5b676128db10e16",
+        "x-river-decoder-route": "openjpeg-declared-alpha-fallback",
+        "x-river-selected-driver": "openhtj2k",
+        "x-river-decoder-backend": "openjpeg",
+        "x-river-queue-ms": "0.014",
+        "x-river-decode-ms": "9.073",
+        "x-river-encode-ms": "0.294",
+        "x-river-server-ms": "9.675",
+        "x-river-source-cache": "s3-range-hit",
+        "x-river-source-cache-ms": "0.075",
+        "x-river-source-read-bytes": "0",
+        "x-river-source-range-requests": "0",
+        "x-river-source-cache-hit-bytes": "171092"
+      }
+    },
+    {
+      "file": "synthetic-edge-alpha.jp2",
+      "requestedDriver": "auto",
+      "ms": 0.8739000004425179,
+      "size": [
+        256,
+        256
+      ],
+      "exact": true,
+      "differingChannels": 0,
+      "maxChannelDifference": 0,
+      "pixelSha256": "dc42ce81d0aa4735a7e235af49945f09a847a056b1ffa0e41e65b503d6dded49",
+      "headers": {
+        "x-river-trace-id": "dfec195119d1ab9023cf30e61f188a9d",
+        "x-river-decoder-route": "encoded-raster-cache",
+        "x-river-selected-driver": "openjpeg",
+        "x-river-decoder-backend": "openjpeg",
+        "x-river-queue-ms": "0.000",
+        "x-river-decode-ms": "0.000",
+        "x-river-encode-ms": "0.000",
+        "x-river-server-ms": "0.011",
+        "x-river-source-cache": "encoded-raster-hit",
+        "x-river-source-cache-ms": "0.005",
+        "x-river-source-read-bytes": "0",
+        "x-river-source-range-requests": "0",
+        "x-river-source-cache-hit-bytes": "0"
+      }
+    },
+    {
+      "file": "synthetic-edge-six-band.jp2",
+      "requestedDriver": "openjpeg",
+      "ms": 25.222940999810817,
+      "size": [
+        256,
+        256
+      ],
+      "exact": true,
+      "differingChannels": 0,
+      "maxChannelDifference": 0,
+      "pixelSha256": "13b217131af5826f18880ca46adc0e5963ec80aff95a29017251cfcd745763e0",
+      "headers": {
+        "x-river-trace-id": "c80761cd3112edb9b55c8430488f7c4b",
+        "x-river-decoder-route": "s3-tile-part-ranges",
+        "x-river-selected-driver": "openjpeg",
+        "x-river-decoder-backend": "openjpeg",
+        "x-river-queue-ms": "0.007",
+        "x-river-decode-ms": "6.353",
+        "x-river-encode-ms": "0.309",
+        "x-river-server-ms": "14.623",
+        "x-river-source-cache": "s3-range-miss",
+        "x-river-source-cache-ms": "7.788",
+        "x-river-source-read-bytes": "16384",
+        "x-river-source-range-requests": "1",
+        "x-river-source-cache-hit-bytes": "41482"
+      }
+    },
+    {
+      "file": "synthetic-edge-six-band.jp2",
+      "requestedDriver": "jp2grok",
+      "ms": 6.2634150017402135,
+      "size": [
+        256,
+        256
+      ],
+      "exact": true,
+      "differingChannels": 0,
+      "maxChannelDifference": 0,
+      "pixelSha256": "13b217131af5826f18880ca46adc0e5963ec80aff95a29017251cfcd745763e0",
+      "headers": {
+        "x-river-trace-id": "e49850ce2a6d19ea07bca924654aa6b0",
+        "x-river-decoder-route": "jp2grok-native-multispectral-rgb",
+        "x-river-selected-driver": "jp2grok",
+        "x-river-decoder-backend": "jp2grok-native-multispectral-rgb",
+        "x-river-queue-ms": "0.010",
+        "x-river-decode-ms": "4.363",
+        "x-river-encode-ms": "0.292",
+        "x-river-server-ms": "4.926",
+        "x-river-source-cache": "s3-range-hit",
+        "x-river-source-cache-ms": "0.054",
+        "x-river-source-read-bytes": "0",
+        "x-river-source-range-requests": "0",
+        "x-river-source-cache-hit-bytes": "57866"
+      }
+    },
+    {
+      "file": "synthetic-edge-six-band.jp2",
+      "requestedDriver": "openhtj2k",
+      "ms": 6.372756997734541,
+      "size": [
+        256,
+        256
+      ],
+      "exact": true,
+      "differingChannels": 0,
+      "maxChannelDifference": 0,
+      "pixelSha256": "13b217131af5826f18880ca46adc0e5963ec80aff95a29017251cfcd745763e0",
+      "headers": {
+        "x-river-trace-id": "d421766d35492ff9ecdf92d992790765",
+        "x-river-decoder-route": "jp2grok-native-multispectral-rgb",
+        "x-river-selected-driver": "openhtj2k",
+        "x-river-decoder-backend": "jp2grok-native-multispectral-rgb",
+        "x-river-queue-ms": "0.010",
+        "x-river-decode-ms": "4.570",
+        "x-river-encode-ms": "0.282",
+        "x-river-server-ms": "5.141",
+        "x-river-source-cache": "s3-range-hit",
+        "x-river-source-cache-ms": "0.056",
+        "x-river-source-read-bytes": "0",
+        "x-river-source-range-requests": "0",
+        "x-river-source-cache-hit-bytes": "57866"
+      }
+    },
+    {
+      "file": "synthetic-edge-six-band.jp2",
+      "requestedDriver": "auto",
+      "ms": 1.053760999639053,
+      "size": [
+        256,
+        256
+      ],
+      "exact": true,
+      "differingChannels": 0,
+      "maxChannelDifference": 0,
+      "pixelSha256": "13b217131af5826f18880ca46adc0e5963ec80aff95a29017251cfcd745763e0",
+      "headers": {
+        "x-river-trace-id": "a9a5d6e576d7cbd7276853cab3c44872",
+        "x-river-decoder-route": "encoded-raster-cache",
+        "x-river-selected-driver": "openjpeg",
+        "x-river-decoder-backend": "openjpeg",
+        "x-river-queue-ms": "0.000",
+        "x-river-decode-ms": "0.000",
+        "x-river-encode-ms": "0.000",
+        "x-river-server-ms": "0.013",
+        "x-river-source-cache": "encoded-raster-hit",
+        "x-river-source-cache-ms": "0.006",
+        "x-river-source-read-bytes": "0",
+        "x-river-source-range-requests": "0",
+        "x-river-source-cache-hit-bytes": "0"
+      }
+    },
+    {
+      "file": "synthetic-edge-eight-band.jp2",
+      "requestedDriver": "openjpeg",
+      "ms": 28.276025001105154,
+      "size": [
+        256,
+        256
+      ],
+      "exact": true,
+      "differingChannels": 0,
+      "maxChannelDifference": 0,
+      "pixelSha256": "13b217131af5826f18880ca46adc0e5963ec80aff95a29017251cfcd745763e0",
+      "headers": {
+        "x-river-trace-id": "b111671e3188ca1fbdaf625526c9e477",
+        "x-river-decoder-route": "s3-tile-part-ranges",
+        "x-river-selected-driver": "openjpeg",
+        "x-river-decoder-backend": "openjpeg",
+        "x-river-queue-ms": "0.006",
+        "x-river-decode-ms": "8.157",
+        "x-river-encode-ms": "0.291",
+        "x-river-server-ms": "16.817",
+        "x-river-source-cache": "s3-range-miss",
+        "x-river-source-cache-ms": "8.123",
+        "x-river-source-read-bytes": "23552",
+        "x-river-source-range-requests": "1",
+        "x-river-source-cache-hit-bytes": "54991"
+      }
+    },
+    {
+      "file": "synthetic-edge-eight-band.jp2",
+      "requestedDriver": "jp2grok",
+      "ms": 8.524806002242258,
+      "size": [
+        256,
+        256
+      ],
+      "exact": true,
+      "differingChannels": 0,
+      "maxChannelDifference": 0,
+      "pixelSha256": "13b217131af5826f18880ca46adc0e5963ec80aff95a29017251cfcd745763e0",
+      "headers": {
+        "x-river-trace-id": "1eb04c85f8cfdc2ea9cfa10e56d0448d",
+        "x-river-decoder-route": "jp2grok-native-multispectral-rgb",
+        "x-river-selected-driver": "jp2grok",
+        "x-river-decoder-backend": "jp2grok-native-multispectral-rgb",
+        "x-river-queue-ms": "0.006",
+        "x-river-decode-ms": "6.524",
+        "x-river-encode-ms": "0.283",
+        "x-river-server-ms": "7.103",
+        "x-river-source-cache": "s3-range-hit",
+        "x-river-source-cache-ms": "0.052",
+        "x-river-source-read-bytes": "0",
+        "x-river-source-range-requests": "0",
+        "x-river-source-cache-hit-bytes": "78543"
+      }
+    },
+    {
+      "file": "synthetic-edge-eight-band.jp2",
+      "requestedDriver": "openhtj2k",
+      "ms": 6.810181999753695,
+      "size": [
+        256,
+        256
+      ],
+      "exact": true,
+      "differingChannels": 0,
+      "maxChannelDifference": 0,
+      "pixelSha256": "13b217131af5826f18880ca46adc0e5963ec80aff95a29017251cfcd745763e0",
+      "headers": {
+        "x-river-trace-id": "e73a46562f122999f3ec6efade2c55ec",
+        "x-river-decoder-route": "jp2grok-native-multispectral-rgb",
+        "x-river-selected-driver": "openhtj2k",
+        "x-river-decoder-backend": "jp2grok-native-multispectral-rgb",
+        "x-river-queue-ms": "0.012",
+        "x-river-decode-ms": "5.050",
+        "x-river-encode-ms": "0.298",
+        "x-river-server-ms": "5.596",
+        "x-river-source-cache": "s3-range-hit",
+        "x-river-source-cache-ms": "0.053",
+        "x-river-source-read-bytes": "0",
+        "x-river-source-range-requests": "0",
+        "x-river-source-cache-hit-bytes": "78543"
+      }
+    },
+    {
+      "file": "synthetic-edge-eight-band.jp2",
+      "requestedDriver": "auto",
+      "ms": 0.872784003149718,
+      "size": [
+        256,
+        256
+      ],
+      "exact": true,
+      "differingChannels": 0,
+      "maxChannelDifference": 0,
+      "pixelSha256": "13b217131af5826f18880ca46adc0e5963ec80aff95a29017251cfcd745763e0",
+      "headers": {
+        "x-river-trace-id": "e251a3b3f4cf715e6017604c3dc7bc6c",
+        "x-river-decoder-route": "encoded-raster-cache",
+        "x-river-selected-driver": "openjpeg",
+        "x-river-decoder-backend": "openjpeg",
+        "x-river-queue-ms": "0.000",
+        "x-river-decode-ms": "0.000",
+        "x-river-encode-ms": "0.000",
+        "x-river-server-ms": "0.012",
+        "x-river-source-cache": "encoded-raster-hit",
+        "x-river-source-cache-ms": "0.005",
+        "x-river-source-read-bytes": "0",
+        "x-river-source-range-requests": "0",
+        "x-river-source-cache-hit-bytes": "0"
+      }
+    },
+    {
+      "file": "synthetic-edge-ht-rgb.jph",
+      "requestedDriver": "openjpeg",
+      "status": 422,
+      "error": "{\"code\":\"source_prepare_failed\",\"details\":{\"assetId\":\"s3v-3461a78d44adeae88a95af77b5ee0915570ee321bb26357b76c09a5444890f54\",\"column\":0,\"driver\":\"openjpeg\",\"matrix\":1,\"row\":0},\"message\":\"Cannot prepare this image: HTJ2K input needs JP2Grok or nvJPEG2000; OpenJPEG cannot decode its HT blocks\",\"method\":\"GET\",\"path\":\"/streamer/v1/1/0/0/tile.png\",\"requestId\":\"020e8a79-0b55-4f3e-bae6-9272b880a0c7\",\"status\":422}"
+    },
+    {
+      "file": "synthetic-edge-ht-rgb.jph",
+      "requestedDriver": "jp2grok",
+      "ms": 11.184586001036223,
+      "size": [
+        256,
+        256
+      ],
+      "exact": true,
+      "differingChannels": 0,
+      "maxChannelDifference": 0,
+      "pixelSha256": "2a3d2fd1ba883b036fc43e1ec4ed500a04874507d4c578afa476ebf8d89de50c",
+      "headers": {
+        "x-river-trace-id": "416e6102c6ea1334992d27af514cd14a",
+        "x-river-decoder-route": "s3-tile-part-ranges",
+        "x-river-selected-driver": "jp2grok",
+        "x-river-decoder-backend": "jp2grok-native",
+        "x-river-queue-ms": "0.009",
+        "x-river-decode-ms": "1.781",
+        "x-river-encode-ms": "0.278",
+        "x-river-server-ms": "10.219",
+        "x-river-source-cache": "s3-range-miss",
+        "x-river-source-cache-ms": "8.039",
+        "x-river-source-read-bytes": "50176",
+        "x-river-source-range-requests": "1",
+        "x-river-source-cache-hit-bytes": "108419"
+      }
+    },
+    {
+      "file": "synthetic-edge-ht-rgb.jph",
+      "requestedDriver": "openhtj2k",
+      "ms": 3.126866002276074,
+      "size": [
+        256,
+        256
+      ],
+      "exact": true,
+      "differingChannels": 0,
+      "maxChannelDifference": 0,
+      "pixelSha256": "2a3d2fd1ba883b036fc43e1ec4ed500a04874507d4c578afa476ebf8d89de50c",
+      "headers": {
+        "x-river-trace-id": "4232bc5a2e4029d5d6ee5dd4c0db15f7",
+        "x-river-decoder-route": "openht-fallback-s3-tile-part-ranges",
+        "x-river-selected-driver": "openhtj2k",
+        "x-river-decoder-backend": "jp2grok-native",
+        "x-river-queue-ms": "0.006",
+        "x-river-decode-ms": "1.614",
+        "x-river-encode-ms": "0.285",
+        "x-river-server-ms": "2.168",
+        "x-river-source-cache": "s3-range-hit",
+        "x-river-source-cache-ms": "0.120",
+        "x-river-source-read-bytes": "0",
+        "x-river-source-range-requests": "0",
+        "x-river-source-cache-hit-bytes": "158595"
+      }
+    },
+    {
+      "file": "synthetic-edge-ht-rgb.jph",
+      "requestedDriver": "auto",
+      "ms": 1.2064729999110568,
+      "size": [
+        256,
+        256
+      ],
+      "exact": true,
+      "differingChannels": 0,
+      "maxChannelDifference": 0,
+      "pixelSha256": "2a3d2fd1ba883b036fc43e1ec4ed500a04874507d4c578afa476ebf8d89de50c",
+      "headers": {
+        "x-river-trace-id": "59d1cc669fe27bde3ebaf91a6a5d9b6b",
+        "x-river-decoder-route": "encoded-raster-cache",
+        "x-river-selected-driver": "jp2grok",
+        "x-river-decoder-backend": "jp2grok-native",
+        "x-river-queue-ms": "0.000",
+        "x-river-decode-ms": "0.000",
+        "x-river-encode-ms": "0.000",
+        "x-river-server-ms": "0.013",
+        "x-river-source-cache": "encoded-raster-hit",
+        "x-river-source-cache-ms": "0.005",
+        "x-river-source-read-bytes": "0",
+        "x-river-source-range-requests": "0",
+        "x-river-source-cache-hit-bytes": "0"
+      }
+    }
+  ]
+}

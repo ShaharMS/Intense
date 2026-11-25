@@ -1,0 +1,866 @@
+[
+  {
+    "fixture": "terrain10-plain.j2k",
+    "flow": "browse",
+    "step": "child",
+    "n": 2,
+    "m1229": 64.1,
+    "m1230": 68.8
+  },
+  {
+    "fixture": "terrain10-plain.j2k",
+    "flow": "browse",
+    "step": "neighbor",
+    "n": 2,
+    "m1229": 64.2,
+    "m1230": 60.7
+  },
+  {
+    "fixture": "terrain10-plain.j2k",
+    "flow": "browse",
+    "step": "overview",
+    "n": 2,
+    "m1229": 615.3,
+    "m1230": 566.9
+  },
+  {
+    "fixture": "terrain10-plain.j2k",
+    "flow": "browse",
+    "step": "parent",
+    "n": 2,
+    "m1229": 171.5,
+    "m1230": 170.9
+  },
+  {
+    "fixture": "terrain10-plain.j2k",
+    "flow": "browse",
+    "step": "repeat",
+    "n": 2,
+    "m1229": 2.2,
+    "m1230": 2.3
+  },
+  {
+    "fixture": "terrain10-plain.j2k",
+    "flow": "burst",
+    "step": "pan-six",
+    "n": 12,
+    "m1229": 111.1,
+    "m1230": 110.6
+  },
+  {
+    "fixture": "terrain10-plain.j2k",
+    "flow": "burst",
+    "step": "pan-start",
+    "n": 2,
+    "m1229": 238.8,
+    "m1230": 244.4
+  },
+  {
+    "fixture": "terrain10-plain.j2k",
+    "flow": "cold",
+    "step": "cold",
+    "n": 2,
+    "m1229": 409.2,
+    "m1230": 400.7
+  },
+  {
+    "fixture": "terrain10-tlm.j2k",
+    "flow": "browse",
+    "step": "child",
+    "n": 2,
+    "m1229": 63.7,
+    "m1230": 65.6
+  },
+  {
+    "fixture": "terrain10-tlm.j2k",
+    "flow": "browse",
+    "step": "neighbor",
+    "n": 2,
+    "m1229": 63.7,
+    "m1230": 66.6
+  },
+  {
+    "fixture": "terrain10-tlm.j2k",
+    "flow": "browse",
+    "step": "overview",
+    "n": 2,
+    "m1229": 269.9,
+    "m1230": 292.1
+  },
+  {
+    "fixture": "terrain10-tlm.j2k",
+    "flow": "browse",
+    "step": "parent",
+    "n": 2,
+    "m1229": 169.0,
+    "m1230": 173.3
+  },
+  {
+    "fixture": "terrain10-tlm.j2k",
+    "flow": "browse",
+    "step": "repeat",
+    "n": 2,
+    "m1229": 2.2,
+    "m1230": 2.5
+  },
+  {
+    "fixture": "terrain10-tlm.j2k",
+    "flow": "burst",
+    "step": "pan-six",
+    "n": 12,
+    "m1229": 119.2,
+    "m1230": 93.2
+  },
+  {
+    "fixture": "terrain10-tlm.j2k",
+    "flow": "burst",
+    "step": "pan-start",
+    "n": 2,
+    "m1229": 67.8,
+    "m1230": 68.7
+  },
+  {
+    "fixture": "terrain10-tlm.j2k",
+    "flow": "cold",
+    "step": "cold",
+    "n": 2,
+    "m1229": 66.7,
+    "m1230": 64.6
+  },
+  {
+    "fixture": "terrain10wide-plain.j2k",
+    "flow": "browse",
+    "step": "child",
+    "n": 2,
+    "m1229": 106.2,
+    "m1230": 70.2
+  },
+  {
+    "fixture": "terrain10wide-plain.j2k",
+    "flow": "browse",
+    "step": "neighbor",
+    "n": 2,
+    "m1229": 101.7,
+    "m1230": 50.3
+  },
+  {
+    "fixture": "terrain10wide-plain.j2k",
+    "flow": "browse",
+    "step": "overview",
+    "n": 2,
+    "m1229": 252.0,
+    "m1230": 237.1
+  },
+  {
+    "fixture": "terrain10wide-plain.j2k",
+    "flow": "browse",
+    "step": "parent",
+    "n": 2,
+    "m1229": 64.3,
+    "m1230": 67.4
+  },
+  {
+    "fixture": "terrain10wide-plain.j2k",
+    "flow": "browse",
+    "step": "repeat",
+    "n": 2,
+    "m1229": 1.8,
+    "m1230": 2.0
+  },
+  {
+    "fixture": "terrain10wide-plain.j2k",
+    "flow": "burst",
+    "step": "pan-six",
+    "n": 12,
+    "m1229": 167.9,
+    "m1230": 173.6
+  },
+  {
+    "fixture": "terrain10wide-plain.j2k",
+    "flow": "burst",
+    "step": "pan-start",
+    "n": 2,
+    "m1229": 153.6,
+    "m1230": 117.9
+  },
+  {
+    "fixture": "terrain10wide-plain.j2k",
+    "flow": "cold",
+    "step": "cold",
+    "n": 2,
+    "m1229": 187.7,
+    "m1230": 151.1
+  },
+  {
+    "fixture": "terrain10wide-tlm.j2k",
+    "flow": "browse",
+    "step": "child",
+    "n": 2,
+    "m1229": 102.2,
+    "m1230": 86.8
+  },
+  {
+    "fixture": "terrain10wide-tlm.j2k",
+    "flow": "browse",
+    "step": "neighbor",
+    "n": 2,
+    "m1229": 95.8,
+    "m1230": 50.6
+  },
+  {
+    "fixture": "terrain10wide-tlm.j2k",
+    "flow": "browse",
+    "step": "overview",
+    "n": 2,
+    "m1229": 168.2,
+    "m1230": 160.5
+  },
+  {
+    "fixture": "terrain10wide-tlm.j2k",
+    "flow": "browse",
+    "step": "parent",
+    "n": 2,
+    "m1229": 65.9,
+    "m1230": 65.3
+  },
+  {
+    "fixture": "terrain10wide-tlm.j2k",
+    "flow": "browse",
+    "step": "repeat",
+    "n": 2,
+    "m1229": 2.3,
+    "m1230": 2.1
+  },
+  {
+    "fixture": "terrain10wide-tlm.j2k",
+    "flow": "burst",
+    "step": "pan-six",
+    "n": 12,
+    "m1229": 164.7,
+    "m1230": 176.0
+  },
+  {
+    "fixture": "terrain10wide-tlm.j2k",
+    "flow": "burst",
+    "step": "pan-start",
+    "n": 2,
+    "m1229": 102.2,
+    "m1230": 71.2
+  },
+  {
+    "fixture": "terrain10wide-tlm.j2k",
+    "flow": "cold",
+    "step": "cold",
+    "n": 2,
+    "m1229": 116.7,
+    "m1230": 70.6
+  },
+  {
+    "fixture": "terrain11-plain.j2k",
+    "flow": "browse",
+    "step": "child",
+    "n": 2,
+    "m1229": 106.1,
+    "m1230": 72.4
+  },
+  {
+    "fixture": "terrain11-plain.j2k",
+    "flow": "browse",
+    "step": "neighbor",
+    "n": 2,
+    "m1229": 94.1,
+    "m1230": 49.3
+  },
+  {
+    "fixture": "terrain11-plain.j2k",
+    "flow": "browse",
+    "step": "overview",
+    "n": 2,
+    "m1229": 255.8,
+    "m1230": 250.0
+  },
+  {
+    "fixture": "terrain11-plain.j2k",
+    "flow": "browse",
+    "step": "parent",
+    "n": 2,
+    "m1229": 62.9,
+    "m1230": 62.9
+  },
+  {
+    "fixture": "terrain11-plain.j2k",
+    "flow": "browse",
+    "step": "repeat",
+    "n": 2,
+    "m1229": 2.0,
+    "m1230": 2.0
+  },
+  {
+    "fixture": "terrain11-plain.j2k",
+    "flow": "burst",
+    "step": "pan-six",
+    "n": 12,
+    "m1229": 164.6,
+    "m1230": 198.6
+  },
+  {
+    "fixture": "terrain11-plain.j2k",
+    "flow": "burst",
+    "step": "pan-start",
+    "n": 2,
+    "m1229": 149.3,
+    "m1230": 134.4
+  },
+  {
+    "fixture": "terrain11-plain.j2k",
+    "flow": "cold",
+    "step": "cold",
+    "n": 2,
+    "m1229": 200.1,
+    "m1230": 147.8
+  },
+  {
+    "fixture": "terrain11-tlm.j2k",
+    "flow": "browse",
+    "step": "child",
+    "n": 2,
+    "m1229": 102.1,
+    "m1230": 73.2
+  },
+  {
+    "fixture": "terrain11-tlm.j2k",
+    "flow": "browse",
+    "step": "neighbor",
+    "n": 2,
+    "m1229": 92.0,
+    "m1230": 51.0
+  },
+  {
+    "fixture": "terrain11-tlm.j2k",
+    "flow": "browse",
+    "step": "overview",
+    "n": 2,
+    "m1229": 175.2,
+    "m1230": 177.3
+  },
+  {
+    "fixture": "terrain11-tlm.j2k",
+    "flow": "browse",
+    "step": "parent",
+    "n": 2,
+    "m1229": 62.1,
+    "m1230": 64.0
+  },
+  {
+    "fixture": "terrain11-tlm.j2k",
+    "flow": "browse",
+    "step": "repeat",
+    "n": 2,
+    "m1229": 2.1,
+    "m1230": 2.5
+  },
+  {
+    "fixture": "terrain11-tlm.j2k",
+    "flow": "burst",
+    "step": "pan-six",
+    "n": 12,
+    "m1229": 156.8,
+    "m1230": 171.0
+  },
+  {
+    "fixture": "terrain11-tlm.j2k",
+    "flow": "burst",
+    "step": "pan-start",
+    "n": 2,
+    "m1229": 108.1,
+    "m1230": 72.6
+  },
+  {
+    "fixture": "terrain11-tlm.j2k",
+    "flow": "cold",
+    "step": "cold",
+    "n": 2,
+    "m1229": 133.7,
+    "m1230": 76.4
+  },
+  {
+    "fixture": "terrain12-plain.j2k",
+    "flow": "browse",
+    "step": "child",
+    "n": 2,
+    "m1229": 726.3,
+    "m1230": 616.7
+  },
+  {
+    "fixture": "terrain12-plain.j2k",
+    "flow": "browse",
+    "step": "neighbor",
+    "n": 2,
+    "m1229": 300.7,
+    "m1230": 89.5
+  },
+  {
+    "fixture": "terrain12-plain.j2k",
+    "flow": "browse",
+    "step": "overview",
+    "n": 2,
+    "m1229": 55.7,
+    "m1230": 53.3
+  },
+  {
+    "fixture": "terrain12-plain.j2k",
+    "flow": "browse",
+    "step": "parent",
+    "n": 2,
+    "m1229": 117.4,
+    "m1230": 117.3
+  },
+  {
+    "fixture": "terrain12-plain.j2k",
+    "flow": "browse",
+    "step": "repeat",
+    "n": 2,
+    "m1229": 1.7,
+    "m1230": 2.4
+  },
+  {
+    "fixture": "terrain12-plain.j2k",
+    "flow": "burst",
+    "step": "pan-six",
+    "n": 12,
+    "m1229": 960.9,
+    "m1230": 252.3
+  },
+  {
+    "fixture": "terrain12-plain.j2k",
+    "flow": "burst",
+    "step": "pan-start",
+    "n": 2,
+    "m1229": 791.8,
+    "m1230": 714.5
+  },
+  {
+    "fixture": "terrain12-plain.j2k",
+    "flow": "cold",
+    "step": "cold",
+    "n": 2,
+    "m1229": 769.8,
+    "m1230": 696.5
+  },
+  {
+    "fixture": "terrain12-plain.j2k",
+    "flow": "quality",
+    "step": "full",
+    "n": 2,
+    "m1229": 696.1,
+    "m1230": 642.8
+  },
+  {
+    "fixture": "terrain12-plain.j2k",
+    "flow": "quality",
+    "step": "neighbor",
+    "n": 2,
+    "m1229": 295.7,
+    "m1230": 68.3
+  },
+  {
+    "fixture": "terrain12-plain.j2k",
+    "flow": "quality",
+    "step": "preview",
+    "n": 2,
+    "m1229": 106.2,
+    "m1230": 49.2
+  },
+  {
+    "fixture": "terrain12-tlm.j2k",
+    "flow": "browse",
+    "step": "child",
+    "n": 2,
+    "m1229": 750.0,
+    "m1230": 640.9
+  },
+  {
+    "fixture": "terrain12-tlm.j2k",
+    "flow": "browse",
+    "step": "neighbor",
+    "n": 2,
+    "m1229": 305.2,
+    "m1230": 69.1
+  },
+  {
+    "fixture": "terrain12-tlm.j2k",
+    "flow": "browse",
+    "step": "overview",
+    "n": 2,
+    "m1229": 53.9,
+    "m1230": 53.3
+  },
+  {
+    "fixture": "terrain12-tlm.j2k",
+    "flow": "browse",
+    "step": "parent",
+    "n": 2,
+    "m1229": 109.4,
+    "m1230": 116.9
+  },
+  {
+    "fixture": "terrain12-tlm.j2k",
+    "flow": "browse",
+    "step": "repeat",
+    "n": 2,
+    "m1229": 2.2,
+    "m1230": 1.9
+  },
+  {
+    "fixture": "terrain12-tlm.j2k",
+    "flow": "burst",
+    "step": "pan-six",
+    "n": 12,
+    "m1229": 967.4,
+    "m1230": 245.5
+  },
+  {
+    "fixture": "terrain12-tlm.j2k",
+    "flow": "burst",
+    "step": "pan-start",
+    "n": 2,
+    "m1229": 782.2,
+    "m1230": 738.0
+  },
+  {
+    "fixture": "terrain12-tlm.j2k",
+    "flow": "cold",
+    "step": "cold",
+    "n": 2,
+    "m1229": 814.2,
+    "m1230": 737.4
+  },
+  {
+    "fixture": "terrain12-tlm.j2k",
+    "flow": "quality",
+    "step": "full",
+    "n": 2,
+    "m1229": 766.6,
+    "m1230": 639.3
+  },
+  {
+    "fixture": "terrain12-tlm.j2k",
+    "flow": "quality",
+    "step": "neighbor",
+    "n": 2,
+    "m1229": 296.4,
+    "m1230": 66.5
+  },
+  {
+    "fixture": "terrain12-tlm.j2k",
+    "flow": "quality",
+    "step": "preview",
+    "n": 2,
+    "m1229": 55.5,
+    "m1230": 45.8
+  },
+  {
+    "fixture": "texture12-plain.j2k",
+    "flow": "browse",
+    "step": "child",
+    "n": 2,
+    "m1229": 320.2,
+    "m1230": 217.9
+  },
+  {
+    "fixture": "texture12-plain.j2k",
+    "flow": "browse",
+    "step": "neighbor",
+    "n": 2,
+    "m1229": 165.1,
+    "m1230": 61.7
+  },
+  {
+    "fixture": "texture12-plain.j2k",
+    "flow": "browse",
+    "step": "overview",
+    "n": 2,
+    "m1229": 197.8,
+    "m1230": 166.5
+  },
+  {
+    "fixture": "texture12-plain.j2k",
+    "flow": "browse",
+    "step": "parent",
+    "n": 2,
+    "m1229": 118.7,
+    "m1230": 117.3
+  },
+  {
+    "fixture": "texture12-plain.j2k",
+    "flow": "browse",
+    "step": "repeat",
+    "n": 2,
+    "m1229": 1.9,
+    "m1230": 2.4
+  },
+  {
+    "fixture": "texture12-plain.j2k",
+    "flow": "burst",
+    "step": "pan-six",
+    "n": 12,
+    "m1229": 309.0,
+    "m1230": 219.9
+  },
+  {
+    "fixture": "texture12-plain.j2k",
+    "flow": "burst",
+    "step": "pan-start",
+    "n": 2,
+    "m1229": 315.3,
+    "m1230": 262.4
+  },
+  {
+    "fixture": "texture12-plain.j2k",
+    "flow": "cold",
+    "step": "cold",
+    "n": 2,
+    "m1229": 304.7,
+    "m1230": 264.8
+  },
+  {
+    "fixture": "texture12-tlm.j2k",
+    "flow": "browse",
+    "step": "child",
+    "n": 2,
+    "m1229": 298.8,
+    "m1230": 228.0
+  },
+  {
+    "fixture": "texture12-tlm.j2k",
+    "flow": "browse",
+    "step": "neighbor",
+    "n": 2,
+    "m1229": 156.9,
+    "m1230": 61.9
+  },
+  {
+    "fixture": "texture12-tlm.j2k",
+    "flow": "browse",
+    "step": "overview",
+    "n": 2,
+    "m1229": 166.1,
+    "m1230": 163.9
+  },
+  {
+    "fixture": "texture12-tlm.j2k",
+    "flow": "browse",
+    "step": "parent",
+    "n": 2,
+    "m1229": 115.7,
+    "m1230": 117.7
+  },
+  {
+    "fixture": "texture12-tlm.j2k",
+    "flow": "browse",
+    "step": "repeat",
+    "n": 2,
+    "m1229": 2.1,
+    "m1230": 2.3
+  },
+  {
+    "fixture": "texture12-tlm.j2k",
+    "flow": "burst",
+    "step": "pan-six",
+    "n": 12,
+    "m1229": 324.9,
+    "m1230": 217.3
+  },
+  {
+    "fixture": "texture12-tlm.j2k",
+    "flow": "burst",
+    "step": "pan-start",
+    "n": 2,
+    "m1229": 298.2,
+    "m1230": 251.7
+  },
+  {
+    "fixture": "texture12-tlm.j2k",
+    "flow": "cold",
+    "step": "cold",
+    "n": 2,
+    "m1229": 285.1,
+    "m1230": 250.9
+  },
+  {
+    "fixture": "urban11-plain.j2k",
+    "flow": "browse",
+    "step": "child",
+    "n": 2,
+    "m1229": 108.0,
+    "m1230": 69.6
+  },
+  {
+    "fixture": "urban11-plain.j2k",
+    "flow": "browse",
+    "step": "neighbor",
+    "n": 2,
+    "m1229": 91.1,
+    "m1230": 51.3
+  },
+  {
+    "fixture": "urban11-plain.j2k",
+    "flow": "browse",
+    "step": "overview",
+    "n": 2,
+    "m1229": 275.8,
+    "m1230": 266.5
+  },
+  {
+    "fixture": "urban11-plain.j2k",
+    "flow": "browse",
+    "step": "parent",
+    "n": 2,
+    "m1229": 64.2,
+    "m1230": 63.4
+  },
+  {
+    "fixture": "urban11-plain.j2k",
+    "flow": "browse",
+    "step": "repeat",
+    "n": 2,
+    "m1229": 2.2,
+    "m1230": 1.8
+  },
+  {
+    "fixture": "urban11-plain.j2k",
+    "flow": "burst",
+    "step": "pan-six",
+    "n": 12,
+    "m1229": 176.9,
+    "m1230": 159.4
+  },
+  {
+    "fixture": "urban11-plain.j2k",
+    "flow": "burst",
+    "step": "pan-start",
+    "n": 2,
+    "m1229": 158.6,
+    "m1230": 112.4
+  },
+  {
+    "fixture": "urban11-plain.j2k",
+    "flow": "cold",
+    "step": "cold",
+    "n": 2,
+    "m1229": 209.3,
+    "m1230": 148.8
+  },
+  {
+    "fixture": "urban11-plain.j2k",
+    "flow": "quality",
+    "step": "full",
+    "n": 2,
+    "m1229": 90.8,
+    "m1230": 44.4
+  },
+  {
+    "fixture": "urban11-plain.j2k",
+    "flow": "quality",
+    "step": "neighbor",
+    "n": 2,
+    "m1229": 100.0,
+    "m1230": 49.6
+  },
+  {
+    "fixture": "urban11-plain.j2k",
+    "flow": "quality",
+    "step": "preview",
+    "n": 2,
+    "m1229": 118.0,
+    "m1230": 105.0
+  },
+  {
+    "fixture": "urban11-tlm.j2k",
+    "flow": "browse",
+    "step": "child",
+    "n": 2,
+    "m1229": 107.2,
+    "m1230": 74.7
+  },
+  {
+    "fixture": "urban11-tlm.j2k",
+    "flow": "browse",
+    "step": "neighbor",
+    "n": 2,
+    "m1229": 100.7,
+    "m1230": 54.0
+  },
+  {
+    "fixture": "urban11-tlm.j2k",
+    "flow": "browse",
+    "step": "overview",
+    "n": 2,
+    "m1229": 211.9,
+    "m1230": 214.9
+  },
+  {
+    "fixture": "urban11-tlm.j2k",
+    "flow": "browse",
+    "step": "parent",
+    "n": 2,
+    "m1229": 66.1,
+    "m1230": 71.0
+  },
+  {
+    "fixture": "urban11-tlm.j2k",
+    "flow": "browse",
+    "step": "repeat",
+    "n": 2,
+    "m1229": 1.7,
+    "m1230": 2.0
+  },
+  {
+    "fixture": "urban11-tlm.j2k",
+    "flow": "burst",
+    "step": "pan-six",
+    "n": 12,
+    "m1229": 163.8,
+    "m1230": 177.9
+  },
+  {
+    "fixture": "urban11-tlm.j2k",
+    "flow": "burst",
+    "step": "pan-start",
+    "n": 2,
+    "m1229": 107.3,
+    "m1230": 80.5
+  },
+  {
+    "fixture": "urban11-tlm.j2k",
+    "flow": "cold",
+    "step": "cold",
+    "n": 2,
+    "m1229": 112.9,
+    "m1230": 70.0
+  },
+  {
+    "fixture": "urban11-tlm.j2k",
+    "flow": "quality",
+    "step": "full",
+    "n": 2,
+    "m1229": 78.6,
+    "m1230": 43.5
+  },
+  {
+    "fixture": "urban11-tlm.j2k",
+    "flow": "quality",
+    "step": "neighbor",
+    "n": 2,
+    "m1229": 96.0,
+    "m1230": 60.8
+  },
+  {
+    "fixture": "urban11-tlm.j2k",
+    "flow": "quality",
+    "step": "preview",
+    "n": 2,
+    "m1229": 39.5,
+    "m1230": 46.9
+  }
+]

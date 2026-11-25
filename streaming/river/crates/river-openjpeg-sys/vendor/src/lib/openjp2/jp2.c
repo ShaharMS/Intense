@@ -891,7 +891,42 @@ static void opj_jp2_free_pclr(opj_jp2_color_t *color)
     color->jp2_pclr = NULL;
 }
 
+/* A sparse cdef is usable when it identifies every display colour and
+ * every listed role is unambiguous. Omitted channels are auxiliary. */
+static OPJ_UINT32 opj_jp2_omitted_aux(const opj_jp2_t *jp2, const opj_image_t *image)
+{
+    const opj_jp2_cdef_t *cdef = jp2->color.jp2_cdef;
+    OPJ_UINT32 channels = 0, associations = 0, i;
+    OPJ_BOOL opacity = OPJ_FALSE;
+    OPJ_UINT32 colors = jp2->enumcs == 16 ? 3U : 1U;
+    if (image->numcomps < 4 || image->numcomps > 16 ||
+            jp2->meth != 1 || (jp2->enumcs != 16 && jp2->enumcs != 17) ||
+            jp2->color.jp2_pclr || !cdef || cdef->n >= image->numcomps) {
+        return 0;
+    }
+    for (i = 0; i < cdef->n; ++i) {
+        const opj_jp2_cdef_info_t *entry = &cdef->info[i];
+        if (entry->cn >= image->numcomps || (channels & (1U << entry->cn))) {
+            return 0;
+        }
+        channels |= 1U << entry->cn;
+        if (entry->typ == 0 && entry->asoc >= 1 && entry->asoc <= colors) {
+            if (associations & (1U << entry->asoc)) {
+                return 0;
+            }
+            associations |= 1U << entry->asoc;
+        } else if ((entry->typ == 1 || entry->typ == 2) && entry->asoc == 0 && !opacity) {
+            opacity = OPJ_TRUE;
+        } else if (entry->asoc != 65535 || (entry->typ != 65535 && entry->typ != 0)) {
+            return 0;
+        }
+    }
+    return associations == (2U << colors) - 2U ?
+           ((1U << image->numcomps) - 1U) & ~channels : 0;
+}
+
 static OPJ_BOOL opj_jp2_check_color(opj_image_t *image, opj_jp2_color_t *color,
+                                    OPJ_UINT32 omitted_aux,
                                     opj_event_mgr_t *p_manager)
 {
     OPJ_UINT16 i;
@@ -933,7 +968,7 @@ static OPJ_BOOL opj_jp2_check_color(opj_image_t *image, opj_jp2_color_t *color,
                     break;
                 }
             }
-            if (i == n) {
+            if (i == n && (nr_channels > 16 || !(omitted_aux & (1U << (nr_channels - 1U))))) {
                 opj_event_msg(p_manager, EVT_ERROR, "Incomplete channel definitions.\n");
                 return OPJ_FALSE;
             }
@@ -1377,7 +1412,9 @@ static void opj_jp2_apply_cdef(opj_image_t *image, opj_jp2_color_t *color,
             }
         }
 
-        image->comps[cn].alpha = info[i].typ;
+        /* A reordered colour now occupies acn. Preserve the role of the
+         * displaced component, which can already be marked as opacity. */
+        image->comps[info[i].typ == 0 ? acn : cn].alpha = info[i].typ;
     }
 
     if (color->jp2_cdef->info) {
@@ -1604,7 +1641,16 @@ static OPJ_BOOL opj_jp2_apply_color_postprocessing(opj_jp2_t *jp2,
     }
 
     if (!jp2->ignore_pclr_cmap_cdef) {
-        if (!opj_jp2_check_color(p_image, &(jp2->color), p_manager)) {
+        OPJ_UINT32 omitted_aux = opj_jp2_omitted_aux(jp2, p_image);
+        if (omitted_aux) {
+            OPJ_UINT32 i;
+            for (i = 0; i < p_image->numcomps; ++i) {
+                if (omitted_aux & (1U << i)) {
+                    p_image->comps[i].alpha = 65535;
+                }
+            }
+        }
+        if (!opj_jp2_check_color(p_image, &(jp2->color), omitted_aux, p_manager)) {
             return OPJ_FALSE;
         }
 

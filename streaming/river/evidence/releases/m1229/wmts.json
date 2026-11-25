@@ -1,0 +1,1452 @@
+{
+  "m1227": {
+    "imageId": "a1f48cbf9a11cd56a2d6b7833e1748d4f2a2cac8ac437e8183095d541a83bf46",
+    "rows": [
+      {
+        "image": "synthetic-terrain-tlm-plt-d6-layers.jp2",
+        "trial": 0,
+        "phase": "preview",
+        "ms": 50.11081699922215,
+        "elapsedMs": 50.1202059967909,
+        "pixelSha256": "5c65f0642593062e2689d95c8c0428415553440aad8277eff9294a20ecf2f2ca",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-terrain-tlm-plt-d6-layers.jp2",
+        "trial": 0,
+        "phase": "full",
+        "ms": 140.59020699642133,
+        "elapsedMs": 190.72677299845964,
+        "pixelSha256": "05d95cae935e49b439767d39f8534d845bdfae127500fa9790c39d38cdd37c23",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-terrain-tlm-plt-d6-layers.jp2",
+        "trial": 0,
+        "phase": "neighbor",
+        "ms": 116.91090499516577,
+        "elapsedMs": 307.6506060024258,
+        "pixelSha256": "6c3fe98acde4f012640e96bb09508f76f746f1078f3d22873ed1f93ff548d106",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-terrain-tlm-plt-d6-layers.jp2",
+        "trial": 0,
+        "phase": "repeat",
+        "ms": 3.0081740114837885,
+        "elapsedMs": 310.6802420079475,
+        "pixelSha256": "05d95cae935e49b439767d39f8534d845bdfae127500fa9790c39d38cdd37c23",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-terrain-tlm-plt-d6-single.jp2",
+        "trial": 0,
+        "phase": "preview",
+        "ms": 74.10175800032448,
+        "elapsedMs": 74.11683099053334,
+        "pixelSha256": "0c1cda9f8799b948c2cdada6532c3e484e8510229ca4d93b91b7a2d668d5165c",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-terrain-tlm-plt-d6-single.jp2",
+        "trial": 0,
+        "phase": "full",
+        "ms": 539.6792999963509,
+        "elapsedMs": 613.8230079959612,
+        "pixelSha256": "05d95cae935e49b439767d39f8534d845bdfae127500fa9790c39d38cdd37c23",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-terrain-tlm-plt-d6-single.jp2",
+        "trial": 0,
+        "phase": "neighbor",
+        "ms": 544.8302950098878,
+        "elapsedMs": 1158.6731419956777,
+        "pixelSha256": "6c3fe98acde4f012640e96bb09508f76f746f1078f3d22873ed1f93ff548d106",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-terrain-tlm-plt-d6-single.jp2",
+        "trial": 0,
+        "phase": "repeat",
+        "ms": 2.835456994944252,
+        "elapsedMs": 1161.5300309931627,
+        "pixelSha256": "05d95cae935e49b439767d39f8534d845bdfae127500fa9790c39d38cdd37c23",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-urban-tlm-plt-d6-layers.jp2",
+        "trial": 0,
+        "phase": "preview",
+        "ms": 46.96692799916491,
+        "elapsedMs": 46.97965599189047,
+        "pixelSha256": "ea5b14ed3b2d0641a9f684e3e01f1008efe8c5c94ecefa21c18981cf91f10ee9",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-urban-tlm-plt-d6-layers.jp2",
+        "trial": 0,
+        "phase": "full",
+        "ms": 142.08763198985253,
+        "elapsedMs": 189.08734899014235,
+        "pixelSha256": "3d3e7a92084373b8d4ab15bef26a59274853d2d22c7fa597d9d0bc07e6990c44",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-urban-tlm-plt-d6-layers.jp2",
+        "trial": 0,
+        "phase": "neighbor",
+        "ms": 119.55378200218547,
+        "elapsedMs": 308.6599709931761,
+        "pixelSha256": "feaf66cfb97e458b4393d31fdf3943acba9638a32d7f076c32c4da4bf92921b1",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-urban-tlm-plt-d6-layers.jp2",
+        "trial": 0,
+        "phase": "repeat",
+        "ms": 1.9228369928896427,
+        "elapsedMs": 310.60215199249797,
+        "pixelSha256": "3d3e7a92084373b8d4ab15bef26a59274853d2d22c7fa597d9d0bc07e6990c44",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-urban-tlm-plt-d6-single.jp2",
+        "trial": 0,
+        "phase": "preview",
+        "ms": 65.18792700080667,
+        "elapsedMs": 65.20093500148505,
+        "pixelSha256": "398e96b7b67bc6a97af52e6ab9ae5f15ad0f40af35afee912f3bda16712b4bc1",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-urban-tlm-plt-d6-single.jp2",
+        "trial": 0,
+        "phase": "full",
+        "ms": 529.6311099955346,
+        "elapsedMs": 594.8500529921148,
+        "pixelSha256": "3d3e7a92084373b8d4ab15bef26a59274853d2d22c7fa597d9d0bc07e6990c44",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-urban-tlm-plt-d6-single.jp2",
+        "trial": 0,
+        "phase": "neighbor",
+        "ms": 382.4578509957064,
+        "elapsedMs": 977.3283429967705,
+        "pixelSha256": "feaf66cfb97e458b4393d31fdf3943acba9638a32d7f076c32c4da4bf92921b1",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-urban-tlm-plt-d6-single.jp2",
+        "trial": 0,
+        "phase": "repeat",
+        "ms": 1.9532090082066134,
+        "elapsedMs": 979.2947800015099,
+        "pixelSha256": "3d3e7a92084373b8d4ab15bef26a59274853d2d22c7fa597d9d0bc07e6990c44",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-texture-tlm-plt-d6-layers.jp2",
+        "trial": 0,
+        "phase": "preview",
+        "ms": 50.008138990961015,
+        "elapsedMs": 50.021192990243435,
+        "pixelSha256": "fbefe577abba900205239b00601578117a18bb1faa311c39564dd31c1d823268",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-texture-tlm-plt-d6-layers.jp2",
+        "trial": 0,
+        "phase": "full",
+        "ms": 174.0062669996405,
+        "elapsedMs": 224.0491539996583,
+        "pixelSha256": "5f127da6d04a3b9cd2270d525c8d0357eb68d86c9c71c6fe873a5f279045f992",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-texture-tlm-plt-d6-layers.jp2",
+        "trial": 0,
+        "phase": "neighbor",
+        "ms": 118.86553899967112,
+        "elapsedMs": 342.92714699404314,
+        "pixelSha256": "8c45eca360af5b3b1f852094286aa7d0b85b6b082344fd787459c3fedcbbbcd7",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-texture-tlm-plt-d6-layers.jp2",
+        "trial": 0,
+        "phase": "repeat",
+        "ms": 2.0596690010279417,
+        "elapsedMs": 345.0046409998322,
+        "pixelSha256": "5f127da6d04a3b9cd2270d525c8d0357eb68d86c9c71c6fe873a5f279045f992",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-texture-tlm-plt-d6-single.jp2",
+        "trial": 0,
+        "phase": "preview",
+        "ms": 77.95198199164588,
+        "elapsedMs": 77.95890899433289,
+        "pixelSha256": "535ea662ad1356ab07353ac286f4e83c02448a4ef4a327d466728add6947d598",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-texture-tlm-plt-d6-single.jp2",
+        "trial": 0,
+        "phase": "full",
+        "ms": 630.9960780054098,
+        "elapsedMs": 708.9911740040407,
+        "pixelSha256": "5f127da6d04a3b9cd2270d525c8d0357eb68d86c9c71c6fe873a5f279045f992",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-texture-tlm-plt-d6-single.jp2",
+        "trial": 0,
+        "phase": "neighbor",
+        "ms": 487.68368700984865,
+        "elapsedMs": 1196.6903330030618,
+        "pixelSha256": "8c45eca360af5b3b1f852094286aa7d0b85b6b082344fd787459c3fedcbbbcd7",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-texture-tlm-plt-d6-single.jp2",
+        "trial": 0,
+        "phase": "repeat",
+        "ms": 1.9758340058615431,
+        "elapsedMs": 1198.6864710052032,
+        "pixelSha256": "5f127da6d04a3b9cd2270d525c8d0357eb68d86c9c71c6fe873a5f279045f992",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-terrain-tlm-plt-d6-layers.jp2",
+        "trial": 1,
+        "phase": "preview",
+        "ms": 51.58886300341692,
+        "elapsedMs": 51.60526400140952,
+        "pixelSha256": "5c65f0642593062e2689d95c8c0428415553440aad8277eff9294a20ecf2f2ca",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-terrain-tlm-plt-d6-layers.jp2",
+        "trial": 1,
+        "phase": "full",
+        "ms": 162.30762899795081,
+        "elapsedMs": 213.9363400056027,
+        "pixelSha256": "05d95cae935e49b439767d39f8534d845bdfae127500fa9790c39d38cdd37c23",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-terrain-tlm-plt-d6-layers.jp2",
+        "trial": 1,
+        "phase": "neighbor",
+        "ms": 122.70183600776363,
+        "elapsedMs": 336.65982700767927,
+        "pixelSha256": "6c3fe98acde4f012640e96bb09508f76f746f1078f3d22873ed1f93ff548d106",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-terrain-tlm-plt-d6-layers.jp2",
+        "trial": 1,
+        "phase": "repeat",
+        "ms": 2.9660410073120147,
+        "elapsedMs": 339.64085100160446,
+        "pixelSha256": "05d95cae935e49b439767d39f8534d845bdfae127500fa9790c39d38cdd37c23",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-terrain-tlm-plt-d6-single.jp2",
+        "trial": 1,
+        "phase": "preview",
+        "ms": 71.25661399913952,
+        "elapsedMs": 71.2658980046399,
+        "pixelSha256": "0c1cda9f8799b948c2cdada6532c3e484e8510229ca4d93b91b7a2d668d5165c",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-terrain-tlm-plt-d6-single.jp2",
+        "trial": 1,
+        "phase": "full",
+        "ms": 526.4707510068547,
+        "elapsedMs": 597.7555610006675,
+        "pixelSha256": "05d95cae935e49b439767d39f8534d845bdfae127500fa9790c39d38cdd37c23",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-terrain-tlm-plt-d6-single.jp2",
+        "trial": 1,
+        "phase": "neighbor",
+        "ms": 395.25999801116996,
+        "elapsedMs": 993.0341300059808,
+        "pixelSha256": "6c3fe98acde4f012640e96bb09508f76f746f1078f3d22873ed1f93ff548d106",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-terrain-tlm-plt-d6-single.jp2",
+        "trial": 1,
+        "phase": "repeat",
+        "ms": 2.0506159926299006,
+        "elapsedMs": 995.09644099453,
+        "pixelSha256": "05d95cae935e49b439767d39f8534d845bdfae127500fa9790c39d38cdd37c23",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-urban-tlm-plt-d6-layers.jp2",
+        "trial": 1,
+        "phase": "preview",
+        "ms": 45.209028001409024,
+        "elapsedMs": 45.21887899318244,
+        "pixelSha256": "ea5b14ed3b2d0641a9f684e3e01f1008efe8c5c94ecefa21c18981cf91f10ee9",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-urban-tlm-plt-d6-layers.jp2",
+        "trial": 1,
+        "phase": "full",
+        "ms": 131.78961499943398,
+        "elapsedMs": 177.02431698853616,
+        "pixelSha256": "3d3e7a92084373b8d4ab15bef26a59274853d2d22c7fa597d9d0bc07e6990c44",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-urban-tlm-plt-d6-layers.jp2",
+        "trial": 1,
+        "phase": "neighbor",
+        "ms": 108.17831198801287,
+        "elapsedMs": 285.2175359876128,
+        "pixelSha256": "feaf66cfb97e458b4393d31fdf3943acba9638a32d7f076c32c4da4bf92921b1",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-urban-tlm-plt-d6-layers.jp2",
+        "trial": 1,
+        "phase": "repeat",
+        "ms": 2.4539500009268522,
+        "elapsedMs": 287.6897489913972,
+        "pixelSha256": "3d3e7a92084373b8d4ab15bef26a59274853d2d22c7fa597d9d0bc07e6990c44",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-urban-tlm-plt-d6-single.jp2",
+        "trial": 1,
+        "phase": "preview",
+        "ms": 110.46155799704138,
+        "elapsedMs": 110.47032799979206,
+        "pixelSha256": "398e96b7b67bc6a97af52e6ab9ae5f15ad0f40af35afee912f3bda16712b4bc1",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-urban-tlm-plt-d6-single.jp2",
+        "trial": 1,
+        "phase": "full",
+        "ms": 1664.9370009981794,
+        "elapsedMs": 1775.4218969930662,
+        "pixelSha256": "3d3e7a92084373b8d4ab15bef26a59274853d2d22c7fa597d9d0bc07e6990c44",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-urban-tlm-plt-d6-single.jp2",
+        "trial": 1,
+        "phase": "neighbor",
+        "ms": 396.44396599032916,
+        "elapsedMs": 2171.880712994607,
+        "pixelSha256": "feaf66cfb97e458b4393d31fdf3943acba9638a32d7f076c32c4da4bf92921b1",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-urban-tlm-plt-d6-single.jp2",
+        "trial": 1,
+        "phase": "repeat",
+        "ms": 3.475735997199081,
+        "elapsedMs": 2175.377922001644,
+        "pixelSha256": "3d3e7a92084373b8d4ab15bef26a59274853d2d22c7fa597d9d0bc07e6990c44",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-texture-tlm-plt-d6-layers.jp2",
+        "trial": 1,
+        "phase": "preview",
+        "ms": 91.02172100392636,
+        "elapsedMs": 91.03118001075927,
+        "pixelSha256": "fbefe577abba900205239b00601578117a18bb1faa311c39564dd31c1d823268",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-texture-tlm-plt-d6-layers.jp2",
+        "trial": 1,
+        "phase": "full",
+        "ms": 198.99654100299813,
+        "elapsedMs": 290.04856500250753,
+        "pixelSha256": "5f127da6d04a3b9cd2270d525c8d0357eb68d86c9c71c6fe873a5f279045f992",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-texture-tlm-plt-d6-layers.jp2",
+        "trial": 1,
+        "phase": "neighbor",
+        "ms": 207.76947599370033,
+        "elapsedMs": 497.8295379987685,
+        "pixelSha256": "8c45eca360af5b3b1f852094286aa7d0b85b6b082344fd787459c3fedcbbbcd7",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-texture-tlm-plt-d6-layers.jp2",
+        "trial": 1,
+        "phase": "repeat",
+        "ms": 2.1103960025357082,
+        "elapsedMs": 499.9521550053032,
+        "pixelSha256": "5f127da6d04a3b9cd2270d525c8d0357eb68d86c9c71c6fe873a5f279045f992",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-texture-tlm-plt-d6-single.jp2",
+        "trial": 1,
+        "phase": "preview",
+        "ms": 72.26443299441598,
+        "elapsedMs": 72.27759700617753,
+        "pixelSha256": "535ea662ad1356ab07353ac286f4e83c02448a4ef4a327d466728add6947d598",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-texture-tlm-plt-d6-single.jp2",
+        "trial": 1,
+        "phase": "full",
+        "ms": 604.2090569972061,
+        "elapsedMs": 676.4997900027083,
+        "pixelSha256": "5f127da6d04a3b9cd2270d525c8d0357eb68d86c9c71c6fe873a5f279045f992",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-texture-tlm-plt-d6-single.jp2",
+        "trial": 1,
+        "phase": "neighbor",
+        "ms": 448.0878030008171,
+        "elapsedMs": 1124.6028560126433,
+        "pixelSha256": "8c45eca360af5b3b1f852094286aa7d0b85b6b082344fd787459c3fedcbbbcd7",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-texture-tlm-plt-d6-single.jp2",
+        "trial": 1,
+        "phase": "repeat",
+        "ms": 2.1872159995837137,
+        "elapsedMs": 1126.8098190048477,
+        "pixelSha256": "5f127da6d04a3b9cd2270d525c8d0357eb68d86c9c71c6fe873a5f279045f992",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-terrain-tlm-plt-d6-layers.jp2",
+        "trial": 2,
+        "phase": "preview",
+        "ms": 83.32115301163867,
+        "elapsedMs": 83.33558800222818,
+        "pixelSha256": "5c65f0642593062e2689d95c8c0428415553440aad8277eff9294a20ecf2f2ca",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-terrain-tlm-plt-d6-layers.jp2",
+        "trial": 2,
+        "phase": "full",
+        "ms": 207.4826730095083,
+        "elapsedMs": 290.8312869985821,
+        "pixelSha256": "05d95cae935e49b439767d39f8534d845bdfae127500fa9790c39d38cdd37c23",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-terrain-tlm-plt-d6-layers.jp2",
+        "trial": 2,
+        "phase": "neighbor",
+        "ms": 116.19676700502168,
+        "elapsedMs": 407.0517869986361,
+        "pixelSha256": "6c3fe98acde4f012640e96bb09508f76f746f1078f3d22873ed1f93ff548d106",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-terrain-tlm-plt-d6-layers.jp2",
+        "trial": 2,
+        "phase": "repeat",
+        "ms": 3.3872390049509704,
+        "elapsedMs": 410.4616230033571,
+        "pixelSha256": "05d95cae935e49b439767d39f8534d845bdfae127500fa9790c39d38cdd37c23",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-terrain-tlm-plt-d6-single.jp2",
+        "trial": 2,
+        "phase": "preview",
+        "ms": 72.35403799859341,
+        "elapsedMs": 72.36169600219,
+        "pixelSha256": "0c1cda9f8799b948c2cdada6532c3e484e8510229ca4d93b91b7a2d668d5165c",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-terrain-tlm-plt-d6-single.jp2",
+        "trial": 2,
+        "phase": "full",
+        "ms": 543.2422579906415,
+        "elapsedMs": 615.6229909975082,
+        "pixelSha256": "05d95cae935e49b439767d39f8534d845bdfae127500fa9790c39d38cdd37c23",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-terrain-tlm-plt-d6-single.jp2",
+        "trial": 2,
+        "phase": "neighbor",
+        "ms": 401.1914399889065,
+        "elapsedMs": 1016.8235379969701,
+        "pixelSha256": "6c3fe98acde4f012640e96bb09508f76f746f1078f3d22873ed1f93ff548d106",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-terrain-tlm-plt-d6-single.jp2",
+        "trial": 2,
+        "phase": "repeat",
+        "ms": 1.5452049992745742,
+        "elapsedMs": 1018.3787770074559,
+        "pixelSha256": "05d95cae935e49b439767d39f8534d845bdfae127500fa9790c39d38cdd37c23",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-urban-tlm-plt-d6-layers.jp2",
+        "trial": 2,
+        "phase": "preview",
+        "ms": 56.30439500964712,
+        "elapsedMs": 56.348912010435015,
+        "pixelSha256": "ea5b14ed3b2d0641a9f684e3e01f1008efe8c5c94ecefa21c18981cf91f10ee9",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-urban-tlm-plt-d6-layers.jp2",
+        "trial": 2,
+        "phase": "full",
+        "ms": 149.67419501044787,
+        "elapsedMs": 206.04407200880814,
+        "pixelSha256": "3d3e7a92084373b8d4ab15bef26a59274853d2d22c7fa597d9d0bc07e6990c44",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-urban-tlm-plt-d6-layers.jp2",
+        "trial": 2,
+        "phase": "neighbor",
+        "ms": 114.23424999520648,
+        "elapsedMs": 320.28966600773856,
+        "pixelSha256": "feaf66cfb97e458b4393d31fdf3943acba9638a32d7f076c32c4da4bf92921b1",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-urban-tlm-plt-d6-layers.jp2",
+        "trial": 2,
+        "phase": "repeat",
+        "ms": 1.99571400298737,
+        "elapsedMs": 322.3034300026484,
+        "pixelSha256": "3d3e7a92084373b8d4ab15bef26a59274853d2d22c7fa597d9d0bc07e6990c44",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-urban-tlm-plt-d6-single.jp2",
+        "trial": 2,
+        "phase": "preview",
+        "ms": 76.75879599992186,
+        "elapsedMs": 76.7708759958623,
+        "pixelSha256": "398e96b7b67bc6a97af52e6ab9ae5f15ad0f40af35afee912f3bda16712b4bc1",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-urban-tlm-plt-d6-single.jp2",
+        "trial": 2,
+        "phase": "full",
+        "ms": 574.6595189993968,
+        "elapsedMs": 651.4533989975462,
+        "pixelSha256": "3d3e7a92084373b8d4ab15bef26a59274853d2d22c7fa597d9d0bc07e6990c44",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-urban-tlm-plt-d6-single.jp2",
+        "trial": 2,
+        "phase": "neighbor",
+        "ms": 421.9320909905946,
+        "elapsedMs": 1073.3964259998174,
+        "pixelSha256": "feaf66cfb97e458b4393d31fdf3943acba9638a32d7f076c32c4da4bf92921b1",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-urban-tlm-plt-d6-single.jp2",
+        "trial": 2,
+        "phase": "repeat",
+        "ms": 2.000183012569323,
+        "elapsedMs": 1075.4141610086663,
+        "pixelSha256": "3d3e7a92084373b8d4ab15bef26a59274853d2d22c7fa597d9d0bc07e6990c44",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-texture-tlm-plt-d6-layers.jp2",
+        "trial": 2,
+        "phase": "preview",
+        "ms": 43.04554300324526,
+        "elapsedMs": 43.053590998169966,
+        "pixelSha256": "fbefe577abba900205239b00601578117a18bb1faa311c39564dd31c1d823268",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-texture-tlm-plt-d6-layers.jp2",
+        "trial": 2,
+        "phase": "full",
+        "ms": 142.60348900279496,
+        "elapsedMs": 185.66710900631733,
+        "pixelSha256": "5f127da6d04a3b9cd2270d525c8d0357eb68d86c9c71c6fe873a5f279045f992",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-texture-tlm-plt-d6-layers.jp2",
+        "trial": 2,
+        "phase": "neighbor",
+        "ms": 103.69404799712356,
+        "elapsedMs": 289.3724250025116,
+        "pixelSha256": "8c45eca360af5b3b1f852094286aa7d0b85b6b082344fd787459c3fedcbbbcd7",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-texture-tlm-plt-d6-layers.jp2",
+        "trial": 2,
+        "phase": "repeat",
+        "ms": 1.8400600092718378,
+        "elapsedMs": 291.2243290047627,
+        "pixelSha256": "5f127da6d04a3b9cd2270d525c8d0357eb68d86c9c71c6fe873a5f279045f992",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-texture-tlm-plt-d6-single.jp2",
+        "trial": 2,
+        "phase": "preview",
+        "ms": 64.4204609998269,
+        "elapsedMs": 64.43119898904115,
+        "pixelSha256": "535ea662ad1356ab07353ac286f4e83c02448a4ef4a327d466728add6947d598",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-texture-tlm-plt-d6-single.jp2",
+        "trial": 2,
+        "phase": "full",
+        "ms": 567.1997729950817,
+        "elapsedMs": 631.6445119882701,
+        "pixelSha256": "5f127da6d04a3b9cd2270d525c8d0357eb68d86c9c71c6fe873a5f279045f992",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-texture-tlm-plt-d6-single.jp2",
+        "trial": 2,
+        "phase": "neighbor",
+        "ms": 423.980797000695,
+        "elapsedMs": 1055.6448259885656,
+        "pixelSha256": "8c45eca360af5b3b1f852094286aa7d0b85b6b082344fd787459c3fedcbbbcd7",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-texture-tlm-plt-d6-single.jp2",
+        "trial": 2,
+        "phase": "repeat",
+        "ms": 2.3831099970266223,
+        "elapsedMs": 1058.040733987582,
+        "pixelSha256": "5f127da6d04a3b9cd2270d525c8d0357eb68d86c9c71c6fe873a5f279045f992",
+        "backend": "openjpeg",
+        "exact": true
+      }
+    ]
+  },
+  "m1229": {
+    "imageId": "894e09893fafe1a593e31ba286a6893d58185cf175163f1f307c775aae2ae613",
+    "rows": [
+      {
+        "image": "synthetic-terrain-tlm-plt-d6-layers.jp2",
+        "trial": 0,
+        "phase": "preview",
+        "ms": 53.290427997126244,
+        "elapsedMs": 53.29969199374318,
+        "pixelSha256": "5c65f0642593062e2689d95c8c0428415553440aad8277eff9294a20ecf2f2ca",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-terrain-tlm-plt-d6-layers.jp2",
+        "trial": 0,
+        "phase": "full",
+        "ms": 32.7023290010402,
+        "elapsedMs": 86.04414299770724,
+        "pixelSha256": "05d95cae935e49b439767d39f8534d845bdfae127500fa9790c39d38cdd37c23",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-terrain-tlm-plt-d6-layers.jp2",
+        "trial": 0,
+        "phase": "neighbor",
+        "ms": 39.89613700832706,
+        "elapsedMs": 125.96376999863423,
+        "pixelSha256": "6c3fe98acde4f012640e96bb09508f76f746f1078f3d22873ed1f93ff548d106",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-terrain-tlm-plt-d6-layers.jp2",
+        "trial": 0,
+        "phase": "repeat",
+        "ms": 2.0819430064875633,
+        "elapsedMs": 128.06301499949768,
+        "pixelSha256": "05d95cae935e49b439767d39f8534d845bdfae127500fa9790c39d38cdd37c23",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-terrain-tlm-plt-d6-single.jp2",
+        "trial": 0,
+        "phase": "preview",
+        "ms": 61.32221801090054,
+        "elapsedMs": 61.345381996943615,
+        "pixelSha256": "0c1cda9f8799b948c2cdada6532c3e484e8510229ca4d93b91b7a2d668d5165c",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-terrain-tlm-plt-d6-single.jp2",
+        "trial": 0,
+        "phase": "full",
+        "ms": 74.99506500607822,
+        "elapsedMs": 136.3558489974821,
+        "pixelSha256": "05d95cae935e49b439767d39f8534d845bdfae127500fa9790c39d38cdd37c23",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-terrain-tlm-plt-d6-single.jp2",
+        "trial": 0,
+        "phase": "neighbor",
+        "ms": 74.91467898944393,
+        "elapsedMs": 211.28408498771023,
+        "pixelSha256": "6c3fe98acde4f012640e96bb09508f76f746f1078f3d22873ed1f93ff548d106",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-terrain-tlm-plt-d6-single.jp2",
+        "trial": 0,
+        "phase": "repeat",
+        "ms": 1.861725002527237,
+        "elapsedMs": 213.18032799172215,
+        "pixelSha256": "05d95cae935e49b439767d39f8534d845bdfae127500fa9790c39d38cdd37c23",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-urban-tlm-plt-d6-layers.jp2",
+        "trial": 0,
+        "phase": "preview",
+        "ms": 42.141141995671205,
+        "elapsedMs": 42.15455499070231,
+        "pixelSha256": "ea5b14ed3b2d0641a9f684e3e01f1008efe8c5c94ecefa21c18981cf91f10ee9",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-urban-tlm-plt-d6-layers.jp2",
+        "trial": 0,
+        "phase": "full",
+        "ms": 67.91148899355903,
+        "elapsedMs": 110.08660799416248,
+        "pixelSha256": "3d3e7a92084373b8d4ab15bef26a59274853d2d22c7fa597d9d0bc07e6990c44",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-urban-tlm-plt-d6-layers.jp2",
+        "trial": 0,
+        "phase": "neighbor",
+        "ms": 37.35212399624288,
+        "elapsedMs": 147.44901198719162,
+        "pixelSha256": "feaf66cfb97e458b4393d31fdf3943acba9638a32d7f076c32c4da4bf92921b1",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-urban-tlm-plt-d6-layers.jp2",
+        "trial": 0,
+        "phase": "repeat",
+        "ms": 2.2663370036752895,
+        "elapsedMs": 149.73503600049298,
+        "pixelSha256": "3d3e7a92084373b8d4ab15bef26a59274853d2d22c7fa597d9d0bc07e6990c44",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-urban-tlm-plt-d6-single.jp2",
+        "trial": 0,
+        "phase": "preview",
+        "ms": 66.32368700229563,
+        "elapsedMs": 66.33257700013928,
+        "pixelSha256": "398e96b7b67bc6a97af52e6ab9ae5f15ad0f40af35afee912f3bda16712b4bc1",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-urban-tlm-plt-d6-single.jp2",
+        "trial": 0,
+        "phase": "full",
+        "ms": 75.90553000045475,
+        "elapsedMs": 142.25371400243603,
+        "pixelSha256": "3d3e7a92084373b8d4ab15bef26a59274853d2d22c7fa597d9d0bc07e6990c44",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-urban-tlm-plt-d6-single.jp2",
+        "trial": 0,
+        "phase": "neighbor",
+        "ms": 69.25908398989122,
+        "elapsedMs": 211.5301549929427,
+        "pixelSha256": "feaf66cfb97e458b4393d31fdf3943acba9638a32d7f076c32c4da4bf92921b1",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-urban-tlm-plt-d6-single.jp2",
+        "trial": 0,
+        "phase": "repeat",
+        "ms": 2.034621997154318,
+        "elapsedMs": 213.57727599388454,
+        "pixelSha256": "3d3e7a92084373b8d4ab15bef26a59274853d2d22c7fa597d9d0bc07e6990c44",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-texture-tlm-plt-d6-layers.jp2",
+        "trial": 0,
+        "phase": "preview",
+        "ms": 49.15227800665889,
+        "elapsedMs": 49.160726004629396,
+        "pixelSha256": "fbefe577abba900205239b00601578117a18bb1faa311c39564dd31c1d823268",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-texture-tlm-plt-d6-layers.jp2",
+        "trial": 0,
+        "phase": "full",
+        "ms": 48.03489599726163,
+        "elapsedMs": 97.2075780009618,
+        "pixelSha256": "5f127da6d04a3b9cd2270d525c8d0357eb68d86c9c71c6fe873a5f279045f992",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-texture-tlm-plt-d6-layers.jp2",
+        "trial": 0,
+        "phase": "neighbor",
+        "ms": 42.99567699490581,
+        "elapsedMs": 140.22357900103088,
+        "pixelSha256": "8c45eca360af5b3b1f852094286aa7d0b85b6b082344fd787459c3fedcbbbcd7",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-texture-tlm-plt-d6-layers.jp2",
+        "trial": 0,
+        "phase": "repeat",
+        "ms": 2.3999529948923737,
+        "elapsedMs": 142.6380170014454,
+        "pixelSha256": "5f127da6d04a3b9cd2270d525c8d0357eb68d86c9c71c6fe873a5f279045f992",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-texture-tlm-plt-d6-single.jp2",
+        "trial": 0,
+        "phase": "preview",
+        "ms": 66.01421000959817,
+        "elapsedMs": 66.03070000710431,
+        "pixelSha256": "535ea662ad1356ab07353ac286f4e83c02448a4ef4a327d466728add6947d598",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-texture-tlm-plt-d6-single.jp2",
+        "trial": 0,
+        "phase": "full",
+        "ms": 70.32733100641053,
+        "elapsedMs": 136.37779900454916,
+        "pixelSha256": "5f127da6d04a3b9cd2270d525c8d0357eb68d86c9c71c6fe873a5f279045f992",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-texture-tlm-plt-d6-single.jp2",
+        "trial": 0,
+        "phase": "neighbor",
+        "ms": 63.61973199818749,
+        "elapsedMs": 200.00839499698486,
+        "pixelSha256": "8c45eca360af5b3b1f852094286aa7d0b85b6b082344fd787459c3fedcbbbcd7",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-texture-tlm-plt-d6-single.jp2",
+        "trial": 0,
+        "phase": "repeat",
+        "ms": 2.750258005107753,
+        "elapsedMs": 202.7807840058813,
+        "pixelSha256": "5f127da6d04a3b9cd2270d525c8d0357eb68d86c9c71c6fe873a5f279045f992",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-terrain-tlm-plt-d6-layers.jp2",
+        "trial": 1,
+        "phase": "preview",
+        "ms": 47.661276999861,
+        "elapsedMs": 47.67438198905438,
+        "pixelSha256": "5c65f0642593062e2689d95c8c0428415553440aad8277eff9294a20ecf2f2ca",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-terrain-tlm-plt-d6-layers.jp2",
+        "trial": 1,
+        "phase": "full",
+        "ms": 37.39353900891729,
+        "elapsedMs": 85.08053599507548,
+        "pixelSha256": "05d95cae935e49b439767d39f8534d845bdfae127500fa9790c39d38cdd37c23",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-terrain-tlm-plt-d6-layers.jp2",
+        "trial": 1,
+        "phase": "neighbor",
+        "ms": 40.462693010340445,
+        "elapsedMs": 125.56277599651366,
+        "pixelSha256": "6c3fe98acde4f012640e96bb09508f76f746f1078f3d22873ed1f93ff548d106",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-terrain-tlm-plt-d6-layers.jp2",
+        "trial": 1,
+        "phase": "repeat",
+        "ms": 2.290489006554708,
+        "elapsedMs": 127.87335399480071,
+        "pixelSha256": "05d95cae935e49b439767d39f8534d845bdfae127500fa9790c39d38cdd37c23",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-terrain-tlm-plt-d6-single.jp2",
+        "trial": 1,
+        "phase": "preview",
+        "ms": 73.27947500743903,
+        "elapsedMs": 73.29260901315138,
+        "pixelSha256": "0c1cda9f8799b948c2cdada6532c3e484e8510229ca4d93b91b7a2d668d5165c",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-terrain-tlm-plt-d6-single.jp2",
+        "trial": 1,
+        "phase": "full",
+        "ms": 84.03817600628827,
+        "elapsedMs": 157.3671250080224,
+        "pixelSha256": "05d95cae935e49b439767d39f8534d845bdfae127500fa9790c39d38cdd37c23",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-terrain-tlm-plt-d6-single.jp2",
+        "trial": 1,
+        "phase": "neighbor",
+        "ms": 70.94645200413652,
+        "elapsedMs": 228.32374600693583,
+        "pixelSha256": "6c3fe98acde4f012640e96bb09508f76f746f1078f3d22873ed1f93ff548d106",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-terrain-tlm-plt-d6-single.jp2",
+        "trial": 1,
+        "phase": "repeat",
+        "ms": 1.3480240013450384,
+        "elapsedMs": 229.68461000709794,
+        "pixelSha256": "05d95cae935e49b439767d39f8534d845bdfae127500fa9790c39d38cdd37c23",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-urban-tlm-plt-d6-layers.jp2",
+        "trial": 1,
+        "phase": "preview",
+        "ms": 47.025559993926436,
+        "elapsedMs": 47.0379179896554,
+        "pixelSha256": "ea5b14ed3b2d0641a9f684e3e01f1008efe8c5c94ecefa21c18981cf91f10ee9",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-urban-tlm-plt-d6-layers.jp2",
+        "trial": 1,
+        "phase": "full",
+        "ms": 34.67383800307289,
+        "elapsedMs": 81.72424099757336,
+        "pixelSha256": "3d3e7a92084373b8d4ab15bef26a59274853d2d22c7fa597d9d0bc07e6990c44",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-urban-tlm-plt-d6-layers.jp2",
+        "trial": 1,
+        "phase": "neighbor",
+        "ms": 39.20633399684448,
+        "elapsedMs": 120.94213099044282,
+        "pixelSha256": "feaf66cfb97e458b4393d31fdf3943acba9638a32d7f076c32c4da4bf92921b1",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-urban-tlm-plt-d6-layers.jp2",
+        "trial": 1,
+        "phase": "repeat",
+        "ms": 1.3997979986015707,
+        "elapsedMs": 122.35311399854254,
+        "pixelSha256": "3d3e7a92084373b8d4ab15bef26a59274853d2d22c7fa597d9d0bc07e6990c44",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-urban-tlm-plt-d6-single.jp2",
+        "trial": 1,
+        "phase": "preview",
+        "ms": 64.0142259944696,
+        "elapsedMs": 64.02360799256712,
+        "pixelSha256": "398e96b7b67bc6a97af52e6ab9ae5f15ad0f40af35afee912f3bda16712b4bc1",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-urban-tlm-plt-d6-single.jp2",
+        "trial": 1,
+        "phase": "full",
+        "ms": 99.88904699275736,
+        "elapsedMs": 163.92646699387114,
+        "pixelSha256": "3d3e7a92084373b8d4ab15bef26a59274853d2d22c7fa597d9d0bc07e6990c44",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-urban-tlm-plt-d6-single.jp2",
+        "trial": 1,
+        "phase": "neighbor",
+        "ms": 72.49079800385516,
+        "elapsedMs": 236.43049399834126,
+        "pixelSha256": "feaf66cfb97e458b4393d31fdf3943acba9638a32d7f076c32c4da4bf92921b1",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-urban-tlm-plt-d6-single.jp2",
+        "trial": 1,
+        "phase": "repeat",
+        "ms": 2.046210996923037,
+        "elapsedMs": 238.4891089895973,
+        "pixelSha256": "3d3e7a92084373b8d4ab15bef26a59274853d2d22c7fa597d9d0bc07e6990c44",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-texture-tlm-plt-d6-layers.jp2",
+        "trial": 1,
+        "phase": "preview",
+        "ms": 44.97618999448605,
+        "elapsedMs": 44.989431989961304,
+        "pixelSha256": "fbefe577abba900205239b00601578117a18bb1faa311c39564dd31c1d823268",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-texture-tlm-plt-d6-layers.jp2",
+        "trial": 1,
+        "phase": "full",
+        "ms": 46.9643229880603,
+        "elapsedMs": 91.96664098999463,
+        "pixelSha256": "5f127da6d04a3b9cd2270d525c8d0357eb68d86c9c71c6fe873a5f279045f992",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-texture-tlm-plt-d6-layers.jp2",
+        "trial": 1,
+        "phase": "neighbor",
+        "ms": 39.98116000730079,
+        "elapsedMs": 131.95869899936952,
+        "pixelSha256": "8c45eca360af5b3b1f852094286aa7d0b85b6b082344fd787459c3fedcbbbcd7",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-texture-tlm-plt-d6-layers.jp2",
+        "trial": 1,
+        "phase": "repeat",
+        "ms": 2.1748279978055507,
+        "elapsedMs": 134.15152300149202,
+        "pixelSha256": "5f127da6d04a3b9cd2270d525c8d0357eb68d86c9c71c6fe873a5f279045f992",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-texture-tlm-plt-d6-single.jp2",
+        "trial": 1,
+        "phase": "preview",
+        "ms": 63.16876299388241,
+        "elapsedMs": 63.180570999975316,
+        "pixelSha256": "535ea662ad1356ab07353ac286f4e83c02448a4ef4a327d466728add6947d598",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-texture-tlm-plt-d6-single.jp2",
+        "trial": 1,
+        "phase": "full",
+        "ms": 92.5345389987342,
+        "elapsedMs": 155.73492100520525,
+        "pixelSha256": "5f127da6d04a3b9cd2270d525c8d0357eb68d86c9c71c6fe873a5f279045f992",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-texture-tlm-plt-d6-single.jp2",
+        "trial": 1,
+        "phase": "neighbor",
+        "ms": 73.22131098771933,
+        "elapsedMs": 228.97423099493608,
+        "pixelSha256": "8c45eca360af5b3b1f852094286aa7d0b85b6b082344fd787459c3fedcbbbcd7",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-texture-tlm-plt-d6-single.jp2",
+        "trial": 1,
+        "phase": "repeat",
+        "ms": 2.303196000866592,
+        "elapsedMs": 231.29658000834752,
+        "pixelSha256": "5f127da6d04a3b9cd2270d525c8d0357eb68d86c9c71c6fe873a5f279045f992",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-terrain-tlm-plt-d6-layers.jp2",
+        "trial": 2,
+        "phase": "preview",
+        "ms": 43.622670986223966,
+        "elapsedMs": 43.63116899912711,
+        "pixelSha256": "5c65f0642593062e2689d95c8c0428415553440aad8277eff9294a20ecf2f2ca",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-terrain-tlm-plt-d6-layers.jp2",
+        "trial": 2,
+        "phase": "full",
+        "ms": 69.62730501254555,
+        "elapsedMs": 113.27997701300774,
+        "pixelSha256": "05d95cae935e49b439767d39f8534d845bdfae127500fa9790c39d38cdd37c23",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-terrain-tlm-plt-d6-layers.jp2",
+        "trial": 2,
+        "phase": "neighbor",
+        "ms": 44.69031699409243,
+        "elapsedMs": 157.98115500365384,
+        "pixelSha256": "6c3fe98acde4f012640e96bb09508f76f746f1078f3d22873ed1f93ff548d106",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-terrain-tlm-plt-d6-layers.jp2",
+        "trial": 2,
+        "phase": "repeat",
+        "ms": 2.0155630045337602,
+        "elapsedMs": 160.01602201140486,
+        "pixelSha256": "05d95cae935e49b439767d39f8534d845bdfae127500fa9790c39d38cdd37c23",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-terrain-tlm-plt-d6-single.jp2",
+        "trial": 2,
+        "phase": "preview",
+        "ms": 58.81417200725991,
+        "elapsedMs": 58.82079999719281,
+        "pixelSha256": "0c1cda9f8799b948c2cdada6532c3e484e8510229ca4d93b91b7a2d668d5165c",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-terrain-tlm-plt-d6-single.jp2",
+        "trial": 2,
+        "phase": "full",
+        "ms": 68.2034850033233,
+        "elapsedMs": 127.03798599250149,
+        "pixelSha256": "05d95cae935e49b439767d39f8534d845bdfae127500fa9790c39d38cdd37c23",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-terrain-tlm-plt-d6-single.jp2",
+        "trial": 2,
+        "phase": "neighbor",
+        "ms": 66.54458898992743,
+        "elapsedMs": 193.60198998765554,
+        "pixelSha256": "6c3fe98acde4f012640e96bb09508f76f746f1078f3d22873ed1f93ff548d106",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-terrain-tlm-plt-d6-single.jp2",
+        "trial": 2,
+        "phase": "repeat",
+        "ms": 1.5571999974781647,
+        "elapsedMs": 195.17407499370165,
+        "pixelSha256": "05d95cae935e49b439767d39f8534d845bdfae127500fa9790c39d38cdd37c23",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-urban-tlm-plt-d6-layers.jp2",
+        "trial": 2,
+        "phase": "preview",
+        "ms": 53.453242013347335,
+        "elapsedMs": 53.461501011042856,
+        "pixelSha256": "ea5b14ed3b2d0641a9f684e3e01f1008efe8c5c94ecefa21c18981cf91f10ee9",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-urban-tlm-plt-d6-layers.jp2",
+        "trial": 2,
+        "phase": "full",
+        "ms": 35.44721599610057,
+        "elapsedMs": 88.92017300240695,
+        "pixelSha256": "3d3e7a92084373b8d4ab15bef26a59274853d2d22c7fa597d9d0bc07e6990c44",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-urban-tlm-plt-d6-layers.jp2",
+        "trial": 2,
+        "phase": "neighbor",
+        "ms": 35.12378499726765,
+        "elapsedMs": 124.05744699935894,
+        "pixelSha256": "feaf66cfb97e458b4393d31fdf3943acba9638a32d7f076c32c4da4bf92921b1",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-urban-tlm-plt-d6-layers.jp2",
+        "trial": 2,
+        "phase": "repeat",
+        "ms": 1.9125540129607543,
+        "elapsedMs": 125.99194901122246,
+        "pixelSha256": "3d3e7a92084373b8d4ab15bef26a59274853d2d22c7fa597d9d0bc07e6990c44",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-urban-tlm-plt-d6-single.jp2",
+        "trial": 2,
+        "phase": "preview",
+        "ms": 62.03789399296511,
+        "elapsedMs": 62.04484699992463,
+        "pixelSha256": "398e96b7b67bc6a97af52e6ab9ae5f15ad0f40af35afee912f3bda16712b4bc1",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-urban-tlm-plt-d6-single.jp2",
+        "trial": 2,
+        "phase": "full",
+        "ms": 71.60565500089433,
+        "elapsedMs": 133.66321500507183,
+        "pixelSha256": "3d3e7a92084373b8d4ab15bef26a59274853d2d22c7fa597d9d0bc07e6990c44",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-urban-tlm-plt-d6-single.jp2",
+        "trial": 2,
+        "phase": "neighbor",
+        "ms": 67.90926700341515,
+        "elapsedMs": 201.5923470025882,
+        "pixelSha256": "feaf66cfb97e458b4393d31fdf3943acba9638a32d7f076c32c4da4bf92921b1",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-urban-tlm-plt-d6-single.jp2",
+        "trial": 2,
+        "phase": "repeat",
+        "ms": 1.8294050096301362,
+        "elapsedMs": 203.4323310072068,
+        "pixelSha256": "3d3e7a92084373b8d4ab15bef26a59274853d2d22c7fa597d9d0bc07e6990c44",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-texture-tlm-plt-d6-layers.jp2",
+        "trial": 2,
+        "phase": "preview",
+        "ms": 49.45566400419921,
+        "elapsedMs": 49.47103300946765,
+        "pixelSha256": "fbefe577abba900205239b00601578117a18bb1faa311c39564dd31c1d823268",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-texture-tlm-plt-d6-layers.jp2",
+        "trial": 2,
+        "phase": "full",
+        "ms": 42.87844800273888,
+        "elapsedMs": 92.37235100590624,
+        "pixelSha256": "5f127da6d04a3b9cd2270d525c8d0357eb68d86c9c71c6fe873a5f279045f992",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-texture-tlm-plt-d6-layers.jp2",
+        "trial": 2,
+        "phase": "neighbor",
+        "ms": 39.33721799694467,
+        "elapsedMs": 131.72787000075914,
+        "pixelSha256": "8c45eca360af5b3b1f852094286aa7d0b85b6b082344fd787459c3fedcbbbcd7",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-texture-tlm-plt-d6-layers.jp2",
+        "trial": 2,
+        "phase": "repeat",
+        "ms": 1.9407430081628263,
+        "elapsedMs": 133.680456012371,
+        "pixelSha256": "5f127da6d04a3b9cd2270d525c8d0357eb68d86c9c71c6fe873a5f279045f992",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-texture-tlm-plt-d6-single.jp2",
+        "trial": 2,
+        "phase": "preview",
+        "ms": 65.2075769903604,
+        "elapsedMs": 65.21462899399921,
+        "pixelSha256": "535ea662ad1356ab07353ac286f4e83c02448a4ef4a327d466728add6947d598",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-texture-tlm-plt-d6-single.jp2",
+        "trial": 2,
+        "phase": "full",
+        "ms": 83.94184299686458,
+        "elapsedMs": 149.16870699380524,
+        "pixelSha256": "5f127da6d04a3b9cd2270d525c8d0357eb68d86c9c71c6fe873a5f279045f992",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-texture-tlm-plt-d6-single.jp2",
+        "trial": 2,
+        "phase": "neighbor",
+        "ms": 67.53929400292691,
+        "elapsedMs": 216.72955399844795,
+        "pixelSha256": "8c45eca360af5b3b1f852094286aa7d0b85b6b082344fd787459c3fedcbbbcd7",
+        "backend": "openjpeg",
+        "exact": true
+      },
+      {
+        "image": "synthetic-texture-tlm-plt-d6-single.jp2",
+        "trial": 2,
+        "phase": "repeat",
+        "ms": 1.9480699993437156,
+        "elapsedMs": 218.6966909939656,
+        "pixelSha256": "5f127da6d04a3b9cd2270d525c8d0357eb68d86c9c71c6fe873a5f279045f992",
+        "backend": "openjpeg",
+        "exact": true
+      }
+    ]
+  }
+}

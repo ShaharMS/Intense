@@ -35,6 +35,23 @@ pub(crate) fn acquire(maximum:usize,large:bool)->Budget<'static> {
  shared_pool().acquire(maximum,large)
 }
 
+/// Arrival workers overlap the source scheduler. Each owns only one spare
+/// CPU and releases it independently when its last codeword is published.
+pub(crate) fn arrival_limit(maximum: usize) -> usize {
+    let pool = shared_pool();
+    let ceiling = if crate::adaptation::conserve_compute() &&
+        !crate::adaptation::explicit("RIVER_OPENJPEG_THREADS_PER_DECODE") {
+        maximum.div_ceil(2)
+    } else { maximum };
+    let fair = fair_maximum(ceiling, ACTIVE_WORK.load(Ordering::Acquire), pool.cpus, pool.slots);
+    fair.saturating_sub(1).min(pool.free.load(Ordering::Acquire))
+}
+
+pub(crate) fn try_arrival_worker() -> Option<Budget<'static>> {
+    let lease = shared_pool().acquire(2,true);
+    (lease.claimed != 0).then_some(lease)
+}
+
 fn useful_pixels(request:&crate::engine::TileDecodeRequest)->u64 {
  let scale=1u32.checked_shl(u32::from(request.reduction)).unwrap_or(u32::MAX);
  request.tiles.iter().map(|&(x,y)| {
@@ -78,7 +95,27 @@ pub(crate) fn request_maximum(request:&crate::engine::TileDecodeRequest)->usize 
  let ceiling = if crate::adaptation::conserve_compute() && !crate::adaptation::explicit("RIVER_OPENJPEG_THREADS_PER_DECODE") {
      request.decoder_threads.div_ceil(2)
  } else { request.decoder_threads };
- maximum_with_groups(ceiling,useful_pixels(request),ACTIVE_WORK.load(Ordering::Acquire),pool.cpus,pool.slots,compact_native_groups(request))
+ let active = ACTIVE_WORK.load(Ordering::Acquire);
+ let pixels = useful_pixels(request);
+ // Sparse full-resolution streams retain hundreds of independent Tier-1
+ // blocks even for a single transport tile. Share idle workers under the
+ // same active-job and pool limits used for a large output.
+ if pixels >= 512 * 512 && request.reduction == 0 && request.layers == 0
+     && request.source.prepared.as_ref().is_some_and(|io| matches!(io.route, "s3-codeblock-ranges" | "s3-packet-ranges"))
+     && request.source.memory.as_ref().is_some_and(|bytes| bytes.len() >= 1024 * 1024)
+ {
+     return fair_maximum(ceiling, active, pool.cpus, pool.slots);
+ }
+ // A reduced ROI in a single large native tile can have many independent
+ // Tier-1 codeblocks even when its output is only one transport tile.
+ if pixels >= 512 * 512 && request.reduction > 0
+     && request.source.prepared.as_ref().is_some_and(|io| io.route == "s3-packet-ranges")
+     && request.source.native_tile_layout.is_some_and(|h| h.columns == 1 && h.rows == 1)
+     && request.source.memory.as_ref().is_some_and(|bytes| bytes.len() >= 4 * 1024 * 1024)
+ {
+     return fair_maximum(ceiling, active, pool.cpus, pool.slots);
+ }
+ maximum_with_groups(ceiling,pixels,active,pool.cpus,pool.slots,compact_native_groups(request))
 }
 
 pub(crate) fn large_request(request:&crate::engine::TileDecodeRequest)->bool {

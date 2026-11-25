@@ -5,6 +5,47 @@ use std::path::Path;
 
 use super::*;
 
+/// Convert an associated-alpha sample to straight color at the same precision.
+pub fn straight_sample(color: u16, alpha: u16, maximum: u16) -> u16 {
+  if alpha == 0 { return 0; }
+  let value = (u32::from(color) * u32::from(maximum) + u32::from(alpha / 2)) / u32::from(alpha);
+  value.min(u32::from(maximum)) as u16
+}
+
+fn straighten<T: Copy + Into<u16> + TryFrom<u16>>(samples: &mut [T], channels: usize, maximum: u16) {
+  for pixel in samples.chunks_exact_mut(channels) {
+    let alpha = pixel[channels - 1].into();
+    for color in &mut pixel[..channels - 1] {
+      if let Ok(value) = T::try_from(straight_sample((*color).into(), alpha, maximum)) { *color = value; }
+    }
+  }
+}
+
+/// Display convention for a source without usable channel labels.
+#[derive(Clone,Copy,Debug,PartialEq,Eq)]
+pub enum BandFallback { Gray, Rgb, Bgr, Rgba, Bgra }
+impl BandFallback {
+  fn indices(self) -> &'static [usize] {
+    match self { Self::Gray=>&[0], Self::Rgb=>&[0,1,2], Self::Bgr=>&[2,1,0],
+      Self::Rgba=>&[0,1,2,3], Self::Bgra=>&[2,1,0,3] }
+  }
+}
+
+/// Select display planes after OpenJPEG has applied JP2 channel associations.
+pub fn display_planes<T>(planes: &[T], space: ColorSpace, role: impl Fn(&T) -> u16) -> Result<Vec<&T>> {
+  let gray = matches!(space, ColorSpace::Gray)
+    || (planes.len() <= 2 && matches!(space, ColorSpace::Unknown | ColorSpace::Unspecified));
+  let colors=if gray {1} else {3};
+  let mut display: Vec<_> = planes.iter().filter(|p| role(p) == 0).take(colors).collect();
+  let mut opacity=planes.iter().filter(|p| matches!(role(p), 1 | 2));
+  if display.len()!=colors {return Err(Error::UnsupportedComponentsError(planes.len() as u32));}
+  if let Some(alpha) = opacity.next() {
+    if opacity.next().is_some() {return Err(Error::CodecError("multiple opacity channels".into()));}
+    display.push(alpha);
+  }
+  Ok(display)
+}
+
 /// A Jpeg2000 Image Component.
 pub struct ImageComponent(pub(crate) sys::opj_image_comp_t);
 
@@ -51,8 +92,11 @@ impl ImageComponent {
 
   /// Is component an alpha channel.
   pub fn is_alpha(&self) -> bool {
-    self.0.alpha == 1
+    matches!(self.0.alpha, 1 | 2)
   }
+
+  /// JP2 channel type after the decoder has applied the channel associations.
+  pub fn channel_type(&self) -> u16 { self.0.alpha }
 
   /// Is component data signed.
   pub fn is_signed(&self) -> bool {
@@ -345,12 +389,22 @@ impl Image {
   ///
   /// `alpha_default` - The default value for the alpha channel if there is no alpha component.
   pub fn get_pixels(&self, alpha_default: Option<u32>) -> Result<ImageData> {
-    let comps = self.components();
-    let comps=if comps.len()>4 || (comps.len()==4 && !comps.iter().any(|c|c.is_alpha())) {&comps[..3]}else{comps};
+    self.get_display_pixels(alpha_default,None)
+  }
+
+  pub fn get_display_pixels(&self, alpha_default: Option<u32>, fallback: Option<BandFallback>) -> Result<ImageData> {
+    let planes=if let Some(layout)=fallback {
+      let components=self.components();
+      layout.indices().iter().map(|&i|components.get(i).ok_or(Error::UnsupportedComponentsError(self.num_components()))).collect::<Result<Vec<_>>>()?
+    } else { display_planes(self.components(),self.color_space(),|c|c.0.alpha)? };
+    let comps=planes.as_slice();
     let (width, height) = comps
       .get(0)
       .map(|c| (c.width(), c.height()))
       .ok_or_else(|| Error::UnsupportedComponentsError(0))?;
+    if comps.iter().any(|c| c.width()!=width || c.height()!=height) {
+      return Err(Error::CodecError("display planes have different sampling grids".into()));
+    }
     let max_prec = comps
       .iter()
       .fold(std::u32::MIN, |max, c| max.max(c.precision()));
@@ -368,7 +422,7 @@ impl Image {
       }
     }
 
-    let data = match (comps, has_alpha, max_prec) {
+    let mut data = match (comps, has_alpha, max_prec) {
       ([r], _, 1..=8) => {
         if let Some(alpha) = alpha_default {
           format = ImageFormat::La8;
@@ -465,6 +519,13 @@ impl Image {
         return Err(Error::UnsupportedComponentsError(self.num_components()));
       }
     };
+    if comps.last().is_some_and(|c|c.0.alpha==2) {
+      match &mut data {
+        ImagePixelData::La8(p) | ImagePixelData::Rgba8(p) => straighten(p, comps.len(), 255),
+        ImagePixelData::La16(p) | ImagePixelData::Rgba16(p) => straighten(p, comps.len(), 65535),
+        _ => (),
+      }
+    }
     Ok(ImageData {
       width,
       height,

@@ -9,7 +9,7 @@ pub(super) struct Entry {pub tile:u16,pub ordinal:u8,pub offset:u64,pub length:u
 #[derive(Clone,Copy,Debug)]
 pub(super) enum Locator {Root {offset:u64,length:u64},Codestream {offset:u64,length:u64}}
 
-fn box_header(bytes:&[u8],at:usize)->Result<(u64,usize,[u8;4])> {
+pub(super) fn box_header(bytes:&[u8],at:usize)->Result<(u64,usize,[u8;4])> {
  let n=be32(bytes,at)?;ensure!(n!=0,"unbounded advertised JPIP box");
  let kind=bytes.get(at+4..at+8).context("short advertised JPIP box")?.try_into()?;
  let (length,header)=if n==1 {(be64(bytes,at+8)?,16)}else{(u64::from(n),8)};

@@ -1,0 +1,229 @@
+{
+  "qualifiedForRelease": true,
+  "version": "m1228-consolidation",
+  "imageId": "sha256:e7b73ab0f2aae69f5267f1629371b221b123b0b8b7557cb201b14561cd898c7a",
+  "sourceManifestSha256": "47ac7797d91281a6b3c3422be5f9e9b2440116585a338d4c4ef857b56035de53",
+  "channels": [
+    "stable",
+    "lts",
+    "latest"
+  ],
+  "channelPolicy": "One qualified image; explicitly requested consolidation and shared maintenance, no claimed 10% speedup",
+  "baseline": {
+    "version": "m1227",
+    "originalPublishedImage": true,
+    "archiveSha256": "078eabefeeb01bcf791c78ea13903a1967135c2b9eea70b83c49eab6eacb708c"
+  },
+  "httpMeasurements": 360,
+  "progressiveStreams": 180,
+  "additionalPairedMeasurements": 192,
+  "unitTests": {
+    "passed": 326,
+    "ignored": 16,
+    "realRedisValkeyIntegration": "separate live server and container restart checks passed"
+  },
+  "performance": {
+    "cold_zoom": {
+      "medianImageRatio": 1.0019406389633292,
+      "largestInitialImageRatio": 1.0396036546480718
+    },
+    "cold_preview": {
+      "medianImageRatio": 1.0037894558173355,
+      "largestInitialImageRatio": 1.0293976709856063
+    },
+    "zoom_after_preview": {
+      "medianImageRatio": 0.9993592324060775,
+      "largestInitialImageRatio": 1.4116778702556463
+    },
+    "repeated_zoom": {
+      "medianImageRatio": 0.9817449278016677,
+      "largestInitialImageRatio": 1.2195934674286197
+    }
+  },
+  "correctness": "Independent full-resolution and progressive final pixels exact; HTTP preview pixels exact across versions; 19/20 edge driver paths exact, explicit OpenJPEG HT rejection expected",
+  "resourceSafety": "Matched four-CPU/two-GiB containers; pressure contraction and recovery without OOM; RAM-only scratch; bounded transfer rates and explicit ceilings; native 512-MiB concurrency/lookup test",
+  "cacheLearning": {
+    "signals": [
+      "measured producer work reused per resident byte",
+      "measurement coverage",
+      "reuse",
+      "eviction pressure",
+      "occupancy"
+    ],
+    "measuredCategories": 7,
+    "unavailableCategories": [
+      "indexes",
+      "asset_metadata"
+    ],
+    "liveRequests": 1398,
+    "scope": "Sustained native workload on identical cache-learning implementation plus image diagnostics; no inferred end-to-end gain"
+  },
+  "overfetch": {
+    "originAccountingExact": true,
+    "configuredWarmupRespected": true,
+    "successfulRetriesExcluded": true,
+    "scope": "Forty cold object aliases on one controlled source; needed bytes are unique consumer-requested intersections, not theoretical entropy",
+    "observedRatio": 3.0748034973063674,
+    "learnedOptionalRatio": 1.5,
+    "bandwidthGainClaimed": false
+  },
+  "knownLimitations": [
+    "No NVIDIA GPU was available; CPU drivers and disclosed fallbacks were exercised.",
+    "Synthetic fixtures cannot qualify every customer codestream.",
+    "Index and image-metadata time benefits remain unavailable; nested saved-work estimates are not additive.",
+    "An extended baseline m1227 run timed out on memory admission; both versions restart between matched progressive batches. Failure evidence is retained.",
+    "Intermittent source-read latency outliers remain in raw results; eight-pair followups are reported separately.",
+    "Overfetch feedback is applied in adaptive mode; observe remains observational. Mandatory reads can exceed the optional ratio target.",
+    "Progressive timings measure frame arrival after manifest preparation, not browser paint."
+  ],
+  "evidence": [
+    {
+      "path": "evidence/consolidation-m1228/measurements/container-comparison.json",
+      "sha256": "0a157d03c0747438c93abf9d6b61a9f045dea34ea5678c180d06ce45e035df0b"
+    },
+    {
+      "path": "evidence/consolidation-m1228/measurements/comparison.html",
+      "sha256": "54f741169d99ceff08c20fd4badc086b13323a72e4077c8ee16b695d24a7b555"
+    },
+    {
+      "path": "evidence/consolidation-m1228/measurements/progressive-m1227.json",
+      "sha256": "adcfdf81f6f52086ecc52ca09390930ef46345b6c51e9c6dae3a0756ff6db08e"
+    },
+    {
+      "path": "evidence/consolidation-m1228/measurements/progressive-m1227-auto-overview.json",
+      "sha256": "3a9f9ca2630a02fa7f15c98a6385e548ac6017da2a581839e5a36277e051f99c"
+    },
+    {
+      "path": "evidence/consolidation-m1228/measurements/progressive-m1227-r2.json",
+      "sha256": "fb82607ffe2fc4f17eedc8f2c64fa5f3ce7bec1a87b7d47ac631120d3951bc04"
+    },
+    {
+      "path": "evidence/consolidation-m1228/measurements/progressive-m1227-r2-auto-overview.json",
+      "sha256": "0400f53336be18dd02bac0aff9cb488519552588d75aa82c523f06b944e6b6b2"
+    },
+    {
+      "path": "evidence/consolidation-m1228/measurements/progressive-m1227-r3.json",
+      "sha256": "fddb9dcca0dac80a6ba26998bd747dcb323c96010ddd80adb53af2c11a2fe3a7"
+    },
+    {
+      "path": "evidence/consolidation-m1228/measurements/progressive-m1227-r3-auto-overview.json",
+      "sha256": "fc050a7d65794045c4eacd1ab2c218374d68757db53435e59d453d80b44453e7"
+    },
+    {
+      "path": "evidence/consolidation-m1228/measurements/progressive-current.json",
+      "sha256": "0aae6f27f288cfe16076ec154dec003d2a864cfac0b7926e3ce5a2b90e60005f"
+    },
+    {
+      "path": "evidence/consolidation-m1228/measurements/progressive-current-auto-overview.json",
+      "sha256": "94126cef5b47a87f283c0bd1b7557907f885c8d713cf7ff3334d3dd4467520f0"
+    },
+    {
+      "path": "evidence/consolidation-m1228/measurements/progressive-current-r2.json",
+      "sha256": "c12db2acf4ec649bfe2995f1f4e574bd57f3b716a9bfebab0005526a9c707b4e"
+    },
+    {
+      "path": "evidence/consolidation-m1228/measurements/progressive-current-r2-auto-overview.json",
+      "sha256": "e6b5a47ec7ea554a1f4d359db9ae9bddd1c4f583be498058585981d60143d979"
+    },
+    {
+      "path": "evidence/consolidation-m1228/measurements/progressive-current-r3.json",
+      "sha256": "4bbc2041020db5fe3517ae8dc3d177007d28241e14fe5dbce91dcf220f8939eb"
+    },
+    {
+      "path": "evidence/consolidation-m1228/measurements/progressive-current-r3-auto-overview.json",
+      "sha256": "05396a3cec51c76a63d4d679aea02c599405718a350163b7ffe15820ecdb30b6"
+    },
+    {
+      "path": "evidence/consolidation-m1228/measurements/urban-followup.json",
+      "sha256": "179803410f9c5fdf819d8f8064956cdee3448469d5d579f2c6cc5a80ca330f97"
+    },
+    {
+      "path": "evidence/consolidation-m1228/measurements/terrain-followup.json",
+      "sha256": "f8a6ee9017e8f39fbb47efa8e800603716205df01ad980e42029f09e672bd191"
+    },
+    {
+      "path": "evidence/consolidation-m1228/measurements/layers-followup.json",
+      "sha256": "03ee472c3909f0e331f965ffcf6531b51cc74eca47ffa8d3242ae1a5e95f5c42"
+    },
+    {
+      "path": "evidence/consolidation-m1228/measurements/edge-m1227.json",
+      "sha256": "15b5acc32af69e40a917ba1bf3cf5c1798f64f3bb72a974182b92ba29da6549b"
+    },
+    {
+      "path": "evidence/consolidation-m1228/measurements/edge-current.json",
+      "sha256": "d5b81ac5a4abfb5cdcc39910e03f49d5a1e3f6e3c1f3eb1ab825354f444e7c07"
+    },
+    {
+      "path": "evidence/consolidation-m1228/checks/cors-final.json",
+      "sha256": "cd515b4f6a23e9ca808223aa63c92e2dd008bb781d6e965a4e5148b3e3ad0c85"
+    },
+    {
+      "path": "evidence/consolidation-m1228/checks/tls-final.json",
+      "sha256": "2e565a0eb430ce5d596315c0e6945215adb6c3510217d9d17bc26845999a4b2a"
+    },
+    {
+      "path": "evidence/consolidation-m1228/checks/tls-pfx-final.json",
+      "sha256": "f4ca99768ea05478e067fbf6ecbd53292ef2ba604b976c607fadd3beb9e93639"
+    },
+    {
+      "path": "evidence/consolidation-m1228/checks/container-read-feedback.json",
+      "sha256": "ccc77355cc6e6cc5588c82c071d25f29d4815ca5fd8bd7f13c7f8548988311d2"
+    },
+    {
+      "path": "evidence/consolidation-m1228/checks/container-retry-feedback.json",
+      "sha256": "7de482659b326459ee110d80359030f16b7a41942ff0641ff7005c61760f31d2"
+    },
+    {
+      "path": "evidence/consolidation-m1228/checks/container-shared-cache.json",
+      "sha256": "a4b79e942f6245a1edd6966e5ac6d55516b959fa04ac91dd2035de8e6e3b60f8"
+    },
+    {
+      "path": "evidence/consolidation-m1228/checks/container-pressure.json",
+      "sha256": "340e55e552ca94c1baaa9b733220854b83a6dff0f7ff5436568894ed71f62598"
+    },
+    {
+      "path": "evidence/consolidation-m1228/checks/container-local.json",
+      "sha256": "22b60ff8f5f901a96e542b19ee3a8611a9d73a88f57bf79b2b8746144d8fd3af"
+    },
+    {
+      "path": "evidence/consolidation-m1228/checks/cache-learning.json",
+      "sha256": "9cd118c23ec88b1d559daa81f984e813d1feb85520310dee60b064046b8ed03b"
+    },
+    {
+      "path": "evidence/consolidation-m1228/checks/local-lookup.json",
+      "sha256": "a45c07b8e57b74e220bd6a7f93d76775e9e322e2a2d4cd0dfd4af2e0a5a20869"
+    },
+    {
+      "path": "evidence/consolidation-m1228/checks/http3-final.log",
+      "sha256": "a074e89fa8e874312e2d5c99e0ff74c818b2fa23077e440bd2deff8b67323f63"
+    },
+    {
+      "path": "evidence/consolidation-m1228/checks/http3-pfx-final.log",
+      "sha256": "a074e89fa8e874312e2d5c99e0ff74c818b2fa23077e440bd2deff8b67323f63"
+    },
+    {
+      "path": "evidence/consolidation-m1228/checks/tests-feedback-final.log",
+      "sha256": "086156c1c03dfabea3067da5719131e899d2491ef29f51b03792c19d0beacf6a"
+    },
+    {
+      "path": "evidence/consolidation-m1228/checks/corpus.json",
+      "sha256": "f603ef7d08cde778b8180577c16bc1e46ee6468728f9c8ef81c3415df03f5912"
+    },
+    {
+      "path": "evidence/consolidation-m1228/checks/edge-corpus.json",
+      "sha256": "0eefda07def41a5ac6069acb4ff6754265e3c0bf0776c904acaba8ae560c6521"
+    },
+    {
+      "path": "evidence/consolidation-m1228/checks/structure-verification.json",
+      "sha256": "c528917b48460d284c2167a49c7494c5cb55afe521bb87112fd42540a793a985"
+    },
+    {
+      "path": "evidence/consolidation-m1228/checks/manifest.json",
+      "sha256": "47ac7797d91281a6b3c3422be5f9e9b2440116585a338d4c4ef857b56035de53"
+    },
+    {
+      "path": "evidence/consolidation-m1228/extended-baseline-timeout/progressive-m1227-r2.log",
+      "sha256": "c3db6a3dcf2c1a6d74185727393c374e17af7e686845d5a77c11f84073cb5931"
+    }
+  ]
+}

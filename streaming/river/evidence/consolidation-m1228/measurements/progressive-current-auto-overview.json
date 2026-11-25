@@ -1,0 +1,1282 @@
+{
+  "complete": true,
+  "scope": "4096x4096 overview at reduction 3; first/full-preview/final measured after manifest preparation; no browser paint",
+  "requestedDriver": "auto",
+  "rows": [
+    {
+      "image": "synthetic-terrain-plain-d4.jp2",
+      "label": "current",
+      "manifestMs": 9.913206999044633,
+      "firstFrameMs": 576.3092070010316,
+      "fullPreviewMs": 576.3092070010316,
+      "finalMs": 1119.1802050016122,
+      "referencePixelsExact": true,
+      "wireAfterManifest": {
+        "gets": 304,
+        "heads": 0,
+        "bytes": 646144
+      },
+      "wireIncludingManifest": {
+        "gets": 305,
+        "heads": 0,
+        "bytes": 649216
+      },
+      "frames": [
+        {
+          "ms": 576.3092070010316,
+          "header": {
+            "sessionId": "7e650a51-f785-4b23-9c4d-962ef2e6c4c0",
+            "traceId": "00000000000000000000000000000000",
+            "assetId": "s3v-e1224da86bf0d9861ee52727dfa2fbc825ecc8ce7cb1ba44404dd2ebc3b8e09e",
+            "sequence": 1,
+            "zoom": 3,
+            "tileX": 0,
+            "tileY": 0,
+            "pass": "preview",
+            "sourceLayers": 1,
+            "sourceBytes": 0,
+            "outputWidth": 512,
+            "outputHeight": 512,
+            "contentType": "image/png",
+            "serverTiming": {
+              "decoderRoute": "s3-reduced-resolution-view",
+              "decoderBackend": "openjpeg",
+              "workerQueueMs": 0.013238,
+              "decodeMs": 17.054963,
+              "encodeMs": 0.46599,
+              "sourceCacheStatus": "s3-range-miss",
+              "sourceCacheMs": 557.360092,
+              "sourceReadBytes": 198656,
+              "sourceRangeRequests": 185,
+              "sourceCacheHitBytes": 693436,
+              "elapsedMs": 575.422912
+            }
+          },
+          "pixelSha256": "c3517abf13b7eef4fedaaa5403fa4ace46c18d1e194777c96040b898a0e7160f"
+        },
+        {
+          "ms": 1119.1802050016122,
+          "header": {
+            "sessionId": "7e650a51-f785-4b23-9c4d-962ef2e6c4c0",
+            "traceId": "00000000000000000000000000000000",
+            "assetId": "s3v-e1224da86bf0d9861ee52727dfa2fbc825ecc8ce7cb1ba44404dd2ebc3b8e09e",
+            "sequence": 1,
+            "zoom": 3,
+            "tileX": 0,
+            "tileY": 0,
+            "pass": "final",
+            "sourceLayers": 1,
+            "sourceBytes": 48850639,
+            "outputWidth": 512,
+            "outputHeight": 512,
+            "contentType": "image/png",
+            "serverTiming": {
+              "decoderRoute": "s3-reduced-resolution-view",
+              "decoderBackend": "openjpeg",
+              "workerQueueMs": 0.158055,
+              "decodeMs": 62.440039000000006,
+              "encodeMs": 2.212366,
+              "sourceCacheStatus": "s3-range-miss",
+              "sourceCacheMs": 474.389593,
+              "sourceReadBytes": 447488,
+              "sourceRangeRequests": 119,
+              "sourceCacheHitBytes": 825732,
+              "elapsedMs": 1116.708281
+            }
+          },
+          "pixelSha256": "3cfae369d60e5cb862278e6736d470af02de503af164f1afb37b8887b96e5c50"
+        }
+      ]
+    },
+    {
+      "image": "synthetic-terrain-tlm-d4.jp2",
+      "label": "current",
+      "manifestMs": 8.690301001479384,
+      "firstFrameMs": 133.0617079984222,
+      "fullPreviewMs": 133.0617079984222,
+      "finalMs": 700.1125440001488,
+      "referencePixelsExact": true,
+      "wireAfterManifest": {
+        "gets": 313,
+        "heads": 0,
+        "bytes": 644096
+      },
+      "wireIncludingManifest": {
+        "gets": 314,
+        "heads": 0,
+        "bytes": 647168
+      },
+      "frames": [
+        {
+          "ms": 133.0617079984222,
+          "header": {
+            "sessionId": "b42d46b1-1bad-4c2a-b47f-0a4717aaefb4",
+            "traceId": "00000000000000000000000000000000",
+            "assetId": "s3v-f523db6d71691aabc8e798049c5eb13455e4654fa7c5318176caaed53fd2a3b6",
+            "sequence": 1,
+            "zoom": 3,
+            "tileX": 0,
+            "tileY": 0,
+            "pass": "preview",
+            "sourceLayers": 1,
+            "sourceBytes": 0,
+            "outputWidth": 512,
+            "outputHeight": 512,
+            "contentType": "image/png",
+            "serverTiming": {
+              "decoderRoute": "s3-reduced-resolution-view",
+              "decoderBackend": "openjpeg",
+              "workerQueueMs": 0.014163,
+              "decodeMs": 14.202497,
+              "encodeMs": 0.455652,
+              "sourceCacheStatus": "s3-range-miss",
+              "sourceCacheMs": 117.087974,
+              "sourceReadBytes": 197632,
+              "sourceRangeRequests": 193,
+              "sourceCacheHitBytes": 683194,
+              "elapsedMs": 132.158338
+            }
+          },
+          "pixelSha256": "c3517abf13b7eef4fedaaa5403fa4ace46c18d1e194777c96040b898a0e7160f"
+        },
+        {
+          "ms": 700.1125440001488,
+          "header": {
+            "sessionId": "b42d46b1-1bad-4c2a-b47f-0a4717aaefb4",
+            "traceId": "00000000000000000000000000000000",
+            "assetId": "s3v-f523db6d71691aabc8e798049c5eb13455e4654fa7c5318176caaed53fd2a3b6",
+            "sequence": 1,
+            "zoom": 3,
+            "tileX": 0,
+            "tileY": 0,
+            "pass": "final",
+            "sourceLayers": 1,
+            "sourceBytes": 48851029,
+            "outputWidth": 512,
+            "outputHeight": 512,
+            "contentType": "image/png",
+            "serverTiming": {
+              "decoderRoute": "s3-reduced-resolution-view",
+              "decoderBackend": "openjpeg",
+              "workerQueueMs": 0.094574,
+              "decodeMs": 61.931647999999996,
+              "encodeMs": 2.121913,
+              "sourceCacheStatus": "s3-range-miss",
+              "sourceCacheMs": 482.959099,
+              "sourceReadBytes": 446464,
+              "sourceRangeRequests": 120,
+              "sourceCacheHitBytes": 890145,
+              "elapsedMs": 698.300218
+            }
+          },
+          "pixelSha256": "3cfae369d60e5cb862278e6736d470af02de503af164f1afb37b8887b96e5c50"
+        }
+      ]
+    },
+    {
+      "image": "synthetic-terrain-tlm-plt-d5.jp2",
+      "label": "current",
+      "manifestMs": 8.484906000376213,
+      "firstFrameMs": 70.41270700210589,
+      "fullPreviewMs": 70.41270700210589,
+      "finalMs": 257.39956100005656,
+      "referencePixelsExact": true,
+      "wireAfterManifest": {
+        "gets": 165,
+        "heads": 0,
+        "bytes": 653312
+      },
+      "wireIncludingManifest": {
+        "gets": 166,
+        "heads": 0,
+        "bytes": 656384
+      },
+      "frames": [
+        {
+          "ms": 70.41270700210589,
+          "header": {
+            "sessionId": "ac115283-a6ff-44f9-b219-2f1a7076528e",
+            "traceId": "00000000000000000000000000000000",
+            "assetId": "s3v-8f0329c1fd94bf20bf2de5bba727456ab560bb2b67e5e1a448414d1ac0184e22",
+            "sequence": 1,
+            "zoom": 3,
+            "tileX": 0,
+            "tileY": 0,
+            "pass": "preview",
+            "sourceLayers": 1,
+            "sourceBytes": 0,
+            "outputWidth": 512,
+            "outputHeight": 512,
+            "contentType": "image/png",
+            "serverTiming": {
+              "decoderRoute": "s3-reduced-resolution-view",
+              "decoderBackend": "openjpeg",
+              "workerQueueMs": 0.012747,
+              "decodeMs": 4.260161999999999,
+              "encodeMs": 0.12523499999999999,
+              "sourceCacheStatus": "s3-range-miss",
+              "sourceCacheMs": 65.226996,
+              "sourceReadBytes": 103424,
+              "sourceRangeRequests": 101,
+              "sourceCacheHitBytes": 306490,
+              "elapsedMs": 70.04975400000001
+            }
+          },
+          "pixelSha256": "92e351089a5986f537c90777aa39bb4a255c7dc1b5bb5ccd8e69f757b75ad3a5"
+        },
+        {
+          "ms": 257.39956100005656,
+          "header": {
+            "sessionId": "ac115283-a6ff-44f9-b219-2f1a7076528e",
+            "traceId": "00000000000000000000000000000000",
+            "assetId": "s3v-8f0329c1fd94bf20bf2de5bba727456ab560bb2b67e5e1a448414d1ac0184e22",
+            "sequence": 1,
+            "zoom": 3,
+            "tileX": 0,
+            "tileY": 0,
+            "pass": "final",
+            "sourceLayers": 1,
+            "sourceBytes": 48856922,
+            "outputWidth": 512,
+            "outputHeight": 512,
+            "contentType": "image/png",
+            "serverTiming": {
+              "decoderRoute": "s3-reduced-resolution-view",
+              "decoderBackend": "openjpeg",
+              "workerQueueMs": 0.013026000000000001,
+              "decodeMs": 65.44070500000001,
+              "encodeMs": 2.2842000000000002,
+              "sourceCacheStatus": "s3-range-miss",
+              "sourceCacheMs": 35.677848,
+              "sourceReadBytes": 549888,
+              "sourceRangeRequests": 64,
+              "sourceCacheHitBytes": 823040,
+              "elapsedMs": 255.710903
+            }
+          },
+          "pixelSha256": "3cfae369d60e5cb862278e6736d470af02de503af164f1afb37b8887b96e5c50"
+        }
+      ]
+    },
+    {
+      "image": "synthetic-terrain-tlm-plt-d6-layers.jp2",
+      "label": "current",
+      "manifestMs": 8.624357000371674,
+      "firstFrameMs": 21.934296997642377,
+      "fullPreviewMs": 21.934296997642377,
+      "finalMs": 253.32967899885261,
+      "referencePixelsExact": true,
+      "wireAfterManifest": {
+        "gets": 44,
+        "heads": 0,
+        "bytes": 596992
+      },
+      "wireIncludingManifest": {
+        "gets": 45,
+        "heads": 0,
+        "bytes": 600064
+      },
+      "frames": [
+        {
+          "ms": 21.934296997642377,
+          "header": {
+            "sessionId": "3a4c3f68-693e-4a2e-9530-c12af6a2b1de",
+            "traceId": "00000000000000000000000000000000",
+            "assetId": "s3v-2350850afee2d0057aea35e567291b5f5ad3f7c4a7fe747312d2a0dc0bd33f89",
+            "sequence": 1,
+            "zoom": 3,
+            "tileX": 0,
+            "tileY": 0,
+            "pass": "preview",
+            "sourceLayers": 1,
+            "sourceBytes": 0,
+            "outputWidth": 512,
+            "outputHeight": 512,
+            "contentType": "image/png",
+            "serverTiming": {
+              "decoderRoute": "s3-packet-ranges",
+              "decoderBackend": "openjpeg",
+              "workerQueueMs": 0.012384999999999998,
+              "decodeMs": 2.873666,
+              "encodeMs": 0.14110699999999998,
+              "sourceCacheStatus": "s3-range-miss",
+              "sourceCacheMs": 18.180412999999998,
+              "sourceReadBytes": 46080,
+              "sourceRangeRequests": 28,
+              "sourceCacheHitBytes": 120757,
+              "elapsedMs": 21.565003
+            }
+          },
+          "pixelSha256": "835b9b2db281586a863aba89bffb963f188ba5558bb6ecb1dd4a849a333c04aa"
+        },
+        {
+          "ms": 253.32967899885261,
+          "header": {
+            "sessionId": "3a4c3f68-693e-4a2e-9530-c12af6a2b1de",
+            "traceId": "00000000000000000000000000000000",
+            "assetId": "s3v-2350850afee2d0057aea35e567291b5f5ad3f7c4a7fe747312d2a0dc0bd33f89",
+            "sequence": 1,
+            "zoom": 3,
+            "tileX": 0,
+            "tileY": 0,
+            "pass": "final",
+            "sourceLayers": 5,
+            "sourceBytes": 48927094,
+            "outputWidth": 512,
+            "outputHeight": 512,
+            "contentType": "image/png",
+            "serverTiming": {
+              "decoderRoute": "s3-packet-ranges",
+              "decoderBackend": "openjpeg",
+              "workerQueueMs": 0.015755,
+              "decodeMs": 63.095507999999995,
+              "encodeMs": 2.084761,
+              "sourceCacheStatus": "s3-range-miss",
+              "sourceCacheMs": 35.015899000000005,
+              "sourceReadBytes": 550912,
+              "sourceRangeRequests": 16,
+              "sourceCacheHitBytes": 695488,
+              "elapsedMs": 252.046995
+            }
+          },
+          "pixelSha256": "ff2b581c1c290d89b6bbb3d9c3d158cb2abcc7512215cd297862e65b65755395"
+        }
+      ]
+    },
+    {
+      "image": "synthetic-terrain-tlm-plt-d6-single.jp2",
+      "label": "current",
+      "manifestMs": 8.689857000717893,
+      "firstFrameMs": 12.319183002546197,
+      "fullPreviewMs": 12.319183002546197,
+      "finalMs": 187.81271600164473,
+      "referencePixelsExact": true,
+      "wireAfterManifest": {
+        "gets": 2,
+        "heads": 0,
+        "bytes": 571392
+      },
+      "wireIncludingManifest": {
+        "gets": 3,
+        "heads": 0,
+        "bytes": 574464
+      },
+      "frames": [
+        {
+          "ms": 12.319183002546197,
+          "header": {
+            "sessionId": "e4fb633a-5b51-45a0-a2d3-d9c287c6de6a",
+            "traceId": "00000000000000000000000000000000",
+            "assetId": "s3v-ca8c1527d261b55d87df77810c28ff768d643d8e630a019bc91c11c1137db0bd",
+            "sequence": 1,
+            "zoom": 3,
+            "tileX": 0,
+            "tileY": 0,
+            "pass": "preview",
+            "sourceLayers": 1,
+            "sourceBytes": 0,
+            "outputWidth": 512,
+            "outputHeight": 512,
+            "contentType": "image/png",
+            "serverTiming": {
+              "decoderRoute": "s3-reduced-resolution-view",
+              "decoderBackend": "jp2grok-native",
+              "workerQueueMs": 0.030095,
+              "decodeMs": 3.6866339999999997,
+              "encodeMs": 0.113386,
+              "sourceCacheStatus": "s3-range-miss",
+              "sourceCacheMs": 7.817415,
+              "sourceReadBytes": 30720,
+              "sourceRangeRequests": 1,
+              "sourceCacheHitBytes": 5230,
+              "elapsedMs": 11.954074
+            }
+          },
+          "pixelSha256": "3ee4da967ff06ce2c39303611ce7381b07dbdbede3834fb493a06171cc9bf2cd"
+        },
+        {
+          "ms": 187.81271600164473,
+          "header": {
+            "sessionId": "e4fb633a-5b51-45a0-a2d3-d9c287c6de6a",
+            "traceId": "00000000000000000000000000000000",
+            "assetId": "s3v-ca8c1527d261b55d87df77810c28ff768d643d8e630a019bc91c11c1137db0bd",
+            "sequence": 1,
+            "zoom": 3,
+            "tileX": 0,
+            "tileY": 0,
+            "pass": "final",
+            "sourceLayers": 1,
+            "sourceBytes": 48831451,
+            "outputWidth": 512,
+            "outputHeight": 512,
+            "contentType": "image/png",
+            "serverTiming": {
+              "decoderRoute": "s3-reduced-resolution-view",
+              "decoderBackend": "jp2grok-native",
+              "workerQueueMs": 0.075694,
+              "decodeMs": 21.308526,
+              "encodeMs": 1.4358680000000001,
+              "sourceCacheStatus": "s3-range-miss",
+              "sourceCacheMs": 11.949511,
+              "sourceReadBytes": 540672,
+              "sourceRangeRequests": 1,
+              "sourceCacheHitBytes": 34840,
+              "elapsedMs": 186.460899
+            }
+          },
+          "pixelSha256": "a3ab7647395f50301dec24de61097cc27249e73599f3b1d1c3302631bd0fd6e8"
+        }
+      ]
+    },
+    {
+      "image": "synthetic-urban-plain-d4.jp2",
+      "label": "current",
+      "manifestMs": 8.911476001230767,
+      "firstFrameMs": 614.6476219983015,
+      "fullPreviewMs": 614.6476219983015,
+      "finalMs": 1195.1951970004302,
+      "referencePixelsExact": true,
+      "wireAfterManifest": {
+        "gets": 318,
+        "heads": 0,
+        "bytes": 664576
+      },
+      "wireIncludingManifest": {
+        "gets": 319,
+        "heads": 0,
+        "bytes": 667648
+      },
+      "frames": [
+        {
+          "ms": 614.6476219983015,
+          "header": {
+            "sessionId": "b240a29b-b2a4-43b1-a250-0cdb4d365040",
+            "traceId": "00000000000000000000000000000000",
+            "assetId": "s3v-80284355c592bdcf10c0e98f20fdfdbe781654d10bdb07206a43e46d92d58419",
+            "sequence": 1,
+            "zoom": 3,
+            "tileX": 0,
+            "tileY": 0,
+            "pass": "preview",
+            "sourceLayers": 1,
+            "sourceBytes": 0,
+            "outputWidth": 512,
+            "outputHeight": 512,
+            "contentType": "image/png",
+            "serverTiming": {
+              "decoderRoute": "s3-reduced-resolution-view",
+              "decoderBackend": "openjpeg",
+              "workerQueueMs": 0.015113999999999999,
+              "decodeMs": 14.973297,
+              "encodeMs": 0.345369,
+              "sourceCacheStatus": "s3-range-miss",
+              "sourceCacheMs": 597.987018,
+              "sourceReadBytes": 200704,
+              "sourceRangeRequests": 190,
+              "sourceCacheHitBytes": 731230,
+              "elapsedMs": 613.7915499999999
+            }
+          },
+          "pixelSha256": "b1e32c5f44329cf50a30bc71d80d46a3b5e96c81bb48ef39bc901d6130c26704"
+        },
+        {
+          "ms": 1195.1951970004302,
+          "header": {
+            "sessionId": "b240a29b-b2a4-43b1-a250-0cdb4d365040",
+            "traceId": "00000000000000000000000000000000",
+            "assetId": "s3v-80284355c592bdcf10c0e98f20fdfdbe781654d10bdb07206a43e46d92d58419",
+            "sequence": 1,
+            "zoom": 3,
+            "tileX": 0,
+            "tileY": 0,
+            "pass": "final",
+            "sourceLayers": 1,
+            "sourceBytes": 49040460,
+            "outputWidth": 512,
+            "outputHeight": 512,
+            "contentType": "image/png",
+            "serverTiming": {
+              "decoderRoute": "s3-reduced-resolution-view",
+              "decoderBackend": "openjpeg",
+              "workerQueueMs": 0.111831,
+              "decodeMs": 64.517504,
+              "encodeMs": 1.9570820000000002,
+              "sourceCacheStatus": "s3-range-miss",
+              "sourceCacheMs": 511.763705,
+              "sourceReadBytes": 463872,
+              "sourceRangeRequests": 128,
+              "sourceCacheHitBytes": 828902,
+              "elapsedMs": 1193.859489
+            }
+          },
+          "pixelSha256": "d6f000bc132a0ac9e34d716023a9d141f7ff15959f7674411a0261c97780d1e7"
+        }
+      ]
+    },
+    {
+      "image": "synthetic-urban-tlm-d4.jp2",
+      "label": "current",
+      "manifestMs": 8.41411300280015,
+      "firstFrameMs": 139.80812400041032,
+      "fullPreviewMs": 139.80812400041032,
+      "finalMs": 744.9876659993606,
+      "referencePixelsExact": true,
+      "wireAfterManifest": {
+        "gets": 328,
+        "heads": 0,
+        "bytes": 667648
+      },
+      "wireIncludingManifest": {
+        "gets": 329,
+        "heads": 0,
+        "bytes": 670720
+      },
+      "frames": [
+        {
+          "ms": 139.80812400041032,
+          "header": {
+            "sessionId": "30ef8c79-9beb-4096-9fd4-de84a9d5693a",
+            "traceId": "00000000000000000000000000000000",
+            "assetId": "s3v-696d772798769b1acab472d2252e5cea8b0360f168878cda089baa93ec6b0f9d",
+            "sequence": 1,
+            "zoom": 3,
+            "tileX": 0,
+            "tileY": 0,
+            "pass": "preview",
+            "sourceLayers": 1,
+            "sourceBytes": 0,
+            "outputWidth": 512,
+            "outputHeight": 512,
+            "contentType": "image/png",
+            "serverTiming": {
+              "decoderRoute": "s3-reduced-resolution-view",
+              "decoderBackend": "openjpeg",
+              "workerQueueMs": 0.016889,
+              "decodeMs": 16.249122,
+              "encodeMs": 0.360943,
+              "sourceCacheStatus": "s3-range-miss",
+              "sourceCacheMs": 122.269375,
+              "sourceReadBytes": 205824,
+              "sourceRangeRequests": 200,
+              "sourceCacheHitBytes": 724060,
+              "elapsedMs": 139.251442
+            }
+          },
+          "pixelSha256": "b1e32c5f44329cf50a30bc71d80d46a3b5e96c81bb48ef39bc901d6130c26704"
+        },
+        {
+          "ms": 744.9876659993606,
+          "header": {
+            "sessionId": "30ef8c79-9beb-4096-9fd4-de84a9d5693a",
+            "traceId": "00000000000000000000000000000000",
+            "assetId": "s3v-696d772798769b1acab472d2252e5cea8b0360f168878cda089baa93ec6b0f9d",
+            "sequence": 1,
+            "zoom": 3,
+            "tileX": 0,
+            "tileY": 0,
+            "pass": "final",
+            "sourceLayers": 1,
+            "sourceBytes": 49040850,
+            "outputWidth": 512,
+            "outputHeight": 512,
+            "contentType": "image/png",
+            "serverTiming": {
+              "decoderRoute": "s3-reduced-resolution-view",
+              "decoderBackend": "openjpeg",
+              "workerQueueMs": 0.11746799999999999,
+              "decodeMs": 64.75905999999999,
+              "encodeMs": 1.854339,
+              "sourceCacheStatus": "s3-range-miss",
+              "sourceCacheMs": 524.769769,
+              "sourceReadBytes": 461824,
+              "sourceRangeRequests": 128,
+              "sourceCacheHitBytes": 900198,
+              "elapsedMs": 743.642621
+            }
+          },
+          "pixelSha256": "d6f000bc132a0ac9e34d716023a9d141f7ff15959f7674411a0261c97780d1e7"
+        }
+      ]
+    },
+    {
+      "image": "synthetic-urban-tlm-plt-d5.jp2",
+      "label": "current",
+      "manifestMs": 8.128011002554558,
+      "firstFrameMs": 64.28091599809704,
+      "fullPreviewMs": 64.28091599809704,
+      "finalMs": 258.287233998999,
+      "referencePixelsExact": true,
+      "wireAfterManifest": {
+        "gets": 158,
+        "heads": 0,
+        "bytes": 668672
+      },
+      "wireIncludingManifest": {
+        "gets": 159,
+        "heads": 0,
+        "bytes": 671744
+      },
+      "frames": [
+        {
+          "ms": 64.28091599809704,
+          "header": {
+            "sessionId": "547d4689-2932-45bf-9ea2-48c623164fc2",
+            "traceId": "00000000000000000000000000000000",
+            "assetId": "s3v-b3c9ae71370898f662ca47650e69c10fd1bd5e3d428ce02a663a0d0b4f51ce09",
+            "sequence": 1,
+            "zoom": 3,
+            "tileX": 0,
+            "tileY": 0,
+            "pass": "preview",
+            "sourceLayers": 1,
+            "sourceBytes": 0,
+            "outputWidth": 512,
+            "outputHeight": 512,
+            "contentType": "image/png",
+            "serverTiming": {
+              "decoderRoute": "s3-reduced-resolution-view",
+              "decoderBackend": "openjpeg",
+              "workerQueueMs": 0.012653000000000001,
+              "decodeMs": 4.106008,
+              "encodeMs": 0.114079,
+              "sourceCacheStatus": "s3-range-miss",
+              "sourceCacheMs": 59.293683,
+              "sourceReadBytes": 97280,
+              "sourceRangeRequests": 94,
+              "sourceCacheHitBytes": 301376,
+              "elapsedMs": 63.86352300000001
+            }
+          },
+          "pixelSha256": "f41048ecb76ef178f6344a0bc53b1feea30ca30ae46cfaaf60b11acaebd2f992"
+        },
+        {
+          "ms": 258.287233998999,
+          "header": {
+            "sessionId": "547d4689-2932-45bf-9ea2-48c623164fc2",
+            "traceId": "00000000000000000000000000000000",
+            "assetId": "s3v-b3c9ae71370898f662ca47650e69c10fd1bd5e3d428ce02a663a0d0b4f51ce09",
+            "sequence": 1,
+            "zoom": 3,
+            "tileX": 0,
+            "tileY": 0,
+            "pass": "final",
+            "sourceLayers": 1,
+            "sourceBytes": 49044489,
+            "outputWidth": 512,
+            "outputHeight": 512,
+            "contentType": "image/png",
+            "serverTiming": {
+              "decoderRoute": "s3-reduced-resolution-view",
+              "decoderBackend": "openjpeg",
+              "workerQueueMs": 0.012498,
+              "decodeMs": 67.24542699999999,
+              "encodeMs": 1.689406,
+              "sourceCacheStatus": "s3-range-miss",
+              "sourceCacheMs": 36.079877,
+              "sourceReadBytes": 571392,
+              "sourceRangeRequests": 64,
+              "sourceCacheHitBytes": 831232,
+              "elapsedMs": 256.82337
+            }
+          },
+          "pixelSha256": "d6f000bc132a0ac9e34d716023a9d141f7ff15959f7674411a0261c97780d1e7"
+        }
+      ]
+    },
+    {
+      "image": "synthetic-urban-tlm-plt-d6-layers.jp2",
+      "label": "current",
+      "manifestMs": 8.414072999585187,
+      "firstFrameMs": 21.5844289996312,
+      "fullPreviewMs": 21.5844289996312,
+      "finalMs": 255.1480879992596,
+      "referencePixelsExact": true,
+      "wireAfterManifest": {
+        "gets": 43,
+        "heads": 0,
+        "bytes": 612352
+      },
+      "wireIncludingManifest": {
+        "gets": 44,
+        "heads": 0,
+        "bytes": 615424
+      },
+      "frames": [
+        {
+          "ms": 21.5844289996312,
+          "header": {
+            "sessionId": "1d2bf407-864b-4ef7-a9c8-0ad4f7d51908",
+            "traceId": "00000000000000000000000000000000",
+            "assetId": "s3v-2dcb345438624fac6ead1abc9ad07bbde08ede73e9184a37febcdcff1999aa70",
+            "sequence": 1,
+            "zoom": 3,
+            "tileX": 0,
+            "tileY": 0,
+            "pass": "preview",
+            "sourceLayers": 1,
+            "sourceBytes": 0,
+            "outputWidth": 512,
+            "outputHeight": 512,
+            "contentType": "image/png",
+            "serverTiming": {
+              "decoderRoute": "s3-packet-ranges",
+              "decoderBackend": "openjpeg",
+              "workerQueueMs": 0.011986,
+              "decodeMs": 2.670557,
+              "encodeMs": 0.122002,
+              "sourceCacheStatus": "s3-range-miss",
+              "sourceCacheMs": 18.136665,
+              "sourceReadBytes": 44032,
+              "sourceRangeRequests": 27,
+              "sourceCacheHitBytes": 115670,
+              "elapsedMs": 21.246402
+            }
+          },
+          "pixelSha256": "f760f22fed2ce258988cf3d7e5285c548c1688e1b7e2cc1a89e8d19e7a996289"
+        },
+        {
+          "ms": 255.1480879992596,
+          "header": {
+            "sessionId": "1d2bf407-864b-4ef7-a9c8-0ad4f7d51908",
+            "traceId": "00000000000000000000000000000000",
+            "assetId": "s3v-2dcb345438624fac6ead1abc9ad07bbde08ede73e9184a37febcdcff1999aa70",
+            "sequence": 1,
+            "zoom": 3,
+            "tileX": 0,
+            "tileY": 0,
+            "pass": "final",
+            "sourceLayers": 5,
+            "sourceBytes": 49113437,
+            "outputWidth": 512,
+            "outputHeight": 512,
+            "contentType": "image/png",
+            "serverTiming": {
+              "decoderRoute": "s3-packet-ranges",
+              "decoderBackend": "openjpeg",
+              "workerQueueMs": 0.01288,
+              "decodeMs": 64.446849,
+              "encodeMs": 1.839541,
+              "sourceCacheStatus": "s3-range-miss",
+              "sourceCacheMs": 35.213114,
+              "sourceReadBytes": 568320,
+              "sourceRangeRequests": 16,
+              "sourceCacheHitBytes": 703680,
+              "elapsedMs": 253.82644599999998
+            }
+          },
+          "pixelSha256": "5ba4a03986f99aafeda432aff07ee6ce48cde5ef9617df38f029dc91341df29f"
+        }
+      ]
+    },
+    {
+      "image": "synthetic-urban-tlm-plt-d6-single.jp2",
+      "label": "current",
+      "manifestMs": 8.111037997878157,
+      "firstFrameMs": 11.197812997124856,
+      "fullPreviewMs": 11.197812997124856,
+      "finalMs": 187.57892299981904,
+      "referencePixelsExact": true,
+      "wireAfterManifest": {
+        "gets": 2,
+        "heads": 0,
+        "bytes": 586752
+      },
+      "wireIncludingManifest": {
+        "gets": 3,
+        "heads": 0,
+        "bytes": 589824
+      },
+      "frames": [
+        {
+          "ms": 11.197812997124856,
+          "header": {
+            "sessionId": "575f0bbc-02b6-4a99-9d59-e525a8de808a",
+            "traceId": "00000000000000000000000000000000",
+            "assetId": "s3v-03079304f6462593955d1609fbf89bc2e352cfc31b8c21b2ca0d58d5b28da0bc",
+            "sequence": 1,
+            "zoom": 3,
+            "tileX": 0,
+            "tileY": 0,
+            "pass": "preview",
+            "sourceLayers": 1,
+            "sourceBytes": 0,
+            "outputWidth": 512,
+            "outputHeight": 512,
+            "contentType": "image/png",
+            "serverTiming": {
+              "decoderRoute": "s3-reduced-resolution-view",
+              "decoderBackend": "jp2grok-native",
+              "workerQueueMs": 0.013430000000000001,
+              "decodeMs": 2.7473549999999998,
+              "encodeMs": 0.164662,
+              "sourceCacheStatus": "s3-range-miss",
+              "sourceCacheMs": 7.760663999999999,
+              "sourceReadBytes": 27648,
+              "sourceRangeRequests": 1,
+              "sourceCacheHitBytes": 5230,
+              "elapsedMs": 11.005931
+            }
+          },
+          "pixelSha256": "1f8c44bad35d16cb47629fde8cc902511bfca913421e3e32c03a8f186d19e3dd"
+        },
+        {
+          "ms": 187.57892299981904,
+          "header": {
+            "sessionId": "575f0bbc-02b6-4a99-9d59-e525a8de808a",
+            "traceId": "00000000000000000000000000000000",
+            "assetId": "s3v-03079304f6462593955d1609fbf89bc2e352cfc31b8c21b2ca0d58d5b28da0bc",
+            "sequence": 1,
+            "zoom": 3,
+            "tileX": 0,
+            "tileY": 0,
+            "pass": "final",
+            "sourceLayers": 1,
+            "sourceBytes": 49016271,
+            "outputWidth": 512,
+            "outputHeight": 512,
+            "contentType": "image/png",
+            "serverTiming": {
+              "decoderRoute": "s3-reduced-resolution-view",
+              "decoderBackend": "jp2grok-native",
+              "workerQueueMs": 0.016437,
+              "decodeMs": 22.621425000000002,
+              "encodeMs": 1.448029,
+              "sourceCacheStatus": "s3-range-miss",
+              "sourceCacheMs": 11.527317,
+              "sourceReadBytes": 559104,
+              "sourceRangeRequests": 1,
+              "sourceCacheHitBytes": 31768,
+              "elapsedMs": 186.638917
+            }
+          },
+          "pixelSha256": "4352dc19ec31483c5aae73d0b63059b7df39847df43daf689fcad33bb2bb5606"
+        }
+      ]
+    },
+    {
+      "image": "synthetic-texture-plain-d4.jp2",
+      "label": "current",
+      "manifestMs": 8.256461002019932,
+      "firstFrameMs": 569.1453010003897,
+      "fullPreviewMs": 569.1453010003897,
+      "finalMs": 1182.1448809969297,
+      "referencePixelsExact": true,
+      "wireAfterManifest": {
+        "gets": 317,
+        "heads": 0,
+        "bytes": 716800
+      },
+      "wireIncludingManifest": {
+        "gets": 318,
+        "heads": 0,
+        "bytes": 719872
+      },
+      "frames": [
+        {
+          "ms": 569.1453010003897,
+          "header": {
+            "sessionId": "c2b3b85c-b049-48f9-8437-e566263c962f",
+            "traceId": "00000000000000000000000000000000",
+            "assetId": "s3v-2578871503581e8c789023f47e74cf9dd0120cd7ac9d2b431840e087615c0663",
+            "sequence": 1,
+            "zoom": 3,
+            "tileX": 0,
+            "tileY": 0,
+            "pass": "preview",
+            "sourceLayers": 1,
+            "sourceBytes": 0,
+            "outputWidth": 512,
+            "outputHeight": 512,
+            "contentType": "image/png",
+            "serverTiming": {
+              "decoderRoute": "s3-reduced-resolution-view",
+              "decoderBackend": "openjpeg",
+              "workerQueueMs": 0.016476,
+              "decodeMs": 16.763374000000002,
+              "encodeMs": 0.330072,
+              "sourceCacheStatus": "s3-range-miss",
+              "sourceCacheMs": 550.713208,
+              "sourceReadBytes": 206848,
+              "sourceRangeRequests": 189,
+              "sourceCacheHitBytes": 720255,
+              "elapsedMs": 568.2959400000001
+            }
+          },
+          "pixelSha256": "bc5b1c45a1381bb374778e48034d4b2124a15e102c5ab208ed9c055c8081a181"
+        },
+        {
+          "ms": 1182.1448809969297,
+          "header": {
+            "sessionId": "c2b3b85c-b049-48f9-8437-e566263c962f",
+            "traceId": "00000000000000000000000000000000",
+            "assetId": "s3v-2578871503581e8c789023f47e74cf9dd0120cd7ac9d2b431840e087615c0663",
+            "sequence": 1,
+            "zoom": 3,
+            "tileX": 0,
+            "tileY": 0,
+            "pass": "final",
+            "sourceLayers": 1,
+            "sourceBytes": 55373731,
+            "outputWidth": 512,
+            "outputHeight": 512,
+            "contentType": "image/png",
+            "serverTiming": {
+              "decoderRoute": "s3-reduced-resolution-view",
+              "decoderBackend": "openjpeg",
+              "workerQueueMs": 0.07992099999999999,
+              "decodeMs": 67.596389,
+              "encodeMs": 2.10974,
+              "sourceCacheStatus": "s3-range-miss",
+              "sourceCacheMs": 541.111311,
+              "sourceReadBytes": 509952,
+              "sourceRangeRequests": 128,
+              "sourceCacheHitBytes": 831222,
+              "elapsedMs": 1180.98154
+            }
+          },
+          "pixelSha256": "aae72f5d54f7542f985a2148bc6f450552dff86eb06a3d4773bdc7d3073158ac"
+        }
+      ]
+    },
+    {
+      "image": "synthetic-texture-tlm-d4.jp2",
+      "label": "current",
+      "manifestMs": 8.447666001302423,
+      "firstFrameMs": 139.85408900043694,
+      "fullPreviewMs": 139.85408900043694,
+      "finalMs": 774.4098420007504,
+      "referencePixelsExact": true,
+      "wireAfterManifest": {
+        "gets": 327,
+        "heads": 0,
+        "bytes": 717824
+      },
+      "wireIncludingManifest": {
+        "gets": 328,
+        "heads": 0,
+        "bytes": 720896
+      },
+      "frames": [
+        {
+          "ms": 139.85408900043694,
+          "header": {
+            "sessionId": "387851e0-7903-4cfd-9496-29dfd1c01145",
+            "traceId": "00000000000000000000000000000000",
+            "assetId": "s3v-e39d1bbd1dc3f929b1866ed819e0784b3478000683f847daf3f36ddd81411ff2",
+            "sequence": 1,
+            "zoom": 3,
+            "tileX": 0,
+            "tileY": 0,
+            "pass": "preview",
+            "sourceLayers": 1,
+            "sourceBytes": 0,
+            "outputWidth": 512,
+            "outputHeight": 512,
+            "contentType": "image/png",
+            "serverTiming": {
+              "decoderRoute": "s3-reduced-resolution-view",
+              "decoderBackend": "openjpeg",
+              "workerQueueMs": 0.014935,
+              "decodeMs": 14.941594,
+              "encodeMs": 0.354412,
+              "sourceCacheStatus": "s3-range-miss",
+              "sourceCacheMs": 123.538534,
+              "sourceReadBytes": 203776,
+              "sourceRangeRequests": 199,
+              "sourceCacheHitBytes": 693629,
+              "elapsedMs": 139.233226
+            }
+          },
+          "pixelSha256": "bc5b1c45a1381bb374778e48034d4b2124a15e102c5ab208ed9c055c8081a181"
+        },
+        {
+          "ms": 774.4098420007504,
+          "header": {
+            "sessionId": "387851e0-7903-4cfd-9496-29dfd1c01145",
+            "traceId": "00000000000000000000000000000000",
+            "assetId": "s3v-e39d1bbd1dc3f929b1866ed819e0784b3478000683f847daf3f36ddd81411ff2",
+            "sequence": 1,
+            "zoom": 3,
+            "tileX": 0,
+            "tileY": 0,
+            "pass": "final",
+            "sourceLayers": 1,
+            "sourceBytes": 55374121,
+            "outputWidth": 512,
+            "outputHeight": 512,
+            "contentType": "image/png",
+            "serverTiming": {
+              "decoderRoute": "s3-reduced-resolution-view",
+              "decoderBackend": "openjpeg",
+              "workerQueueMs": 0.096457,
+              "decodeMs": 69.753451,
+              "encodeMs": 2.171414,
+              "sourceCacheStatus": "s3-range-miss",
+              "sourceCacheMs": 549.388585,
+              "sourceReadBytes": 514048,
+              "sourceRangeRequests": 128,
+              "sourceCacheHitBytes": 898422,
+              "elapsedMs": 773.320296
+            }
+          },
+          "pixelSha256": "aae72f5d54f7542f985a2148bc6f450552dff86eb06a3d4773bdc7d3073158ac"
+        }
+      ]
+    },
+    {
+      "image": "synthetic-texture-tlm-plt-d5.jp2",
+      "label": "current",
+      "manifestMs": 8.67868099885527,
+      "firstFrameMs": 78.34860200091498,
+      "fullPreviewMs": 78.34860200091498,
+      "finalMs": 261.85359900046024,
+      "referencePixelsExact": true,
+      "wireAfterManifest": {
+        "gets": 165,
+        "heads": 0,
+        "bytes": 728064
+      },
+      "wireIncludingManifest": {
+        "gets": 166,
+        "heads": 0,
+        "bytes": 731136
+      },
+      "frames": [
+        {
+          "ms": 78.34860200091498,
+          "header": {
+            "sessionId": "04a50629-8ae8-4272-90de-fb900c483994",
+            "traceId": "00000000000000000000000000000000",
+            "assetId": "s3v-d1d262177c461fabf1bc86e4edd642c428b2f7645e7c13af1a906d6e71f1beb8",
+            "sequence": 1,
+            "zoom": 3,
+            "tileX": 0,
+            "tileY": 0,
+            "pass": "preview",
+            "sourceLayers": 1,
+            "sourceBytes": 0,
+            "outputWidth": 512,
+            "outputHeight": 512,
+            "contentType": "image/png",
+            "serverTiming": {
+              "decoderRoute": "s3-reduced-resolution-view",
+              "decoderBackend": "openjpeg",
+              "workerQueueMs": 0.010261000000000001,
+              "decodeMs": 3.950778,
+              "encodeMs": 0.106977,
+              "sourceCacheStatus": "s3-range-miss",
+              "sourceCacheMs": 73.544044,
+              "sourceReadBytes": 104448,
+              "sourceRangeRequests": 101,
+              "sourceCacheHitBytes": 309568,
+              "elapsedMs": 77.958635
+            }
+          },
+          "pixelSha256": "d9c31a57eb670ad4af72fb4883a587c12a93397a1a755fb4d885f806aebe091d"
+        },
+        {
+          "ms": 261.85359900046024,
+          "header": {
+            "sessionId": "04a50629-8ae8-4272-90de-fb900c483994",
+            "traceId": "00000000000000000000000000000000",
+            "assetId": "s3v-d1d262177c461fabf1bc86e4edd642c428b2f7645e7c13af1a906d6e71f1beb8",
+            "sequence": 1,
+            "zoom": 3,
+            "tileX": 0,
+            "tileY": 0,
+            "pass": "final",
+            "sourceLayers": 1,
+            "sourceBytes": 55384317,
+            "outputWidth": 512,
+            "outputHeight": 512,
+            "contentType": "image/png",
+            "serverTiming": {
+              "decoderRoute": "s3-reduced-resolution-view",
+              "decoderBackend": "openjpeg",
+              "workerQueueMs": 0.014025000000000001,
+              "decodeMs": 70.37048999999999,
+              "encodeMs": 2.010802,
+              "sourceCacheStatus": "s3-range-miss",
+              "sourceCacheMs": 36.144434000000004,
+              "sourceReadBytes": 623616,
+              "sourceRangeRequests": 64,
+              "sourceCacheHitBytes": 900864,
+              "elapsedMs": 260.504721
+            }
+          },
+          "pixelSha256": "aae72f5d54f7542f985a2148bc6f450552dff86eb06a3d4773bdc7d3073158ac"
+        }
+      ]
+    },
+    {
+      "image": "synthetic-texture-tlm-plt-d6-layers.jp2",
+      "label": "current",
+      "manifestMs": 8.9783660005196,
+      "firstFrameMs": 20.51277599821333,
+      "fullPreviewMs": 20.51277599821333,
+      "finalMs": 256.8277569989732,
+      "referencePixelsExact": true,
+      "wireAfterManifest": {
+        "gets": 43,
+        "heads": 0,
+        "bytes": 674816
+      },
+      "wireIncludingManifest": {
+        "gets": 44,
+        "heads": 0,
+        "bytes": 677888
+      },
+      "frames": [
+        {
+          "ms": 20.51277599821333,
+          "header": {
+            "sessionId": "dc8c63af-2938-48c8-9e2e-b3c5e7f155b9",
+            "traceId": "00000000000000000000000000000000",
+            "assetId": "s3v-e7a9306a6c7f2f1806ef62e8c8a58dac5e5de3e4a26bbf097bebc96252c5d968",
+            "sequence": 1,
+            "zoom": 3,
+            "tileX": 0,
+            "tileY": 0,
+            "pass": "preview",
+            "sourceLayers": 1,
+            "sourceBytes": 0,
+            "outputWidth": 512,
+            "outputHeight": 512,
+            "contentType": "image/png",
+            "serverTiming": {
+              "decoderRoute": "s3-packet-ranges",
+              "decoderBackend": "openjpeg",
+              "workerQueueMs": 0.013866000000000002,
+              "decodeMs": 1.409668,
+              "encodeMs": 0.117916,
+              "sourceCacheStatus": "s3-range-miss",
+              "sourceCacheMs": 18.374446,
+              "sourceReadBytes": 43008,
+              "sourceRangeRequests": 27,
+              "sourceCacheHitBytes": 114634,
+              "elapsedMs": 20.227689
+            }
+          },
+          "pixelSha256": "730faacb5501fa4f4b7fa9db7290cd422425a1a92f1537b158c1a570ad1e437e"
+        },
+        {
+          "ms": 256.8277569989732,
+          "header": {
+            "sessionId": "dc8c63af-2938-48c8-9e2e-b3c5e7f155b9",
+            "traceId": "00000000000000000000000000000000",
+            "assetId": "s3v-e7a9306a6c7f2f1806ef62e8c8a58dac5e5de3e4a26bbf097bebc96252c5d968",
+            "sequence": 1,
+            "zoom": 3,
+            "tileX": 0,
+            "tileY": 0,
+            "pass": "final",
+            "sourceLayers": 5,
+            "sourceBytes": 55455997,
+            "outputWidth": 512,
+            "outputHeight": 512,
+            "contentType": "image/png",
+            "serverTiming": {
+              "decoderRoute": "s3-packet-ranges",
+              "decoderBackend": "openjpeg",
+              "workerQueueMs": 0.099388,
+              "decodeMs": 67.003565,
+              "encodeMs": 2.23093,
+              "sourceCacheStatus": "s3-range-miss",
+              "sourceCacheMs": 35.120110000000004,
+              "sourceReadBytes": 631808,
+              "sourceRangeRequests": 16,
+              "sourceCacheHitBytes": 765120,
+              "elapsedMs": 255.62403099999997
+            }
+          },
+          "pixelSha256": "425b4f6ae6d6f1cb9a516bb9b230a1c605ac49c4fe6bbe998fe2e17890f5e2d8"
+        }
+      ]
+    },
+    {
+      "image": "synthetic-texture-tlm-plt-d6-single.jp2",
+      "label": "current",
+      "manifestMs": 8.894159000192303,
+      "firstFrameMs": 10.968226997647434,
+      "fullPreviewMs": 10.968226997647434,
+      "finalMs": 190.99735000054352,
+      "referencePixelsExact": true,
+      "wireAfterManifest": {
+        "gets": 2,
+        "heads": 0,
+        "bytes": 646144
+      },
+      "wireIncludingManifest": {
+        "gets": 3,
+        "heads": 0,
+        "bytes": 649216
+      },
+      "frames": [
+        {
+          "ms": 10.968226997647434,
+          "header": {
+            "sessionId": "a9d7a313-683c-475e-ad66-8e60ba6c390d",
+            "traceId": "00000000000000000000000000000000",
+            "assetId": "s3v-4457ec74580f86c1d201da59eb894c8e161b76731e2ac5975fc04310c4271dda",
+            "sequence": 1,
+            "zoom": 3,
+            "tileX": 0,
+            "tileY": 0,
+            "pass": "preview",
+            "sourceLayers": 1,
+            "sourceBytes": 0,
+            "outputWidth": 512,
+            "outputHeight": 512,
+            "contentType": "image/png",
+            "serverTiming": {
+              "decoderRoute": "s3-reduced-resolution-view",
+              "decoderBackend": "jp2grok-native",
+              "workerQueueMs": 0.015633,
+              "decodeMs": 2.428576,
+              "encodeMs": 0.094965,
+              "sourceCacheStatus": "s3-range-miss",
+              "sourceCacheMs": 7.808597,
+              "sourceReadBytes": 26624,
+              "sourceRangeRequests": 1,
+              "sourceCacheHitBytes": 5230,
+              "elapsedMs": 10.683669
+            }
+          },
+          "pixelSha256": "4884212105a8652b7c7e15b5fbc47a30fb56546c67550db6792e6bc1ab9bfb57"
+        },
+        {
+          "ms": 190.99735000054352,
+          "header": {
+            "sessionId": "a9d7a313-683c-475e-ad66-8e60ba6c390d",
+            "traceId": "00000000000000000000000000000000",
+            "assetId": "s3v-4457ec74580f86c1d201da59eb894c8e161b76731e2ac5975fc04310c4271dda",
+            "sequence": 1,
+            "zoom": 3,
+            "tileX": 0,
+            "tileY": 0,
+            "pass": "final",
+            "sourceLayers": 1,
+            "sourceBytes": 55360677,
+            "outputWidth": 512,
+            "outputHeight": 512,
+            "contentType": "image/png",
+            "serverTiming": {
+              "decoderRoute": "s3-reduced-resolution-view",
+              "decoderBackend": "jp2grok-native",
+              "workerQueueMs": 0.010488,
+              "decodeMs": 24.250130000000002,
+              "encodeMs": 2.067897,
+              "sourceCacheStatus": "s3-range-miss",
+              "sourceCacheMs": 11.706430000000001,
+              "sourceReadBytes": 619520,
+              "sourceRangeRequests": 1,
+              "sourceCacheHitBytes": 30744,
+              "elapsedMs": 189.636496
+            }
+          },
+          "pixelSha256": "f62467c211e7b3e6c9de1f07c14bbda23d0e2e24be2821cd9a9f6611fee47fbd"
+        }
+      ]
+    }
+  ]
+}

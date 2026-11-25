@@ -1,0 +1,44 @@
+{
+  "fixtures": [
+    {
+      "file": "synthetic-edge-gray.jp2",
+      "source": "synthetic-edge-gray-reference.png",
+      "components": 1,
+      "bits": 16,
+      "kind": "gray",
+      "encoder": "Grok 20.4.15 from original m1227 image"
+    },
+    {
+      "file": "synthetic-edge-alpha.jp2",
+      "source": "synthetic-edge-alpha-reference.png",
+      "components": 4,
+      "bits": 8,
+      "kind": "alpha",
+      "encoder": "Grok 20.4.15 from original m1227 image"
+    },
+    {
+      "file": "synthetic-edge-six-band.jp2",
+      "source": "synthetic-edge-six-band-reference.png",
+      "components": 6,
+      "bits": 16,
+      "kind": "six-band",
+      "encoder": "Grok 20.4.15 from original m1227 image"
+    },
+    {
+      "file": "synthetic-edge-eight-band.jp2",
+      "source": "synthetic-edge-eight-band-reference.png",
+      "components": 8,
+      "bits": 16,
+      "kind": "eight-band",
+      "encoder": "Grok 20.4.15 from original m1227 image"
+    },
+    {
+      "file": "synthetic-edge-ht-rgb.jph",
+      "source": "synthetic-edge-ht-rgb-reference.png",
+      "components": 3,
+      "bits": 8,
+      "kind": "ht-rgb",
+      "encoder": "Grok 20.4.15 from original m1227 image"
+    }
+  ]
+}

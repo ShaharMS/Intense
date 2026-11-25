@@ -76,8 +76,7 @@ setting was measured on an RTX 4060 laptop with 8 GiB VRAM.
 The viewer retains trace history for the browser page session without another
 service. For distributed trace export, set `RIVER_OTEL_ENABLED=true` and point
 `OTEL_EXPORTER_OTLP_ENDPOINT` at your existing OTLP/gRPC collector. No collector
-is required for standalone startup. WebSocket message/framing details are
-documented under the Streaming section in Swagger.
+is required for standalone startup.
 
 ## Stop
 
@@ -159,8 +158,7 @@ RIVER_TLS_PROTOCOLS accepts a comma-separated list of http/1.1, h2 and h3.
 The default is http/1.1,h2. JSON uses an array such as ["h2", "h3"].
 RIVER_TLS_BIND defaults to 0.0.0.0:8443. HTTP/1.1 and HTTP/2 use TCP.
 HTTP/3 uses UDP on the same listener port. RIVER_HTTP3_PUBLIC_PORT sets the
-advertised UDP port when it differs from the bind port. WebSockets use HTTPS
-over HTTP/1.1 or HTTP/2. Keep one of those protocols for the progressive viewer.
+advertised UDP port when it differs from the bind port.
 
 Use a Kubernetes TLS Secret mounted at /run/river-tls for PEM, or a generic
 Secret with the PFX and password files. Target TCP and/or UDP port 8443 in

@@ -6,3 +6,9 @@
 deploy/local-state/
 deploy/local-stack.json
 reports/container-consolidation/
+# Reproducible generated imagery; manifests live under target/fixtures.
+/corpus/synthetic-*
+
+__pycache__/
+
+/corpus/maps/

@@ -372,6 +372,7 @@ impl CodestreamInfo {
 
 pub(crate) struct Codec {
   codec: ptr::NonNull<sys::opj_codec_t>,
+  messages: Box<CodecMessages>,
 }
 
 impl Drop for Codec {
@@ -382,23 +383,78 @@ impl Drop for Codec {
   }
 }
 
-extern "C" fn log_info(msg: *const c_char, _data: *mut c_void) {
-  unsafe {
-    log::info!("{:?}", CStr::from_ptr(msg).to_string_lossy());
+thread_local! {
+  static DEBUG_MESSAGES: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// Attach informational codec diagnostics to errors raised by this operation.
+pub fn with_codec_diagnostics<T>(debug: bool, work: impl FnOnce() -> T) -> T {
+  struct Restore(bool);
+  impl Drop for Restore {
+    fn drop(&mut self) { DEBUG_MESSAGES.set(self.0); }
+  }
+  let _restore = Restore(DEBUG_MESSAGES.replace(debug));
+  work()
+}
+
+#[derive(Default)]
+struct MessageBuffer { text: String, omitted: usize }
+
+impl MessageBuffer {
+  fn push(&mut self, message: &str, limit: usize) {
+    if !self.text.is_empty() && self.text.len()+2<=limit { self.text.push_str("; "); }
+    for ch in message.trim().chars() {
+      if self.text.len()+ch.len_utf8()>limit { self.omitted+=1; break; }
+      self.text.push(if ch.is_control() { ' ' } else { ch });
+    }
   }
 }
 
-extern "C" fn log_warn(msg: *const c_char, _data: *mut c_void) {
-  unsafe {
-    log::warn!("{:?}", CStr::from_ptr(msg).to_string_lossy());
+/// Each codec owns its messages, including callbacks on its native workers.
+pub struct CodecMessages { buffers: std::sync::Mutex<[MessageBuffer;3]>, debug: bool }
+
+impl Default for CodecMessages {
+  fn default() -> Self { Self { buffers: Default::default(), debug: DEBUG_MESSAGES.get() } }
+}
+
+impl CodecMessages {
+  /// # Safety
+  /// The codec must be live and this allocation must stay at this address until
+  /// after opj_destroy_codec has finished (including native thread shutdown).
+  pub unsafe fn attach(&self, codec: *mut sys::opj_codec_t) {
+    let data=(self as *const Self).cast_mut().cast();
+    unsafe {
+      sys::opj_set_error_handler(codec,Some(log_error),data);
+      sys::opj_set_warning_handler(codec,Some(log_warn),data);
+      if self.debug || log_enabled!(Level::Info) { sys::opj_set_info_handler(codec,Some(log_info),data); }
+    }
+  }
+
+  pub fn describe(&self, operation: &str) -> String {
+    use std::fmt::Write;
+    let buffers=self.buffers.lock().unwrap_or_else(|e|e.into_inner());
+    let mut out=operation.to_owned();
+    for (label,buf) in ["error","warning","info"].into_iter().zip(buffers.iter()) {
+      if !buf.text.is_empty() {
+        let _=write!(out,": {label}: {}",buf.text);
+        if buf.omitted>0 {let _=write!(out," [{} messages clipped]",buf.omitted);}
+      }
+    }
+    out
   }
 }
 
-extern "C" fn log_error(msg: *const c_char, _data: *mut c_void) {
-  unsafe {
-    log::error!("{:?}", CStr::from_ptr(msg).to_string_lossy());
-  }
+fn codec_message(msg:*const c_char, data:*mut c_void, index:usize, level:Level) {
+  if msg.is_null() || data.is_null() { return; }
+  let message=unsafe { CStr::from_ptr(msg) }.to_string_lossy();
+  log::log!(level,"{}",message.trim());
+  let messages=unsafe { &*data.cast::<CodecMessages>() };
+  if index==2 && !messages.debug && !log_enabled!(Level::Debug) { return; }
+  messages.buffers.lock().unwrap_or_else(|e|e.into_inner())[index].push(&message,2048);
 }
+extern "C" fn log_error(msg:*const c_char,data:*mut c_void) { codec_message(msg,data,0,Level::Error); }
+extern "C" fn log_warn(msg:*const c_char,data:*mut c_void) { codec_message(msg,data,1,Level::Warn); }
+extern "C" fn log_info(msg:*const c_char,data:*mut c_void) { codec_message(msg,data,2,Level::Info); }
 
 impl Codec {
   fn new(fmt: J2KFormat, is_decoder: bool) -> Result<Self> {
@@ -411,15 +467,9 @@ impl Codec {
       }
     };
     if let Some(ptr) = ptr {
-      let null = ptr::null_mut();
+      let messages = Box::<CodecMessages>::default();
       unsafe {
-        if log_enabled!(Level::Info) {
-          sys::opj_set_info_handler(ptr.as_ptr(), Some(log_info), null);
-        }
-        if log_enabled!(Level::Warn) {
-          sys::opj_set_warning_handler(ptr.as_ptr(), Some(log_warn), null);
-        }
-        sys::opj_set_error_handler(ptr.as_ptr(), Some(log_error), null);
+        messages.attach(ptr.as_ptr());
 
         #[cfg(feature = "threads")]
         if sys::opj_has_thread_support() == 1 {
@@ -430,7 +480,7 @@ impl Codec {
         }
       }
 
-      Ok(Self { codec: ptr })
+      Ok(Self { codec: ptr, messages })
     } else {
       Err(Error::CreateCodecError(format!(
         "Codec not supported: {:?}",
@@ -498,11 +548,11 @@ impl<'a> Decoder<'a> {
     let res = unsafe { sys::opj_read_header(self.stream.as_ptr(), self.as_ptr(), &mut img) };
     // Try wrapping the image pointer before handling any errors.
     // Since the read header function might have allocated the image structure.
-    let img = Image::new(img)?;
+    let img = Image::new(img);
     if res == 1 {
-      Ok(img)
+      img
     } else {
-      Err(Error::CodecError("Failed to read header".into()))
+      Err(Error::CodecError(self.codec.messages.describe("opj_read_header failed")))
     }
   }
 
@@ -531,24 +581,20 @@ impl<'a> Decoder<'a> {
         )
       };
       if res != 1 {
-        return Err(Error::CreateCodecError(format!(
-          "Failed to set decode area."
-        )));
+        return Err(Error::CreateCodecError(self.codec.messages.describe("opj_set_decode_area failed")));
       }
     }
     Ok(())
   }
 
   pub(crate) fn decode(&self, img: &Image) -> Result<()> {
-    let res = unsafe {
-      sys::opj_decode(self.as_ptr(), self.stream.as_ptr(), img.as_ptr()) == 1
-        && sys::opj_end_decompress(self.as_ptr(), self.stream.as_ptr()) == 1
-    };
-    if res {
-      Ok(())
-    } else {
-      Err(Error::CodecError("Failed to decode image".into()))
+    if unsafe { sys::opj_decode(self.as_ptr(), self.stream.as_ptr(), img.as_ptr()) } != 1 {
+      return Err(Error::CodecError(self.codec.messages.describe("opj_decode failed")));
     }
+    if unsafe { sys::opj_end_decompress(self.as_ptr(), self.stream.as_ptr()) } != 1 {
+      return Err(Error::CodecError(self.codec.messages.describe("opj_end_decompress failed")));
+    }
+    Ok(())
   }
 
   pub(crate) fn as_ptr(&self) -> *mut sys::opj_codec_t {

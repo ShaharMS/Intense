@@ -1,0 +1,18 @@
+{
+  "version": "m1232",
+  "platform": "linux/amd64",
+  "qualifiedForRelease": false,
+  "releaseTests": "skipped",
+  "reason": "Packaging only. Packaged health and OpenAPI version checked. Release benchmarks skipped.",
+  "smokeChecks": [
+    "health",
+    "openapi-version"
+  ],
+  "imageId": "sha256:ca85f3d170039cdbe8182f663f729488296b53e187163ece8173de0d8eb8edd3",
+  "sourceManifestSha256": "7055e814af0ffa7e1a8c906ea0979adf4795a38312be949ffe8f4c0164bfb727",
+  "channels": [
+    "lts",
+    "stable",
+    "latest"
+  ]
+}

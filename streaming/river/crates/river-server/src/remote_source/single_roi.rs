@@ -125,7 +125,7 @@ impl RemoteSource {
   let mut main=payload.main.clone();main.extend(sot);main.extend(headers);main.extend([0xff,0x93]);main.extend(body);main.extend([0xff,0xd9]);
   let jp2=!payload.container.is_empty();
   let bytes=if jp2 {let mut container=payload.container.clone();container.extend(u32::try_from(main.len()+8)?.to_be_bytes());container.extend(b"jp2c");container.extend(main);container}else{main};
-  Ok(Some(PreparedSubset {view_reduction:0,technical_origin:None,bytes,jp2,route:"s3-streamed-plt-roi",width:h.width,height:h.height,layout:h.layout,offset_x:0,offset_y:0}))
+  Ok(Some(PreparedSubset {view_reduction:0,technical_origin:None,bytes: bytes.into(),jp2,route:"s3-streamed-plt-roi",width:h.width,height:h.height,layout:h.layout,offset_x:0,offset_y:0}))
  }
 }
 

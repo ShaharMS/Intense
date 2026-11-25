@@ -1,0 +1,14 @@
+{
+  "version": "m1231",
+  "platform": "linux/amd64",
+  "qualifiedForRelease": false,
+  "releaseTests": "skipped",
+  "reason": "Packaging only, as requested. No m1231 release-image benchmark was run.",
+  "imageId": "sha256:dd6bb9a2e9558b41bbac9ca87de728d2d8b4cb415621d73395c5d4ddd3939ae5",
+  "sourceManifestSha256": "82f6c26b6b291443f9f2be732bfb59170b46c03f93ff9d94a5bbe03fec6c270c",
+  "channels": [
+    "lts",
+    "stable",
+    "latest"
+  ]
+}

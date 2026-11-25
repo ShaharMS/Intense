@@ -475,6 +475,25 @@ void opq_mqc_finish_dec(opj_mqc_t *mqc)
     memcpy(mqc->end, mqc->backup, OPJ_COMMON_CBLK_DATA_EXTRA);
 }
 
+/* The process-local continuation cache retains state indices, never pointers
+ * into the input stream, a worker, or the native MQ probability table. */
+void river_mqc_save_contexts(const opj_mqc_t *mqc, OPJ_UINT32 *states)
+{
+    OPJ_UINT32 i;
+    for (i = 0; i < MQC_NUMCTXS; ++i) {
+        states[i] = (OPJ_UINT32)(mqc->ctxs[i] - mqc_states);
+    }
+}
+
+void river_mqc_restore_contexts(opj_mqc_t *mqc, const OPJ_UINT32 *states)
+{
+    OPJ_UINT32 i;
+    for (i = 0; i < MQC_NUMCTXS; ++i) {
+        assert(states[i] < 94);
+        mqc->ctxs[i] = &mqc_states[states[i]];
+    }
+}
+
 void opj_mqc_resetstates(opj_mqc_t *mqc)
 {
     OPJ_UINT32 i;

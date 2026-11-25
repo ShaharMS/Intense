@@ -57,8 +57,7 @@ private-network request headers. HTTP OPTIONS does not contact S3.
 browser access, set a comma-separated list of complete HTTP/HTTPS origins.
 Local Compose accepts the global `RIVER_CORS_ORIGINS` value and per-slot
 `RIVER_<SLOT>_CORS_ORIGINS` overrides. CORS is a
-browser policy, not authentication. WebSockets use ws/wss and the proxy must
-forward upgrades. An HTTPS browser page needs an HTTPS/WSS River endpoint;
+browser policy, not authentication. An HTTPS browser page needs an HTTPS River endpoint;
 browser mixed-content or local-network permission blocks cannot be removed by
 CORS headers. Reverse proxies should forward River's CORS headers rather than
 add a second Access-Control-Allow-Origin header.

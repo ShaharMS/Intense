@@ -81,7 +81,7 @@ impl RemoteSource {
   let jp2=!payload.container.is_empty();
   let bytes=if jp2 {let mut container=payload.container.clone();resize_jp2(&mut container,width,height)?;container.extend(u32::try_from(main.len()+8)?.to_be_bytes());container.extend(b"jp2c");container.extend(main);container}else{main};
   tracing::info!(context=context.trace_id,parts,packets=wanted,optimization="sequential_plt_prefix",action="skip_finer_tile_parts","PLT proves the requested resolution prefix");
-  Ok(Some(PreparedSubset {view_reduction:reduction,technical_origin:None,bytes,jp2,route:"s3-sequential-plt-prefix",width:h.width,height:h.height,layout:h.layout,offset_x:0,offset_y:0}))
+  Ok(Some(PreparedSubset {view_reduction:reduction,technical_origin:None,bytes: bytes.into(),jp2,route:"s3-sequential-plt-prefix",width:h.width,height:h.height,layout:h.layout,offset_x:0,offset_y:0}))
  }
  pub(super) fn prepare_single_prefix(&self,payload:&HeaderPayload,reduction:u8,layers:u32,context:&mut ReadContext)->Result<Option<PreparedSubset>> {
   let h=&self.header;
@@ -185,7 +185,7 @@ impl RemoteSource {
   main.extend(sot);main.extend(headers);main.extend([0xff,0x93]);main.extend(bytes);main.extend([0xff,0xd9]);
   let jp2=!payload.container.is_empty();
   let bytes=if jp2 {let mut container=payload.container.clone();resize_jp2(&mut container,width,height)?;container.extend(u32::try_from(main.len()+8)?.to_be_bytes());container.extend(b"jp2c");container.extend(main);container}else{main};
-  Ok(Some(PreparedSubset {view_reduction,technical_origin:None,bytes,jp2,route:"s3-single-resolution-prefix",width:h.width,height:h.height,layout:h.layout,offset_x:0,offset_y:0}))
+  Ok(Some(PreparedSubset {view_reduction,technical_origin:None,bytes: bytes.into(),jp2,route:"s3-single-resolution-prefix",width:h.width,height:h.height,layout:h.layout,offset_x:0,offset_y:0}))
  }
 }
 
@@ -302,10 +302,10 @@ pub(super) fn lowest_header_segments(bytes:&[u8],h:&Header,reduce:u8,main:bool)-
   }
  }
  #[test] fn intermediate_projection_keeps_needed_bands_precincts_and_end_header_markers() {
-  let h=Header {image_origin:(0,0),width:4096,height:4096,components:3,display_rgb_only:false,bit_depth:8,levels:7,layers:1,
+  let h=Header {image_origin:(0,0),width:4096,height:4096,components:3,display_rgb_only:false,band_fallback:None,bit_depth:8,levels:7,layers:1,
    layout:NativeTileLayoutHint {origin_x:0,origin_y:0,width:4096,height:4096,columns:1,rows:1},
    progression:2,is_ht:false,cod:vec![5,2,0,1,1,6,4,4,0,1,0x22,0x33,0x44,0x55,0x66,0x77,0x88],
-   first_part:0,codestream_end:100,packet_compatible:true,prefix_compatible:true,payload_digest:[0;32]};
+   first_part:0,codestream_end:100,packet_compatible:true,prefix_compatible:true,component_specs:Vec::new(), payload_digest:[0;32]};
   let mut bytes=vec![];
   for (code,value) in [(0xff52u16,h.cod.clone()),(0xff5c,vec![0x40;20])] {
    bytes.extend(code.to_be_bytes());bytes.extend(((value.len()+2) as u16).to_be_bytes());bytes.extend(value);
@@ -316,9 +316,9 @@ pub(super) fn lowest_header_segments(bytes:&[u8],h:&Header,reduce:u8,main:bool)-
   let at=n+2;assert_eq!(be16(&projected,at).unwrap(),0xff5c);assert_eq!(be16(&projected,at+2).unwrap(),16);
  }
  #[test] fn projection_preserves_source_and_component_quantization() {
-  let h=Header {image_origin:(0,0),width:4096,height:4096,components:3,display_rgb_only:false,bit_depth:8,levels:7,layers:1,
+  let h=Header {image_origin:(0,0),width:4096,height:4096,components:3,display_rgb_only:false,band_fallback:None,bit_depth:8,levels:7,layers:1,
    layout:NativeTileLayoutHint {origin_x:0,origin_y:0,width:4096,height:4096,columns:1,rows:1},progression:2,is_ht:false,
-   cod:vec![1,2,0,1,0,6,4,4,0,1,0x22,0x33,0x44,0x55,0x66,0x77,0x88],first_part:0,codestream_end:100,packet_compatible:true,prefix_compatible:true,payload_digest:[0;32]};
+   cod:vec![1,2,0,1,0,6,4,4,0,1,0x22,0x33,0x44,0x55,0x66,0x77,0x88],first_part:0,codestream_end:100,packet_compatible:true,prefix_compatible:true,component_specs:Vec::new(), payload_digest:[0;32]};
   let mut siz=vec![0,0];for n in [4096u32,4096,0,0,4096,4096,0,0] {siz.extend(n.to_be_bytes());}siz.extend([0,3,7,1,1,7,1,1,7,1,1]);
   let coc=[vec![0,1],h.cod[5..].to_vec()].concat();let mut main=vec![0xff,0x4f];
   for (code,bytes) in [(0xff51,siz),(0xff52,h.cod.clone()),(0xff5c,vec![0x40;20]),(0xff53,coc),(0xff5d,vec![1,0x40,0x40,0x48])] {

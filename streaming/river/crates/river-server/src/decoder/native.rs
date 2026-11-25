@@ -97,13 +97,14 @@ impl NativeTileLayout {
 }
 
 struct OpenJpegTileDecoder {
+    messages: Box<jpeg2k::CodecMessages>,
     codec: *mut opj::opj_codec_t,
     stream: *mut opj::opj_stream_t,
     image: *mut opj::opj_image_t,
     layout: NativeTileLayout,
 }
 
-struct MemoryStream { bytes: Arc<[u8]>, position: usize }
+struct MemoryStream { bytes: axum::body::Bytes, position: usize }
 unsafe extern "C" fn memory_read(output: *mut std::ffi::c_void, length: usize, user: *mut std::ffi::c_void) -> usize {
     let stream = unsafe { &mut *(user as *mut MemoryStream) };
     let count = length.min(stream.bytes.len() - stream.position);
@@ -145,10 +146,10 @@ impl Drop for OpenJpegTileDecoder {
 impl OpenJpegTileDecoder {
     #[instrument(
         name = "river.codec.openjpeg.native_header",
-        skip(path),
+        skip(path, memory),
         fields(reduction, layers, decoder_threads)
     )]
-    fn open(path: &Path, reduction: u8, layers: u32, decoder_threads: usize, memory: Option<&Arc<[u8]>>) -> Result<Self> {
+    fn open(path: &Path, reduction: u8, layers: u32, decoder_threads: usize, memory: Option<&axum::body::Bytes>) -> Result<Self> {
         let filename = path
             .to_str()
             .context("JPEG 2000 source path is not valid Unicode")?;
@@ -186,6 +187,8 @@ impl OpenJpegTileDecoder {
                 opj::opj_stream_destroy(stream);
                 bail!("OpenJPEG could not create a decoder for {}", path.display());
             }
+            let messages = Box::<jpeg2k::CodecMessages>::default();
+            messages.attach(codec);
             let mut parameters = std::mem::zeroed::<opj::opj_dparameters_t>();
             opj::opj_set_default_decoder_parameters(&mut parameters);
             parameters.cp_reduce = u32::from(reduction);
@@ -216,8 +219,7 @@ impl OpenJpegTileDecoder {
                 opj::opj_destroy_codec(codec);
                 opj::opj_stream_destroy(stream);
                 bail!(
-                    "OpenJPEG could not read the JPEG 2000 header for {}",
-                    path.display()
+                    "{}", messages.describe("opj_read_header failed for native tile input")
                 );
             }
             let mut info = opj::opj_get_cstr_info(codec);
@@ -240,7 +242,7 @@ impl OpenJpegTileDecoder {
             };
             opj::opj_destroy_cstr_info(&mut info);
             Ok(Self {
-                codec,
+                messages, codec,
                 stream,
                 image,
                 layout,
@@ -252,10 +254,10 @@ impl OpenJpegTileDecoder {
     fn decode_tile(&mut self, tile_index: u32) -> Result<RawNativeTile> {
         unsafe {
             if opj::opj_get_decoded_tile(self.codec, self.stream, self.image, tile_index) != 1 {
-                bail!("OpenJPEG could not decode native tile {tile_index}");
+                bail!("{} (native tile {tile_index})",self.messages.describe("opj_get_decoded_tile failed"));
             }
             if opj::opj_end_decompress(self.codec, self.stream) != 1 {
-                bail!("OpenJPEG could not finish native tile {tile_index}");
+                bail!("{} (native tile {tile_index})",self.messages.describe("opj_end_decompress failed"));
             }
             let image = &*self.image;
             let components = std::slice::from_raw_parts(image.comps, image.numcomps as usize);
@@ -265,7 +267,8 @@ impl OpenJpegTileDecoder {
                     components.len()
                 );
             }
-            let components=if components.len()>4 || (components.len()==4 && components[3].alpha==0) {&components[..3]}else{components};
+            let components=jpeg2k::display_planes(components,image.color_space.into(),|c|c.alpha)?;
+            anyhow::ensure!(matches!(components.len(),1|3) || (matches!(components.len(),2|4) && matches!(components.last().unwrap().alpha,1|2)), "unsupported native display layout");
             let width = components[0].w;
             let height = components[0].h;
             if width == 0 || height == 0 {
@@ -282,6 +285,22 @@ impl OpenJpegTileDecoder {
                 .map(|component| std::slice::from_raw_parts(component.data, pixel_count))
                 .collect::<Vec<_>>();
             let mut rgba = Vec::with_capacity(pixel_count * 4);
+            let associated=components.last().is_some_and(|c|c.alpha==2);
+            // Unassociate before quantizing to PNG8. An alpha smaller than
+            // one output step can still carry significant straight colour.
+            if associated && components.iter().any(|c|c.prec>8) {
+                let last=components.len()-1;
+                for i in 0..pixel_count {
+                    let alpha=normalized_u16(planes[last][i],components[last]);
+                    for channel in 0..3 {
+                        let index=if last==1 {0} else {channel};
+                        let value=normalized_u16(planes[index][i],components[index]);
+                        rgba.push(super::u16_to_u8(jpeg2k::straight_sample(value,alpha,u16::MAX)));
+                    }
+                    rgba.push(super::u16_to_u8(alpha));
+                }
+                return Ok(RawNativeTile {width,height,rgba});
+            }
             for pixel in 0..pixel_count {
                 let red = normalized_u8(planes[0][pixel], &components[0]);
                 let (green, blue, alpha) = match components.len() {
@@ -299,7 +318,11 @@ impl OpenJpegTileDecoder {
                     ),
                     _ => unreachable!(),
                 };
-                rgba.extend_from_slice(&[red, green, blue, alpha]);
+                let mut pixel=[red,green,blue,alpha];
+                if associated {
+                    for c in &mut pixel[..3] { *c=jpeg2k::straight_sample((*c).into(),alpha.into(),255) as u8; }
+                }
+                rgba.extend_from_slice(&pixel);
             }
             Ok(RawNativeTile {
                 width,
@@ -319,7 +342,7 @@ struct RawNativeTile {
 #[derive(Clone, Hash, PartialEq, Eq)]
 struct NativeKey { snapshot: String, path: PathBuf, size: u64, modified: SystemTime,
     tile: u32, reduction: u8, layers: u32 }
-struct NativeEntry { tile: Arc<RawNativeTile>, bytes: usize, touched: u64 }
+struct NativeEntry { tile: Arc<RawNativeTile>, bytes: usize, touched: u64, rebuild_ns: u64 }
 #[derive(Default)]
 struct NativeCacheState { entries: HashMap<NativeKey, NativeEntry>, lru: BTreeMap<u64, NativeKey>, bytes: usize, clock: u64 }
 struct NativeCache { limit: usize, state: Mutex<NativeCacheState>, flights: Mutex<HashMap<NativeKey, Weak<Mutex<()>>>> }
@@ -328,7 +351,7 @@ impl NativeCache {
     fn trim(&self,limit:usize)->crate::resources::Occupancy {let mut s=self.state.lock().unwrap_or_else(|e|e.into_inner());while s.bytes>limit||s.entries.len()>crate::resources::entry_limit("RIVER_NATIVE_TILE_CACHE_ENTRIES",limit){let Some((_,key))=s.lru.pop_first()else{break;};if let Some(old)=s.entries.remove(&key){s.bytes-=old.bytes;crate::resources::retain("native_tiles",old.bytes,&old.tile);crate::resources::evict("native_tiles",1);}}crate::resources::Occupancy{bytes:s.bytes,entries:s.entries.len(),..Default::default()}}
     fn get(&self, key: &NativeKey) -> Option<Arc<RawNativeTile>> {
         let mut state = self.state.lock().unwrap();
-        let Some(entry)=state.entries.get(key)else{crate::resources::miss("native_tiles");return None;};crate::resources::hit("native_tiles",entry.bytes);
+        let Some(entry)=state.entries.get(key)else{crate::resources::miss("native_tiles");return None;};crate::resources::hit("native_tiles",entry.bytes);crate::resources::reused_cost("native_tiles",entry.rebuild_ns);
         let tile = entry.tile.clone(); let old = entry.touched;
         state.lru.remove(&old); state.clock += 1; let clock = state.clock;
         state.lru.insert(clock,key.clone()); state.entries.get_mut(key).unwrap().touched = clock;
@@ -345,7 +368,9 @@ impl NativeCache {
         };
         let _guard = gate.lock().unwrap();
         if let Some(tile) = self.get(&key) { return Ok(tile); }
+        let rebuild_started=std::time::Instant::now();
         let tile = Arc::new(decode()?);
+        let rebuild_ns=rebuild_started.elapsed().as_nanos().min(u64::MAX as u128) as u64;
         let bytes = tile.rgba.capacity();
         if bytes <= crate::resources::effective("native_tiles",self.limit) {
             let mut state = self.state.lock().unwrap();
@@ -355,7 +380,7 @@ impl NativeCache {
             }
             state.clock += 1; let touched = state.clock;
             state.bytes += bytes; state.lru.insert(touched,key.clone());
-            state.entries.insert(key,NativeEntry { tile: tile.clone(),bytes,touched });
+            state.entries.insert(key,NativeEntry { tile: tile.clone(),bytes,touched,rebuild_ns });
         }
         Ok(tile)
     }
@@ -373,7 +398,7 @@ struct TransportTile {
 
 #[instrument(
     name = "river.codec.openjpeg.native_tiles",
-    skip(path, tiles),
+    skip(path, tiles, memory),
     fields(tile_count = tiles.len(), source_tile, reduction, layers, decoder_threads, max_native_tiles, native_tile_count = tracing::field::Empty, route = tracing::field::Empty)
 )]
 pub(super) fn decode_transport_tiles(
@@ -389,7 +414,7 @@ pub(super) fn decode_transport_tiles(
     max_native_tiles: usize,
     layout_hint: Option<NativeTileLayoutHint>,
     snapshot: &str,
-    memory: Option<&Arc<[u8]>>,
+    memory: Option<&axum::body::Bytes>,
 ) -> Result<Option<Vec<DecodedTile>>> {
     if tiles.is_empty() {
         return Ok(Some(Vec::new()));
@@ -503,10 +528,10 @@ pub(super) fn decode_transport_tiles(
                 tile.height,
                 format,
             )?;
-            Ok(DecodedTile { rgba:crate::decoder::take_pixel_capture(),
+            Ok(DecodedTile {
                 tile_x: tile.tile_x,
                 tile_y: tile.tile_y,
-                raster: DecodedRaster {
+                raster: DecodedRaster { block_counts: None, grok_stages: None,
                     width: tile.width,
                     height: tile.height,
                     bytes: bytes.into_boxed_slice().into(),
@@ -591,6 +616,17 @@ fn composite_native_tile(
     Ok(())
 }
 
+fn normalized_u16(value:i32, component:&opj::opj_image_comp_t)->u16 {
+    let bits=component.prec.clamp(1,16);
+    if component.sgnd!=0 {
+        let half=1i64<<(bits-1);
+        ((i64::from(value).clamp(-half,half-1)*32768)/half+32768) as u16
+    } else {
+        let max=(1i64<<bits)-1;
+        (i64::from(value).clamp(0,max)*65535/max) as u16
+    }
+}
+
 fn normalized_u8(value: i32, component: &opj::opj_image_comp_t) -> u8 {
     let precision = component.prec.clamp(1, 31);
     let maximum = (1_i64 << precision) - 1;
@@ -621,7 +657,7 @@ mod tests {
     }
     #[test]
     fn memory_stream_checks_bounds_and_releases_its_buffer_lease() {
-        let bytes: std::sync::Arc<[u8]> = std::sync::Arc::from([1u8,2,3]);
+        let bytes = axum::body::Bytes::from(vec![1u8,2,3]);
         let data = Box::into_raw(Box::new(super::MemoryStream { bytes: bytes.clone(),position: 0 })).cast();
         let mut output = [0u8;8];
         unsafe {
@@ -635,9 +671,9 @@ mod tests {
             assert_eq!(super::memory_seek(-1,data),0);
             assert_eq!(super::memory_skip(-4,data),-1);
             assert_eq!(super::memory_seek(0,data),1);
-            assert_eq!(std::sync::Arc::strong_count(&bytes),2);
+            assert!(!bytes.is_unique());
             super::memory_free(data);
-            assert_eq!(std::sync::Arc::strong_count(&bytes),1);
+            assert!(bytes.is_unique());
         }
     }
     #[test]

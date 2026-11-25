@@ -9,11 +9,11 @@ openjpeg-sys = { path = "crates/river-openjpeg-sys" }
 [workspace.package]
 edition = "2024"
 license = "MIT OR Apache-2.0"
-repository = "https://example.invalid/intense/river"
+repository = "https://github.com/ShaharMS/Intense"
 
 [workspace.dependencies]
 anyhow = "1.0.97"
-axum = { version = "0.8.9", features = ["ws", "http2"] }
+axum = { version = "0.8.9", features = ["http2"] }
 base64 = "0.22.1"
 futures-util = "0.3.31"
 # The wrapper's `threads` feature forces ALL CPUs for every generic ROI decode.

@@ -1,7 +1,7 @@
 """One-time authorized cleanup; archive writable files, never delete volumes."""
 import gzip,json,posixpath,shutil,subprocess,tarfile
 from pathlib import Path
-ROOT=Path(__file__).resolve().parents[1];BASE=ROOT/'reports/container-consolidation';BASE.mkdir(exist_ok=True)
+ROOT=Path(__file__).resolve().parents[1];BASE=ROOT/'target/benchmarks/container-consolidation';BASE.mkdir(exist_ok=True)
 ids=subprocess.check_output(['docker','ps','-aq','--filter','name=river-goal-'],text=True).split()
 cs=json.loads(subprocess.check_output(['docker','inspect',*ids])) if ids else []
 assert all(c['Name'].startswith('/river-goal-') and not (c['Config'].get('Labels') or {}).get('com.docker.compose.project') for c in cs)

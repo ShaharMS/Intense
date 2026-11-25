@@ -2123,34 +2123,67 @@ static OPJ_BOOL opj_tcd_t1_decode(opj_tcd_t *p_tcd, opj_event_mgr_t *p_manager)
 }
 
 
+typedef struct {
+    opj_tcd_t *tcd;
+    OPJ_UINT32 component;
+    OPJ_BOOL ok;
+} river_dwt_job_t;
+
+static void river_dwt_component(void *data, opj_tls_t *tls)
+{
+    river_dwt_job_t *job = (river_dwt_job_t *)data;
+    opj_tcd_t *tcd = job->tcd;
+    OPJ_UINT32 c = job->component;
+    opj_tcd_tilecomp_t *comp = &tcd->tcd_image->tiles->comps[c];
+    OPJ_UINT32 levels = tcd->image->comps[c].resno_decoded + 1;
+    OPJ_UNUSED(tls);
+    job->ok = tcd->tcp->tccps[c].qmfbid == 1
+              ? opj_dwt_decode(tcd, comp, levels)
+              : opj_dwt_decode_real(tcd, comp, levels);
+}
+
 static OPJ_BOOL opj_tcd_dwt_decode(opj_tcd_t *p_tcd)
 {
-    OPJ_UINT32 compno;
-    opj_tcd_tile_t * l_tile = p_tcd->tcd_image->tiles;
-    opj_tcd_tilecomp_t * l_tile_comp = l_tile->comps;
-    opj_tccp_t * l_tccp = p_tcd->tcp->tccps;
-    opj_image_comp_t * l_img_comp = p_tcd->image->comps;
-
-    for (compno = 0; compno < l_tile->numcomps;
-            compno++, ++l_tile_comp, ++l_img_comp, ++l_tccp) {
-        if (p_tcd->used_component != NULL && !p_tcd->used_component[compno]) {
+    opj_tcd_tile_t *tile = p_tcd->tcd_image->tiles;
+    river_dwt_job_t jobs[4];
+    OPJ_UINT32 c;
+    /* Partial DWT owns a separate sparse workspace for each component and
+     * never submits nested jobs. Keep large windows serial to bound scratch
+     * memory. Whole-tile DWT already parallelizes within each component. */
+    OPJ_UINT64 area = (OPJ_UINT64)(p_tcd->win_x1 - p_tcd->win_x0) *
+                      (p_tcd->win_y1 - p_tcd->win_y0);
+    OPJ_BOOL parallel = !p_tcd->whole_tile_decoding && tile->numcomps >= 2 &&
+                        tile->numcomps <= 4 &&
+                        p_tcd->tcp->num_layers_to_decode == p_tcd->tcp->numlayers &&
+                        area >= 128 * 128 &&
+                        area <= 1024 * 1024 &&
+                        opj_thread_pool_get_thread_count(p_tcd->thread_pool) > 1;
+    for (c = 0; c < tile->numcomps; ++c) {
+        river_dwt_job_t local;
+        river_dwt_job_t *job = parallel ? &jobs[c] : &local;
+        if (p_tcd->used_component && !p_tcd->used_component[c]) {
+            job->ok = OPJ_TRUE;
             continue;
         }
-
-        if (l_tccp->qmfbid == 1) {
-            if (! opj_dwt_decode(p_tcd, l_tile_comp,
-                                 l_img_comp->resno_decoded + 1)) {
-                return OPJ_FALSE;
-            }
-        } else {
-            if (! opj_dwt_decode_real(p_tcd, l_tile_comp,
-                                      l_img_comp->resno_decoded + 1)) {
+        job->tcd = p_tcd;
+        job->component = c;
+        if (parallel && opj_thread_pool_submit_job(p_tcd->thread_pool,
+                river_dwt_component, job)) {
+            continue;
+        }
+        river_dwt_component(job, NULL);
+        if (!parallel && !job->ok) {
+            return OPJ_FALSE;
+        }
+    }
+    if (parallel) {
+        opj_thread_pool_wait_completion(p_tcd->thread_pool, 0);
+        for (c = 0; c < tile->numcomps; ++c) {
+            if (!jobs[c].ok) {
                 return OPJ_FALSE;
             }
         }
-
     }
-
     return OPJ_TRUE;
 }
 

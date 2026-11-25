@@ -101,7 +101,7 @@ impl RemoteSource {
         let bytes=if jp2 {
             let mut bytes=payload.container.clone();bytes.extend(u32::try_from(codestream.len()+8)?.to_be_bytes());bytes.extend(b"jp2c");bytes.extend(codestream);bytes
         }else{codestream};
-        Ok(Some(PreparedSubset {view_reduction:0,technical_origin:None,bytes,jp2,route:"s3-multipart-packet-ranges",width:h.width,height:h.height,layout:h.layout,offset_x:0,offset_y:0}))
+        Ok(Some(PreparedSubset {view_reduction:0,technical_origin:None,bytes: bytes.into(),jp2,route:"s3-multipart-packet-ranges",width:h.width,height:h.height,layout:h.layout,offset_x:0,offset_y:0}))
     }
 
     fn append_batched_parts(&self,groups:&BTreeMap<u16,Vec<IndexedPart>>,reduction:u8,layers:u32,
@@ -192,7 +192,7 @@ impl RemoteSource {
         }
         stream.extend([0xff,0xd9]);let jp2=!payload.container.is_empty();
         let bytes=if jp2 {let mut bytes=payload.container.clone();bytes.extend(u32::try_from(stream.len()+8)?.to_be_bytes());bytes.extend(b"jp2c");bytes.extend(stream);bytes}else{stream};
-        Ok(PreparedSubset {view_reduction:0,technical_origin:None,bytes,jp2,route:"s3-multipart-lowest-rpcl-ranges",width:h.width,height:h.height,layout:h.layout,offset_x:0,offset_y:0})
+        Ok(PreparedSubset {view_reduction:0,technical_origin:None,bytes: bytes.into(),jp2,route:"s3-multipart-lowest-rpcl-ranges",width:h.width,height:h.height,layout:h.layout,offset_x:0,offset_y:0})
     }
 }
 

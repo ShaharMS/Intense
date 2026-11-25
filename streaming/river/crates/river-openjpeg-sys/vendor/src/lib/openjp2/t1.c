@@ -211,6 +211,23 @@ Decode 1 code-block
 @param p_manager_mutex mutex for the event manager
 @param check_pterm whether PTERM correct termination should be checked
 */
+/* One quality-layer continuation. All cursors and probability states are indices. */
+typedef struct {
+    OPJ_UINT32 a, c, ct, byte, ctx, passes;
+    OPJ_UINT32 contexts[MQC_NUMCTXS];
+} river_mq_checkpoint_t;
+typedef struct {
+    const void *session;
+    OPJ_BOOL capture;
+    int (*transfer)(const void *, const OPJ_UINT32 *, OPJ_BYTE *, size_t,
+                    OPJ_INT32 *, size_t, opj_flag_t *, size_t,
+                    river_mq_checkpoint_t *, size_t, int);
+} river_resume_t;
+typedef struct {
+    river_resume_t session;
+    OPJ_UINT32 key[8];
+} river_resume_block_t;
+
 static OPJ_BOOL opj_t1_decode_cblk(opj_t1_t *t1,
                                    opj_tcd_cblk_dec_t* cblk,
                                    OPJ_UINT32 orient,
@@ -218,7 +235,7 @@ static OPJ_BOOL opj_t1_decode_cblk(opj_t1_t *t1,
                                    OPJ_UINT32 cblksty,
                                    opj_event_mgr_t *p_manager,
                                    opj_mutex_t* p_manager_mutex,
-                                   OPJ_BOOL check_pterm);
+                                   OPJ_BOOL check_pterm, const river_resume_block_t *resume);
 
 /**
 Decode 1 HT code-block
@@ -1588,8 +1605,67 @@ void opj_t1_destroy(opj_t1_t *p_t1)
     opj_free(p_t1);
 }
 
+/* The caller owns the session through thread-pool completion. Only the
+ * submitting thread reads TLS; jobs carry an immutable snapshot. */
+typedef int (*river_block_fn)(const void*, const OPJ_UINT32*, OPJ_INT32*, size_t, int);
+typedef struct { const void* session; river_block_fn access; OPJ_BOOL codewords; river_resume_t resume; } river_block_session_t;
+#if defined(_MSC_VER)
+static __declspec(thread) river_block_session_t river_blocks;
+#else
+static __thread river_block_session_t river_blocks;
+#endif
+void river_opj_block_session(const void* session, river_block_fn access)
+{
+    river_blocks.session = session;
+    river_blocks.access = access;
+    river_blocks.codewords = OPJ_FALSE;
+}
+void river_opj_block_session_v2(const void* session, river_block_fn access)
+{
+    river_opj_block_session(session, access);
+    river_blocks.codewords = OPJ_TRUE;
+}
+
+void river_opj_resume_session(const river_resume_t *session)
+{
+    if (session) river_blocks.resume = *session;
+    else memset(&river_blocks.resume, 0, sizeof(river_blocks.resume));
+}
+
+/* Decode one complete Part 1 MQ segment under the same reversible, default
+ * coding style as the sparse reader. MQ's synthetic terminator is written
+ * only to the decoder's private padded copy. */
+OPJ_INT32* river_opj_t1_word(opj_t1_t* t1, const OPJ_BYTE* word, OPJ_UINT32 len, OPJ_UINT32 passes,
+                      OPJ_UINT32 planes, OPJ_UINT32 orient, OPJ_UINT32 w,
+                      OPJ_UINT32 h)
+{
+    opj_tcd_cblk_dec_t block = {0};
+    opj_tcd_seg_t seg = {0};
+    opj_tcd_seg_data_chunk_t chunk;
+    OPJ_BOOL ok;
+    if (!t1 || !word || !w || !h || w > 4096 / h || !len ||
+            len > UINT_MAX - OPJ_COMMON_CBLK_DATA_EXTRA || !planes ||
+            planes > 30 || !passes || passes > 3 * planes - 2 || orient > 3) {
+        return NULL;
+    }
+    t1->mustuse_cblkdatabuffer = OPJ_TRUE;
+    chunk.data = (OPJ_BYTE*)word;
+    chunk.len = seg.len = len;
+    seg.real_num_passes = passes;
+    block.x1 = (OPJ_INT32)w;
+    block.y1 = (OPJ_INT32)h;
+    block.numbps = planes;
+    block.segs = &seg;
+    block.chunks = &chunk;
+    block.real_num_segs = block.numchunks = 1;
+    ok = opj_t1_decode_cblk(t1, &block, orient, 0, 0, NULL, NULL, OPJ_FALSE, NULL);
+    return ok ? t1->data : NULL;
+}
+
 typedef struct {
     OPJ_BOOL whole_tile_decoding;
+    river_block_session_t blocks;
+    OPJ_UINT32 component;
     OPJ_UINT32 resno;
     opj_tcd_cblk_dec_t* cblk;
     opj_tcd_band_t* band;
@@ -1622,6 +1698,9 @@ static void opj_t1_clbl_decode_processor(void* user_data, opj_tls_t* tls)
     OPJ_UINT32 resno;
     OPJ_UINT32 tile_w;
 
+    OPJ_UINT32 key[10];
+    OPJ_BOOL reusable;
+    OPJ_BOOL hit = OPJ_FALSE;
     job = (opj_t1_cblk_decode_processing_job_t*) user_data;
 
     cblk = job->cblk;
@@ -1688,36 +1767,94 @@ static void opj_t1_clbl_decode_processor(void* user_data, opj_tls_t* tls)
     }
     t1->mustuse_cblkdatabuffer = job->mustuse_cblkdatabuffer;
 
-    if ((tccp->cblksty & J2K_CCP_CBLKSTY_HT) != 0) {
-        if (OPJ_FALSE == opj_t1_ht_decode_cblk(
-                    t1,
-                    cblk,
-                    band->bandno,
-                    (OPJ_UINT32)tccp->roishift,
-                    tccp->cblksty,
-                    job->p_manager,
-                    job->p_manager_mutex,
-                    job->check_pterm)) {
-            *(job->pret) = OPJ_FALSE;
-            opj_free(job);
-            return;
+    cblk_w = (OPJ_UINT32)(cblk->x1 - cblk->x0);
+    cblk_h = (OPJ_UINT32)(cblk->y1 - cblk->y0);
+    reusable = job->blocks.access && cblk->numchunks && !cblk->corrupted &&
+               cblk->real_num_segs && cblk_w && cblk_h && cblk_w <= 4096 / cblk_h;
+    if (reusable) {
+        OPJ_UINT32 i;
+        key[0] = job->component; key[1] = resno; key[2] = band->bandno;
+        key[3] = (OPJ_UINT32)cblk->x0; key[4] = (OPJ_UINT32)cblk->y0;
+        key[5] = cblk_w; key[6] = cblk_h; key[7] = cblk->numbps;
+        key[8] = 0; key[9] = 0;
+        for (i = 0; i < cblk->real_num_segs; ++i) {
+            key[8] += cblk->segs[i].real_num_passes;
+            key[9] += cblk->segs[i].len;
         }
-    } else {
-        if (OPJ_FALSE == opj_t1_decode_cblk(
-                    t1,
-                    cblk,
-                    band->bandno,
-                    (OPJ_UINT32)tccp->roishift,
-                    tccp->cblksty,
-                    job->p_manager,
-                    job->p_manager_mutex,
-                    job->check_pterm)) {
-            *(job->pret) = OPJ_FALSE;
-            opj_free(job);
-            return;
+        if (!cblk->decoded_data && job->blocks.access(job->blocks.session, key, NULL,
+                (size_t)cblk_w * cblk_h, -1)) {
+            if (!opj_t1_allocate_buffers(t1, cblk_w, cblk_h)) {
+                *(job->pret) = OPJ_FALSE;
+                opj_free(job);
+                return;
+            }
+            hit = job->blocks.access(job->blocks.session, key, t1->data,
+                                     (size_t)cblk_w * cblk_h, 0);
+        } else if (cblk->decoded_data) {
+            hit = job->blocks.access(job->blocks.session, key, cblk->decoded_data,
+                                     (size_t)cblk_w * cblk_h, 0);
         }
     }
+    if (!hit) {
+        if ((tccp->cblksty & J2K_CCP_CBLKSTY_HT) != 0) {
+            if (OPJ_FALSE == opj_t1_ht_decode_cblk(
+                        t1,
+                        cblk,
+                        band->bandno,
+                        (OPJ_UINT32)tccp->roishift,
+                        tccp->cblksty,
+                        job->p_manager,
+                        job->p_manager_mutex,
+                        job->check_pterm)) {
+                *(job->pret) = OPJ_FALSE;
+                opj_free(job);
+                return;
+            }
+        } else {
+            river_resume_block_t checkpoint;
+            const river_resume_block_t *resume = NULL;
+            if (job->blocks.resume.transfer && !job->check_pterm && !cblk->corrupted && cblk->numchunks &&
+                    cblk->real_num_segs == 1 && tccp->roishift == 0 && tccp->cblksty == 0 &&
+                    cblk_w && cblk_h && cblk_w <= 4096 / cblk_h) {
+                checkpoint.session = job->blocks.resume;
+                checkpoint.key[0] = job->component;
+                checkpoint.key[1] = resno;
+                checkpoint.key[2] = band->bandno;
+                checkpoint.key[3] = (OPJ_UINT32)cblk->x0;
+                checkpoint.key[4] = (OPJ_UINT32)cblk->y0;
+                checkpoint.key[5] = cblk_w;
+                checkpoint.key[6] = cblk_h;
+                checkpoint.key[7] = cblk->numbps;
+                resume = &checkpoint;
+            }
+            if (OPJ_FALSE == opj_t1_decode_cblk(
+                        t1,
+                        cblk,
+                        band->bandno,
+                        (OPJ_UINT32)tccp->roishift,
+                        tccp->cblksty,
+                        job->p_manager,
+                        job->p_manager_mutex,
+                        job->check_pterm, resume)) {
+                *(job->pret) = OPJ_FALSE;
+                opj_free(job);
+                return;
+            }
+        }
 
+        if (reusable) {
+            OPJ_INT32* samples = cblk->decoded_data ? cblk->decoded_data : t1->data;
+            if (job->blocks.codewords && cblk->numchunks == 1 && cblk->real_num_segs == 1 &&
+                    cblk->chunks[0].len == key[9] && key[9]) {
+                struct { OPJ_INT32* samples; const OPJ_BYTE* bytes; } word =
+                    {samples, cblk->chunks[0].data};
+                job->blocks.access(job->blocks.session, key, (OPJ_INT32*)&word,
+                                   (size_t)cblk_w * cblk_h, 2);
+            } else {
+                job->blocks.access(job->blocks.session, key, samples, (size_t)cblk_w * cblk_h, 1);
+            }
+        }
+    }
     x = cblk->x0 - band->x0;
     y = cblk->y0 - band->y0;
     if (band->bandno & 1) {
@@ -1730,8 +1867,7 @@ static void opj_t1_clbl_decode_processor(void* user_data, opj_tls_t* tls)
     }
 
     datap = cblk->decoded_data ? cblk->decoded_data : t1->data;
-    cblk_w = t1->w;
-    cblk_h = t1->h;
+    /* Dimensions come from the block even when Tier-1 was reused. */
 
     if (tccp->roishift) {
         if (tccp->roishift >= 31) {
@@ -2003,6 +2139,8 @@ void opj_t1_decode_cblks(opj_tcd_t* tcd,
                         *pret = OPJ_FALSE;
                         return;
                     }
+                    job->blocks = river_blocks;
+                    job->component = (OPJ_UINT32)(tilec - tcd->tcd_image->tiles->comps);
                     job->whole_tile_decoding = tcd->whole_tile_decoding;
                     job->resno = resno;
                     job->cblk = cblk;
@@ -2040,7 +2178,7 @@ static OPJ_BOOL opj_t1_decode_cblk(opj_t1_t *t1,
                                    OPJ_UINT32 cblksty,
                                    opj_event_mgr_t *p_manager,
                                    opj_mutex_t* p_manager_mutex,
-                                   OPJ_BOOL check_pterm)
+                                   OPJ_BOOL check_pterm, const river_resume_block_t *resume)
 {
     opj_mqc_t *mqc = &(t1->mqc);   /* MQC component */
 
@@ -2150,7 +2288,28 @@ static OPJ_BOOL opj_t1_decode_cblk(opj_t1_t *t1,
         }
         cblkdataindex += seg->len;
 
-        for (passno = 0; (passno < seg->real_num_passes) &&
+        passno = 0;
+        if (resume && !resume->session.capture) {
+            river_mq_checkpoint_t cp;
+            int restored = resume->session.transfer(resume->session.session, resume->key,
+                    cblkdata, seg->len, t1->data, t1->w * t1->h,
+                    t1->flags, t1->flagssize, &cp, sizeof(cp),
+                    (int)seg->real_num_passes);
+            if (restored == 2) {
+                opq_mqc_finish_dec(mqc);
+                continue;
+            }
+            if (restored == 1) {
+                passno = cp.passes;
+                passtype = (2U + passno) % 3U;
+                bpno_plus_one -= (OPJ_INT32)((2U + passno) / 3U);
+                mqc->a = cp.a; mqc->c = cp.c; mqc->ct = cp.ct;
+                mqc->bp = mqc->start + cp.byte;
+                river_mqc_restore_contexts(mqc, cp.contexts);
+                mqc->curctx = mqc->ctxs + cp.ctx;
+            }
+        }
+        for (; (passno < seg->real_num_passes) &&
                 (bpno_plus_one >= 1); ++passno) {
             switch (passtype) {
             case 0:
@@ -2178,12 +2337,34 @@ static OPJ_BOOL opj_t1_decode_cblk(opj_t1_t *t1,
                 opj_mqc_setstate(mqc, T1_CTXNO_AGG, 0, 3);
                 opj_mqc_setstate(mqc, T1_CTXNO_ZC, 0, 4);
             }
+            /* The synthetic marker at the preview boundary may influence the
+             * final pass. Save a real-input-only state before that point. */
+            if (resume && resume->session.capture &&
+                    (passno + 2 == seg->real_num_passes || passno + 1 == seg->real_num_passes) &&
+                    mqc->end_of_byte_stream_counter == 0 && mqc->bp < mqc->end) {
+                river_mq_checkpoint_t cp = {0};
+                cp.a = mqc->a; cp.c = mqc->c; cp.ct = mqc->ct;
+                cp.byte = (OPJ_UINT32)(mqc->bp - mqc->start);
+                cp.ctx = (OPJ_UINT32)(mqc->curctx - mqc->ctxs);
+                cp.passes = passno + 1;
+                river_mqc_save_contexts(mqc, cp.contexts);
+                resume->session.transfer(resume->session.session, resume->key,
+                    cblkdata, cp.byte + 1, t1->data, t1->w * t1->h,
+                    t1->flags, t1->flagssize, &cp, sizeof(cp), -(int)cp.passes);
+            }
             if (++passtype == 3) {
                 passtype = 0;
                 bpno_plus_one--;
             }
         }
 
+        if (resume && !resume->session.capture && passno == seg->real_num_passes && passno > 0) {
+            /* Finished coefficients need no MQ state. Truncated segments can
+             * only reuse this result for the identical byte string and passes. */
+            resume->session.transfer(resume->session.session, resume->key,
+                cblkdata, seg->len, t1->data, t1->w * t1->h, NULL, 0,
+                NULL, 0, -(int)passno);
+        }
         opq_mqc_finish_dec(mqc);
     }
 

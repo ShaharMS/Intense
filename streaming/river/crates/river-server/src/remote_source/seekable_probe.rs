@@ -22,7 +22,7 @@ async fn tiny_group_clipped_u16_matches_independent_kakadu_planes() {
    let parts=source.selected_parts(&selected,&payload,16384,14,false,true,&mut context).unwrap();
    for layers in [0,1] {
     let prepared=source.prepare_discovered_multipart_prefix(&selected,&payload,&parts,2,layers,&mut context).unwrap().unwrap();
-    let mut view=crate::decoder::Jpeg2000Source::from_catalog("tiny-format.j2k",509,251,Some(source.header.layout));view.memory=Some(prepared.bytes.into());
+    let mut view=crate::decoder::Jpeg2000Source::from_header_layout("tiny-format.j2k",509,251,Some(source.header.layout));view.memory=Some(prepared.bytes.into());
     view.prepared=Some(Arc::new(crate::decoder::PreparedIo {file_ranges:false,view_reduction:2,pcrl_lowest_revision:false,technical_origin:None,predecoded:None,overlapped_decode_ms:0.0,predecoded_origin:(0,0),original_path:view.path.clone(),original_tiles:vec![(0,0)],tile_offset_x:0,tile_offset_y:0,route:prepared.route,stats:Default::default(),elapsed_ms:0.0,_file:None}));
     let planes=(0..channels).map(|c|std::fs::read(fixtures.join(format!("{name}-r2-l{layers}-{c}.u16be"))).unwrap().chunks_exact(2).map(|b|u16::from_be_bytes([b[0],b[1]])).collect::<Vec<_>>()).collect::<Vec<_>>();
     let mut rgba=vec![];for i in 0..128*63 {for c in 0..3 {let value=planes[if channels==1 {0}else{c}][i];rgba.push(((u32::from(value)*255+32767)/65535) as u8);}rgba.push(255);}
@@ -130,7 +130,7 @@ async fn next_level_large_unindexed_prefix_probe() {
   for c in 0..3 {assert!(components[c].data().iter().zip(gold.pixels()).all(|(&a,b)|a==i32::from(b.0[c])));}
   if std::env::var("RIVER_PROBE_TINY_DECODE").as_deref()==Ok("1") {
    use crate::decoder::{Jpeg2000Source,PreparedIo};
-   let mut view=Jpeg2000Source::from_catalog("tiny-probe.j2k",source.header.width,source.header.height,Some(source.header.layout));
+   let mut view=Jpeg2000Source::from_header_layout("tiny-probe.j2k",source.header.width,source.header.height,Some(source.header.layout));
    view.memory=Some(prepared.bytes.clone().into());
    view.prepared=Some(Arc::new(PreparedIo {file_ranges:false,view_reduction:7,pcrl_lowest_revision:false,technical_origin:None,predecoded:None,overlapped_decode_ms:0.0,predecoded_origin:(0,0),original_path:view.path.clone(),original_tiles:vec![(0,0)],tile_offset_x:0,tile_offset_y:0,route:prepared.route,stats:Default::default(),elapsed_ms:0.0,_file:None}));
    for pair in 0..6 {for threads in if pair%2==0 {[1,3]}else{[3,1]} {

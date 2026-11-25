@@ -39,33 +39,6 @@
 #ifndef OPJ_MQC_INL_H
 #define OPJ_MQC_INL_H
 
-/* For internal use of opj_mqc_decode_macro() */
-#define opj_mqc_mpsexchange_macro(d, curctx, a) \
-{ \
-    if (a < (*curctx)->qeval) { \
-        d = !((*curctx)->mps); \
-        *curctx = (*curctx)->nlps; \
-    } else { \
-        d = (*curctx)->mps; \
-        *curctx = (*curctx)->nmps; \
-    } \
-}
-
-/* For internal use of opj_mqc_decode_macro() */
-#define opj_mqc_lpsexchange_macro(d, curctx, a) \
-{ \
-    if (a < (*curctx)->qeval) { \
-        a = (*curctx)->qeval; \
-        d = (*curctx)->mps; \
-        *curctx = (*curctx)->nmps; \
-    } else { \
-        a = (*curctx)->qeval; \
-        d = !((*curctx)->mps); \
-        *curctx = (*curctx)->nlps; \
-    } \
-}
-
-
 /**
 Decode a symbol using raw-decoder. Cfr p.506 TAUBMAN
 @param mqc MQC handle
@@ -135,24 +108,22 @@ static INLINE OPJ_UINT32 opj_mqc_raw_decode(opj_mqc_t *mqc)
     } while (a < 0x8000); \
 }
 
+/* ISO 15444-1 C.3.2. Share one state exchange and renormalization path. */
 #define opj_mqc_decode_macro(d, mqc, curctx, a, c, ct) \
 { \
-    /* Implements ISO 15444-1 C.3.2 Decoding a decision (DECODE) */ \
-    /* Note: alternate "J.2 - Decoding an MPS or an LPS in the */ \
-    /* software-conventions decoder" has been tried, but does not bring any */ \
-    /* improvement. See https://github.com/uclouvain/openjpeg/issues/921 */ \
-    a -= (*curctx)->qeval;  \
-    if ((c >> 16) < (*curctx)->qeval) {  \
-        opj_mqc_lpsexchange_macro(d, curctx, a);  \
-        opj_mqc_renormd_macro(mqc, a, c, ct);  \
-    } else {  \
-        c -= (*curctx)->qeval << 16;  \
-        if ((a & 0x8000) == 0) { \
-            opj_mqc_mpsexchange_macro(d, curctx, a); \
-            opj_mqc_renormd_macro(mqc, a, c, ct); \
-        } else { \
-            d = (*curctx)->mps; \
-        } \
+    const opj_mqc_state_t *state = *curctx; \
+    OPJ_UINT32 qe = state->qeval; \
+    OPJ_UINT32 lower = (c >> 16) < qe; \
+    a -= qe; \
+    if (!lower) { c -= qe << 16; } \
+    d = state->mps; \
+    if (lower || a < 0x8000U) { \
+        /* The lower interval reverses the MPS/LPS exchange condition. */ \
+        OPJ_UINT32 lps = (a < qe) ^ lower; \
+        d ^= lps; \
+        *curctx = lps ? state->nlps : state->nmps; \
+        if (lower) { a = qe; } \
+        opj_mqc_renormd_macro(mqc, a, c, ct); \
     } \
 }
 

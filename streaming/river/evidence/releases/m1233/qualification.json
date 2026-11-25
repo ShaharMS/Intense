@@ -1,0 +1,19 @@
+{
+  "version": "m1233",
+  "platform": "linux/amd64",
+  "qualifiedForRelease": false,
+  "releaseTests": "skipped",
+  "reason": "Packaging only. Packaged health, OpenAPI version and WMTS pixel outputs checked. Release benchmarks skipped.",
+  "smokeChecks": [
+    "health",
+    "openapi-version",
+    "nine exact WMTS PNGs across three generated eight-band layouts"
+  ],
+  "imageId": "sha256:e5d7336f15177db1ede800c06329e8d141238ed38deb1f72fabdc8a8766587f1",
+  "sourceManifestSha256": "6c8b1e1b29b3dd2797befcd8fbe3151075eb7308d1e7f8368c6b907965621341",
+  "channels": [
+    "lts",
+    "stable",
+    "latest"
+  ]
+}

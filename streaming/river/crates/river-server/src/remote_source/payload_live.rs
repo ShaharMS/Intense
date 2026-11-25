@@ -29,7 +29,7 @@ impl RemoteSource {
   let mut checked_rate=self.read_profile.snapshot().planning_bytes_per_second().unwrap_or(f64::MAX);
   self.runtime.block_on(async {
    let mut pending=VecDeque::from(ranges);let mut tasks=tokio::task::JoinSet::new();let mut inflight_bytes=0u64;
-   let spawn=|tasks:&mut tokio::task::JoinSet<Result<(Range<u64>,Vec<u8>)>>,range:Range<u64>| {
+   let spawn=|tasks:&mut tokio::task::JoinSet<Result<(Range<u64>,range_flights::Fetched)>>,range:Range<u64>| {
     let client=client.clone();let cancel=cancel.clone();
     tasks.spawn(async move {let data=client.fetch(range.clone(),deadline,cancel).await?;Ok((range,data))}.in_current_span());
    };
@@ -37,8 +37,9 @@ impl RemoteSource {
    while let Some(result)=tasks.join_next().await {
     let (range,data)=result.context("Live payload range worker failed")??;context.check()?;
     inflight_bytes=inflight_bytes.saturating_sub(range.end-range.start);
-    context.stats.bytes+=data.len() as u64;context.stats.requests+=1;
+    data.account(&mut context.stats);
     let blocks=self.cache.put(&self.cache_key,self.block_size,range.start,&data);
+    if let Some(tx) = &context.ready_blocks { let _ = tx.send(blocks.clone()); }
     if self.cache.limit<8*1024*1024 {context.recent.remember(self.block_size,&blocks);}leases.extend(blocks);
     let observation=self.read_profile.snapshot();
     let settings=crate::read_policy::settings();

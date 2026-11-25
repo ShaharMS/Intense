@@ -169,16 +169,14 @@ already learned source. A restart alone is not cold because disk indexes/raster 
 For a strict empty-cache comparison use a separate empty TEST cache, not deletion of existing data.
 Restarting also loses learned measurements, so label process-cold and learned-source tests separately.
 Keep source registration/metadata IO in accounting. Capture complete HTTP body time and server
-phase headers separately. For WebSockets distinguish first correct frame, complete preview,
-complete final delivery and browser paint; frame arrival is not paint. Keep fresh and reused
+phase headers separately. Keep fresh and reused
 HTTP connection measurements separate. A 1500ms refinement idle delay may be intentional.
 Return: checkpoint/image ID, CPU/memory limits, effective read policy, approximate image size,
 request geometry/driver/format, cold and repeated times, decoder route, source-reads.json,
 read-policy.json and relevant sanitized container logs. S3-side GET/byte metrics are helpful
 when available. Do not send original images, signed URLs, credentials or raw config exports.
 A s3-disk-compatibility decoder route is a disk-backed fallback; identify it separately.
-Forward /api/, /streamer/, /wmts, /docs and /ws routes through any external proxy, including
-WebSocket upgrades. Use one correctly encoded image query value for full S3 object URLs.
+Forward /api/, /streamer/, /wmts, and /docs routes through any external proxy. Use one correctly encoded image query value for full S3 object URLs.
 When troubleshooting404s, compare edge response and River logs before blaming the decoder.
 
 ROLLBACK AND HANDOFF

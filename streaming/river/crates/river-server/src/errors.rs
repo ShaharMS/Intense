@@ -2,6 +2,9 @@
 use axum::{body::{Body,to_bytes},extract::Request,http::{StatusCode,header},middleware::Next,response::{Response,IntoResponse},Json};
 use serde_json::{Value,json};
 
+#[derive(Clone)]
+pub struct TileFailure(pub Value);
+
 pub fn reply(status:StatusCode,code:&str,message:impl Into<String>,details:Value)->Response {
     (status,Json(json!({"code":code,"message":message.into(),"details":details}))).into_response()
 }
@@ -36,6 +39,7 @@ pub async fn normalize(request:Request,next:Next)->Response {
     let started = std::time::Instant::now();
     let route = request.extensions().get::<axum::extract::MatchedPath>().map_or("unmatched route", |path| path.as_str()).to_owned();
     let path=request.uri().path().to_owned(); // Used only in the existing error response.
+    let wmts_uri=(route=="/wmts").then(||request.uri().clone());
     let method=request.method().to_string();
     let request_id=uuid::Uuid::new_v4().to_string();
     let span = tracing::error_span!(crate::console_log::REQUEST_SPAN, %request_id, %route);
@@ -52,6 +56,28 @@ pub async fn normalize(request:Request,next:Next)->Response {
     let message=payload.get("message").and_then(Value::as_str).filter(|v|!v.trim().is_empty()).map(str::to_owned)
         .or_else(||std::str::from_utf8(&bytes).ok().filter(|text|!text.trim().is_empty() && !text.trim_start().starts_with('{')).map(str::to_owned))
         .unwrap_or_else(||explanation(&code,parts.status).to_owned());
+    if parts.extensions.get::<TileFailure>().is_none() && (wmts_uri.is_some() || code.contains("header_failed") || code.contains("header_worker_failed")) {
+        let mut details = payload.get("details").filter(|v| v.is_object()).cloned().unwrap_or_else(||json!({}));
+        details["release"]=json!(option_env!("RIVER_BUILD_VERSION").unwrap_or("development"));
+        if let Some(uri)=wmts_uri {
+            if let Ok(mut query)=axum::extract::Query::<std::collections::BTreeMap<String,String>>::try_from_uri(&uri) {
+                query.retain(|key,_| matches!(key.as_str(),"SERVICE"|"REQUEST"|"VERSION"|"STYLE"|"LAYER"|"TILEMATRIXSET"|"TILEMATRIX"|"TILEROW"|"TILECOL"|"LAYERS"|"FORMAT"|"DRIVER"|"EDGE"|"edge"));
+                details["replay"]=json!(query.0);
+            }
+        }
+        parts.extensions.insert(TileFailure(details));
+    }
+    if let Some(failure)=parts.extensions.get::<TileFailure>() {
+        if !payload["details"].is_object() {payload["details"]=json!({});}
+        if let (Some(out),Some(extra))=(payload["details"].as_object_mut(),failure.0.as_object()) {
+            out.extend(extra.clone());
+        }
+        // The summary layer reads this extension even when verbose events are filtered.
+        let mut chars=message.chars();
+        let mut reason:String=chars.by_ref().take(16384).collect();
+        if chars.next().is_some() { reason.push_str(" [diagnostic truncated]"); }
+        parts.extensions.insert(crate::console_log::FailureReason(reason));
+    }
     payload["code"]=json!(code);payload["message"]=json!(message);
     payload["status"]=json!(parts.status.as_u16());payload["path"]=json!(path);payload["method"]=json!(method);payload["requestId"]=json!(request_id);
     if payload.get("details").is_some_and(|v|v.as_object().is_some_and(|d|d.is_empty())) {payload.as_object_mut().unwrap().remove("details");}
@@ -74,7 +100,11 @@ mod tests {
     }
 }
 
-pub fn scratch_reply(error: &anyhow::Error) -> Option<Response> {
+pub fn resource_reply(error: &anyhow::Error) -> Option<Response> {
+    if let Some(timeout) = error.downcast_ref::<crate::resources::AdmissionTimeout>() {
+        return Some(reply(StatusCode::SERVICE_UNAVAILABLE, "memory_admission_timeout",
+            timeout.to_string(), serde_json::json!({})));
+    }
     let scratch = error.chain().find_map(|cause| {
         cause.downcast_ref::<crate::storage_mode::Unavailable>().or_else(|| {
             cause.downcast_ref::<std::io::Error>()?.get_ref()?.downcast_ref()

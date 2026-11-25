@@ -1,6 +1,8 @@
 use std::{path::PathBuf, process::Command, time::Instant};
 
 use anyhow::{Context, Result, bail};
+#[cfg(target_os = "linux")]
+use anyhow::ensure;
 use image::{ImageFormat, ImageReader};
 use tracing::instrument;
 mod native;
@@ -13,6 +15,12 @@ pub(crate) fn openht_available()->bool {
  #[cfg(unix)] {openht_worker::available()}
  #[cfg(not(unix))] {false}
 }
+
+pub(crate) fn deep_rgb_pool_available() -> bool {
+    native_enabled() && native::pool_threads() >= 8 && native::has_original_reader()
+}
+
+pub(crate) fn has_original_reader() -> bool { native_enabled() && native::has_original_reader() }
 
 pub(crate) fn native_enabled() -> bool {
     std::env::var("RIVER_GROK_NATIVE").is_ok_and(|value| value == "1" || value == "true")
@@ -54,14 +62,31 @@ pub(crate) fn decode_tiles(
     if tiles.is_empty() {
         return Ok(Vec::new());
     }
-    if source.components == Some(4) && !source.display_rgb_only {
-        if let Ok(mut output) = source.decode_tiles(tiles, source_tile, reduction, layers, format) {
-            for tile in &mut output {
-                tile.raster.decoder_route = "openjpeg-declared-alpha-fallback";
+    if source.band_fallback.is_some() {return source.decode_tiles(tiles,source_tile,reduction,layers,format);}
+    // Use the decoded JP2 channel definition for classic two-band input.
+    // The native Grok plane ABI exposes samples but no opacity role.
+    let two_band=source.components==Some(2) && !prefer_openht
+        && !source.stable_source.as_ref().or(source.remote.as_ref()).is_some_and(|r|r.header.is_ht);
+    if two_band || (source.components.is_some_and(|n| n>=4) && !source.display_rgb_only) {
+        match source.decode_tiles(tiles, source_tile, reduction, layers, format) {
+            Ok(mut output) => {
+                for tile in &mut output {
+                    tile.raster.decoder_route = if two_band { "openjpeg-two-band-display" } else { "openjpeg-declared-alpha-fallback" };
+                }
+                return Ok(output);
             }
-            return Ok(output);
+            Err(error) => {
+                if cancelled() || source.components.is_some_and(|n|n>=4) { return Err(error); }
+                return decode_grok_tiles(source,tiles,source_tile,reduction,layers,format,prefer_openht)
+                    .with_context(|| format!("OpenJPEG display path failed ({error:#}); Grok fallback also failed"));
+            }
         }
     }
+    decode_grok_tiles(source,tiles,source_tile,reduction,layers,format,prefer_openht)
+}
+
+fn decode_grok_tiles(source:&Jpeg2000Source, tiles:&[(u32,u32)], source_tile:u32, reduction:u8,
+                     layers:u32, format:RasterFormat, prefer_openht:bool) -> Result<Vec<DecodedTile>> {
     if source.prepared.as_ref().is_some_and(|p|p.pcrl_lowest_revision && p.route!="s3-multipart-lowest-rpcl-ranges") {
         let mut decoded=source.decode_tiles(tiles,source_tile,reduction,layers,format)?;
         for tile in &mut decoded {tile.raster.decoder_route="openjpeg-pcrl-lowest-compatibility";}
@@ -86,12 +111,14 @@ pub(crate) fn decode_tiles(
     let effective_reduction=source.technical_reduction(reduction)?;
     let area = format!("{},{},{},{}",technical_area.0,technical_area.1,technical_area.2,technical_area.3);
     let started = Instant::now();
+    let mut stages = None;
     let (image,backend) = if source.display_rgb_only {
-        match native::decode(source, technical_area, effective_reduction, layers, false) {
+        match native::decode(source, technical_area, effective_reduction, layers, false, &mut stages) {
             Ok((image, _)) => (image, "jp2grok-native-multispectral-rgb"),
             Err(error) => {
                 if cancelled() { return Err(error); }
-                let mut tiles = source.decode_tiles(tiles, source_tile, reduction, layers, format)?;
+                let mut tiles = source.decode_tiles(tiles, source_tile, reduction, layers, format)
+                    .with_context(|| format!("native Grok failed ({error:#}); OpenJPEG display fallback also failed"))?;
                 for tile in &mut tiles {
                     tile.raster.decoder_route = "openjpeg-multispectral-fallback";
                 }
@@ -99,10 +126,10 @@ pub(crate) fn decode_tiles(
             }
         }
     } else if prefer_openht || native_enabled() {
-        match native::decode(source, technical_area, effective_reduction, layers, prefer_openht) {
+        match native::decode(source, technical_area, effective_reduction, layers, prefer_openht, &mut stages) {
             Ok(image) => image,
             Err(error) => {
-                if cancelled(){return Err(error);}
+                if cancelled() || (source.original_read.is_some() && source.memory.is_none()) {return Err(error);}
                 #[cfg(unix)]
                 let worker_failed = error.is::<openht_worker::Failure>();
                 #[cfg(not(unix))]
@@ -114,7 +141,7 @@ pub(crate) fn decode_tiles(
                     tracing::warn!(%error, "OpenHT worker failed; retrying the prepared region with Grok");
                 }
                 let recovered = if worker_failed && native_enabled() {
-                    native::decode(source, technical_area, effective_reduction, layers, false).ok()
+                    native::decode(source, technical_area, effective_reduction, layers, false, &mut stages).ok()
                 } else {
                     None
                 };
@@ -123,7 +150,8 @@ pub(crate) fn decode_tiles(
                     Some((image, _)) => (image, "openht-worker-failure-grok"),
                     None => {
                         tracing::debug!(%error, "using compatible Grok CLI");
-                        let image = decode_cli(source, &area, effective_reduction, layers)?;
+                        let image = decode_cli(source, &area, effective_reduction, layers)
+                            .with_context(|| format!("native decode failed ({error:#}); Grok CLI fallback also failed"))?;
                         let route = if worker_failed { "openht-worker-failure-grok-cli" } else { "jp2grok-cli" };
                         (image, route)
                     }
@@ -175,10 +203,10 @@ pub(crate) fn decode_tiles(
                 height,
                 format,
             )?;
-            Ok(DecodedTile { rgba:crate::decoder::take_pixel_capture(),
+            Ok(DecodedTile {
                 tile_x,
                 tile_y,
-                raster: DecodedRaster {
+                raster: DecodedRaster { block_counts: stages.and_then(|s| s.block_counts), grok_stages: stages,
                     width,
                     height,
                     bytes: bytes.into_boxed_slice().into(),
@@ -248,36 +276,67 @@ fn write_rgb_view(bytes: &[u8], out: &mut impl std::io::Write) -> std::io::Resul
     Ok(true)
 }
 
+// Grok's CLI requires a seekable input. Linux can provide that to the child
+// without a mounted filesystem. Its PAM raster is streamed back via stdout.
+#[cfg(target_os = "linux")]
+fn decode_cli_ram(mut command: Command, source: &Jpeg2000Source, limit: u64) -> Result<image::RgbaImage> {
+    use std::{fs::File, io::{Read, Write}, os::fd::{AsRawFd, FromRawFd}, os::unix::process::CommandExt, process::Stdio};
+    let _reservation = crate::storage_mode::reserve(limit.saturating_add(source.memory.as_ref().map_or(0, |b| b.len() as u64)))?;
+    let mut input = None;
+    if let Some(bytes) = &source.memory {
+        let fd = unsafe { libc::memfd_create(c"river-grok".as_ptr(), libc::MFD_CLOEXEC) };
+        ensure!(fd >= 0, "cannot create anonymous Grok input: {}", std::io::Error::last_os_error());
+        let mut file = unsafe { File::from_raw_fd(fd) };
+        file.write_all(bytes)?;
+        command.arg("-i").arg(format!("/proc/self/fd/{}", file.as_raw_fd()));
+        // Clear CLOEXEC only in this child; concurrent execs cannot inherit it.
+        unsafe { command.pre_exec(move || {
+            if libc::fcntl(fd, libc::F_SETFD, 0) < 0 { return Err(std::io::Error::last_os_error()); }
+            Ok(())
+        }); }
+        input = Some(file);
+    } else {
+        command.arg("-i").arg(&source.path);
+    }
+    let mut child = command.args(["--out-fmt", "pam"]).stdout(Stdio::piped()).stderr(Stdio::piped()).spawn()
+        .context("cannot start Grok RAM decode")?;
+    drop(input);
+    // Drain stderr concurrently with the binary raster so a chatty child
+    // cannot block on either pipe. Keep a bounded excerpt for this request.
+    let mut stderr=child.stderr.take().unwrap();
+    let diagnostics=std::thread::spawn(move || -> std::io::Result<String> {
+        let mut bytes=Vec::new();
+        stderr.by_ref().take(4096).read_to_end(&mut bytes)?;
+        let extra=std::io::copy(&mut stderr,&mut std::io::sink())?;
+        let mut text=String::from_utf8_lossy(&bytes).trim().to_owned();
+        if extra>0 {text.push_str(&format!(" [{extra} stderr bytes omitted]"));}
+        Ok(text)
+    });
+    let mut raster = Vec::new();
+    let read = child.stdout.take().unwrap().take(limit.saturating_add(1)).read_to_end(&mut raster);
+    if read.is_err() || raster.len() as u64 > limit {
+        let _ = child.kill();
+        let _ = child.wait();
+        read?;
+        bail!("Grok RAM output exceeds the requested region budget");
+    }
+    let status=child.wait()?;
+    let diagnostic=diagnostics.join().map_err(|_| anyhow::anyhow!("Grok diagnostic reader stopped"))??;
+    ensure!(status.success(), "Grok RAM decoder exited with {status}; stderr: {}",if diagnostic.is_empty() {"(empty)"} else {&diagnostic});
+    let size=raster.len();
+    Ok(ImageReader::with_format(std::io::Cursor::new(raster), ImageFormat::Pnm).decode()
+        .with_context(||format!("Grok returned undecodable PAM output ({size} bytes), stderr: {diagnostic}"))?.to_rgba8())
+}
+
 fn decode_cli(source: &Jpeg2000Source, area: &str, reduction: u8, layers: u32) -> Result<image::RgbaImage> {
     use std::io::Write;
-    let mut memory_file = None;
-    if let Some(bytes) = &source.memory {
-        let mut file = crate::storage_mode::ScratchFile::create("river-grok-", ".jp2", bytes.len() as u64, None)?;
-        file.write_all(bytes)?;
-        memory_file = Some(file);
-    }
-    let input_path = memory_file.as_ref().map(|file| file.path()).unwrap_or(&source.path);
-    let output_bytes = if crate::storage_mode::disk_cache_enabled() { 0 } else {
-        let coordinates = area.split(',').map(str::parse::<u64>).collect::<std::result::Result<Vec<_>, _>>()?;
-        let [x0,y0,x1,y1]: [u64;4] = coordinates.try_into().map_err(|_| anyhow::anyhow!("Invalid Grok decode region"))?;
-        let scale = 1u64.checked_shl(u32::from(reduction)).unwrap_or(u64::MAX);
-        (x1.div_ceil(scale) - x0 / scale).saturating_mul(y1.div_ceil(scale) - y0 / scale)
-            .saturating_mul(8).saturating_add(4096)
-    };
-    let output_dir = crate::storage_mode::ScratchDirectory::create(output_bytes)?;
-    let output_path = output_dir.path().join("region.pam");
     let executable = executable();
     let threads = std::env::var("RIVER_GROK_THREADS_PER_DECODE").ok()
         .and_then(|value| value.parse::<usize>().ok()).unwrap_or(2).clamp(1, 16);
     let mut command = Command::new(&executable);
-    output_dir.configure_child(&mut command);
     command
         .arg("-H")
         .arg(threads.to_string())
-        .arg("-i")
-        .arg(input_path)
-        .arg("-o")
-        .arg(&output_path)
         .arg("-d")
         .arg(area)
         .arg("-r")
@@ -288,6 +347,28 @@ fn decode_cli(source: &Jpeg2000Source, area: &str, reduction: u8, layers: u32) -
     if layers > 0 {
         command.arg("-l").arg(layers.to_string());
     }
+    let output_bytes = if crate::storage_mode::disk_cache_enabled() { 0 } else {
+        let coordinates = area.split(',').map(str::parse::<u64>).collect::<std::result::Result<Vec<_>, _>>()?;
+        let [x0,y0,x1,y1]: [u64;4] = coordinates.try_into().map_err(|_| anyhow::anyhow!("Invalid Grok decode region"))?;
+        let scale = 1u64.checked_shl(u32::from(reduction)).unwrap_or(u64::MAX);
+        (x1.div_ceil(scale) - x0 / scale).saturating_mul(y1.div_ceil(scale) - y0 / scale)
+            .saturating_mul(8).saturating_add(4096)
+    };
+    #[cfg(target_os = "linux")]
+    if !crate::storage_mode::disk_cache_enabled() {
+        return decode_cli_ram(command, source, output_bytes);
+    }
+    let mut memory_file = None;
+    if let Some(bytes) = &source.memory {
+        let mut file = crate::storage_mode::ScratchFile::create("river-grok-", ".jp2", bytes.len() as u64, None)?;
+        file.write_all(bytes)?;
+        memory_file = Some(file);
+    }
+    let input_path = memory_file.as_ref().map(|file| file.path()).unwrap_or(&source.path);
+    let output_dir = crate::storage_mode::ScratchDirectory::create(output_bytes)?;
+    let output_path = output_dir.path().join("region.pam");
+    output_dir.configure_child(&mut command);
+    command.arg("-i").arg(input_path).arg("-o").arg(&output_path);
     let output = command
         .output()
         .with_context(|| format!("unable to run JP2Grok decoder {}", executable.display()))?;

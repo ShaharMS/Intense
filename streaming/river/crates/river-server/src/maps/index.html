@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>River Atlas</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cesium@1.135.0/Build/Cesium/Widgets/widgets.css">
+  <style>
+    * { box-sizing: border-box }
+    body { margin: 0; color: #ecf6ff; background: #080f17; font: 15px system-ui, sans-serif }
+    #globe { position: absolute; inset: 0; overscroll-behavior: contain }
+    #globe canvas { touch-action: none; cursor: grab }
+    #globe canvas:active { cursor: grabbing }
+    #status { position: absolute; top: 12px; left: 12px; margin: 0; padding: 8px 12px; background: #0b1822; border-radius: 6px }
+    .cesium-viewer-bottom { left: 8px !important }
+  </style>
+  <script defer src="https://cdn.jsdelivr.net/npm/cesium@1.135.0/Build/Cesium/Cesium.js"></script>
+  <script defer src="/map/viewer.js"></script>
+</head>
+<body>
+  <div id="globe" aria-label="Interactive Earth globe"></div>
+  <p id="status" role="status">Loading map layers…</p>
+</body>
+</html>

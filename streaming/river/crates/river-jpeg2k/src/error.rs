@@ -4,7 +4,7 @@ use crate::ColorSpace;
 
 #[derive(Error, Debug)]
 pub enum Error {
-  #[error("Unsupported components")]
+  #[error("Unsupported component layout or precision ({0} components)")]
   UnsupportedComponentsError(u32),
 
   #[error("Unsupported color space: {0:?}")]

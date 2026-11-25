@@ -1,0 +1,594 @@
+{
+  "passed": true,
+  "concurrentRequests": 16,
+  "exactPixels": true,
+  "versionInvalidation": true,
+  "pathConfinement": true,
+  "removedRoutes": true,
+  "resources": {
+    "activeDecodeReservationBytes": 0,
+    "activeDecodeWorkspaces": 0,
+    "adaptation": {
+      "automaticRamTargetPerMille": 1000,
+      "conservesCompute": false,
+      "conservesDisk": true,
+      "conservesRam": false,
+      "decodeAdmissionTarget": 2,
+      "mode": "no-disk",
+      "noDisk": true,
+      "rebalancingEnabled": true,
+      "source": "environment",
+      "sourceIoAdmissionTarget": 2,
+      "startupMode": "no-disk"
+    },
+    "cacheLearning": {
+      "enabled": true,
+      "idleWindows": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "maximumBaselineMultiple": 2,
+      "maximumTransferPerWindowFraction": 0.05,
+      "pausedByAdaptationMode": false,
+      "policy": "reuse under eviction pressure; unmeasured time savings do not drive allocations",
+      "protectedBaselineFraction": 0.5,
+      "sampledWindows": 0,
+      "scope": "process-local deployment workload; learning resets on restart or settings change",
+      "targets": [
+        {
+          "learnedTargetBytes": 0,
+          "name": "ranges"
+        },
+        {
+          "learnedTargetBytes": 0,
+          "name": "headers"
+        },
+        {
+          "learnedTargetBytes": 0,
+          "name": "indexes"
+        },
+        {
+          "learnedTargetBytes": 0,
+          "name": "parsed_headers"
+        },
+        {
+          "learnedTargetBytes": 0,
+          "name": "packet_plans"
+        },
+        {
+          "learnedTargetBytes": 0,
+          "name": "prepared_prefixes"
+        },
+        {
+          "learnedTargetBytes": 0,
+          "name": "native_tiles"
+        },
+        {
+          "learnedTargetBytes": 0,
+          "name": "raster_results"
+        },
+        {
+          "learnedTargetBytes": 0,
+          "name": "asset_metadata"
+        }
+      ],
+      "windowSeconds": 60
+    },
+    "caches": [
+      {
+        "allocation": {
+          "configured_bytes": 13421772,
+          "effective_target_bytes": 13421772,
+          "explicit": false,
+          "reason": "separate persistent-disk ceiling, derived conservatively from instance size; not reserved RAM"
+        },
+        "averageRetainedEntryBytes": null,
+        "bytesOrWorkReused": 0,
+        "detachedActivePayloadBytes": 0,
+        "effectiveLimitBytes": 0,
+        "estimatedWorkAvoidedNanoseconds": 0,
+        "evictions": 0,
+        "hits": 0,
+        "initialized": false,
+        "misses": 0,
+        "name": "asset_locator_disk",
+        "occupancy": {
+          "bytes": 0,
+          "entries": 0,
+          "externally_held_bytes": 0,
+          "persistence_location": null
+        },
+        "purpose": "Persistent disposable cache; separate from process RAM",
+        "sharedPayloadBytesEvictedCumulative": 0,
+        "storage": "disabled",
+        "workAvoidanceCaveat": "Prior observed rebuild cost, not a measured speedup; nested cache estimates must not be summed"
+      },
+      {
+        "allocation": {
+          "configured_bytes": 3250585,
+          "effective_target_bytes": 3250585,
+          "explicit": false,
+          "reason": "10/100 of remaining coordinated RAM after explicit cache ceilings and headroom"
+        },
+        "averageRetainedEntryBytes": 4244,
+        "bytesOrWorkReused": 34,
+        "detachedActivePayloadBytes": 0,
+        "effectiveLimitBytes": 3250585,
+        "estimatedWorkAvoidedNanoseconds": 0,
+        "evictions": 0,
+        "hits": 34,
+        "initialized": true,
+        "misses": 8,
+        "name": "asset_metadata",
+        "occupancy": {
+          "bytes": 8488,
+          "entries": 2,
+          "externally_held_bytes": 0,
+          "persistence_location": null
+        },
+        "purpose": "Demand-loaded image handles; preserves cross-request preparation state",
+        "sharedPayloadBytesEvictedCumulative": 0,
+        "storage": "process-local RAM",
+        "workAvoidanceCaveat": "Prior observed rebuild cost, not a measured speedup; nested cache estimates must not be summed"
+      },
+      {
+        "allocation": {
+          "configured_bytes": 1950351,
+          "effective_target_bytes": 1950351,
+          "explicit": false,
+          "reason": "6/100 of remaining coordinated RAM after explicit cache ceilings and headroom"
+        },
+        "averageRetainedEntryBytes": 179,
+        "bytesOrWorkReused": 358,
+        "detachedActivePayloadBytes": 0,
+        "effectiveLimitBytes": 1950351,
+        "estimatedWorkAvoidedNanoseconds": 0,
+        "evictions": 0,
+        "hits": 2,
+        "initialized": true,
+        "misses": 2,
+        "name": "headers",
+        "occupancy": {
+          "bytes": 358,
+          "entries": 2,
+          "externally_held_bytes": 0,
+          "persistence_location": null
+        },
+        "purpose": "Raw main headers and marker tables; avoids source header reads",
+        "sharedPayloadBytesEvictedCumulative": 0,
+        "storage": "process-local RAM",
+        "workAvoidanceCaveat": "Prior observed rebuild cost, not a measured speedup; nested cache estimates must not be summed"
+      },
+      {
+        "allocation": {
+          "configured_bytes": 107374182,
+          "effective_target_bytes": 107374182,
+          "explicit": false,
+          "reason": "separate persistent-disk ceiling, derived conservatively from instance size; not reserved RAM"
+        },
+        "averageRetainedEntryBytes": null,
+        "bytesOrWorkReused": 0,
+        "detachedActivePayloadBytes": 0,
+        "effectiveLimitBytes": 0,
+        "estimatedWorkAvoidedNanoseconds": 0,
+        "evictions": 0,
+        "hits": 0,
+        "initialized": true,
+        "misses": 0,
+        "name": "index_disk",
+        "occupancy": {
+          "bytes": 0,
+          "entries": 0,
+          "externally_held_bytes": 0,
+          "persistence_location": "/tmp/river-s3-cache/technical-index"
+        },
+        "purpose": "Persistent disposable cache; separate from process RAM",
+        "sharedPayloadBytesEvictedCumulative": 0,
+        "storage": "disabled",
+        "workAvoidanceCaveat": "Prior observed rebuild cost, not a measured speedup; nested cache estimates must not be summed"
+      },
+      {
+        "allocation": {
+          "configured_bytes": 2925527,
+          "effective_target_bytes": 2925527,
+          "explicit": false,
+          "reason": "9/100 of remaining coordinated RAM after explicit cache ceilings and headroom"
+        },
+        "averageRetainedEntryBytes": 429,
+        "bytesOrWorkReused": 0,
+        "detachedActivePayloadBytes": 0,
+        "effectiveLimitBytes": 2925527,
+        "estimatedWorkAvoidedNanoseconds": 0,
+        "evictions": 0,
+        "hits": 0,
+        "initialized": true,
+        "misses": 4,
+        "name": "indexes",
+        "occupancy": {
+          "bytes": 858,
+          "entries": 2,
+          "externally_held_bytes": 0,
+          "persistence_location": null
+        },
+        "purpose": "Validated tile-part offsets; avoids rediscovering file positions",
+        "sharedPayloadBytesEvictedCumulative": 0,
+        "storage": "process-local RAM",
+        "workAvoidanceCaveat": "Prior observed rebuild cost, not a measured speedup; nested cache estimates must not be summed"
+      },
+      {
+        "allocation": {
+          "configured_bytes": 4550819,
+          "effective_target_bytes": 4550819,
+          "explicit": false,
+          "reason": "14/100 of remaining coordinated RAM after explicit cache ceilings and headroom"
+        },
+        "averageRetainedEntryBytes": null,
+        "bytesOrWorkReused": 0,
+        "detachedActivePayloadBytes": 0,
+        "effectiveLimitBytes": 4550819,
+        "estimatedWorkAvoidedNanoseconds": 0,
+        "evictions": 0,
+        "hits": 0,
+        "initialized": false,
+        "misses": 0,
+        "name": "native_tiles",
+        "occupancy": {
+          "bytes": 0,
+          "entries": 0,
+          "externally_held_bytes": 0,
+          "persistence_location": null
+        },
+        "purpose": "Decoded pixel planes; avoids native decode work",
+        "sharedPayloadBytesEvictedCumulative": 0,
+        "storage": "process-local RAM",
+        "workAvoidanceCaveat": "Prior observed rebuild cost, not a measured speedup; nested cache estimates must not be summed"
+      },
+      {
+        "allocation": {
+          "configured_bytes": 2925527,
+          "effective_target_bytes": 2925527,
+          "explicit": false,
+          "reason": "9/100 of remaining coordinated RAM after explicit cache ceilings and headroom"
+        },
+        "averageRetainedEntryBytes": null,
+        "bytesOrWorkReused": 0,
+        "detachedActivePayloadBytes": 0,
+        "effectiveLimitBytes": 2925527,
+        "estimatedWorkAvoidedNanoseconds": 0,
+        "evictions": 0,
+        "hits": 0,
+        "initialized": false,
+        "misses": 0,
+        "name": "packet_plans",
+        "occupancy": {
+          "bytes": 0,
+          "entries": 0,
+          "externally_held_bytes": 0,
+          "persistence_location": null
+        },
+        "purpose": "Packet selection plans; avoids rebuilding byte selection",
+        "sharedPayloadBytesEvictedCumulative": 0,
+        "storage": "process-local RAM",
+        "workAvoidanceCaveat": "Prior observed rebuild cost, not a measured speedup; nested cache estimates must not be summed"
+      },
+      {
+        "allocation": {
+          "configured_bytes": 1950351,
+          "effective_target_bytes": 1950351,
+          "explicit": false,
+          "reason": "6/100 of remaining coordinated RAM after explicit cache ceilings and headroom"
+        },
+        "averageRetainedEntryBytes": null,
+        "bytesOrWorkReused": 0,
+        "detachedActivePayloadBytes": 0,
+        "effectiveLimitBytes": 1950351,
+        "estimatedWorkAvoidedNanoseconds": 0,
+        "evictions": 0,
+        "hits": 0,
+        "initialized": true,
+        "misses": 2,
+        "name": "parsed_headers",
+        "occupancy": {
+          "bytes": 0,
+          "entries": 0,
+          "externally_held_bytes": 0,
+          "persistence_location": null
+        },
+        "purpose": "Parsed codestream structures; avoids repeated parsing",
+        "sharedPayloadBytesEvictedCumulative": 0,
+        "storage": "process-local RAM",
+        "workAvoidanceCaveat": "Prior observed rebuild cost, not a measured speedup; nested cache estimates must not be summed"
+      },
+      {
+        "allocation": {
+          "configured_bytes": 1625292,
+          "effective_target_bytes": 1625292,
+          "explicit": false,
+          "reason": "5/100 of remaining coordinated RAM after explicit cache ceilings and headroom"
+        },
+        "averageRetainedEntryBytes": null,
+        "bytesOrWorkReused": 0,
+        "detachedActivePayloadBytes": 0,
+        "effectiveLimitBytes": 1625292,
+        "estimatedWorkAvoidedNanoseconds": 0,
+        "evictions": 0,
+        "hits": 0,
+        "initialized": false,
+        "misses": 0,
+        "name": "prepared_prefixes",
+        "occupancy": {
+          "bytes": 0,
+          "entries": 0,
+          "externally_held_bytes": 0,
+          "persistence_location": null
+        },
+        "purpose": "Reusable decoder input prefixes; avoids reconstruction",
+        "sharedPayloadBytesEvictedCumulative": 0,
+        "storage": "process-local RAM",
+        "workAvoidanceCaveat": "Prior observed rebuild cost, not a measured speedup; nested cache estimates must not be summed"
+      },
+      {
+        "allocation": {
+          "configured_bytes": 8776581,
+          "effective_target_bytes": 8776581,
+          "explicit": false,
+          "reason": "27/100 of remaining coordinated RAM after explicit cache ceilings and headroom"
+        },
+        "averageRetainedEntryBytes": 312,
+        "bytesOrWorkReused": 10608,
+        "detachedActivePayloadBytes": 0,
+        "effectiveLimitBytes": 8776581,
+        "estimatedWorkAvoidedNanoseconds": 0,
+        "evictions": 0,
+        "hits": 34,
+        "initialized": true,
+        "misses": 4,
+        "name": "ranges",
+        "occupancy": {
+          "bytes": 624,
+          "entries": 2,
+          "externally_held_bytes": 0,
+          "persistence_location": null
+        },
+        "purpose": "Compressed source blocks; avoids fetching retained byte ranges",
+        "sharedPayloadBytesEvictedCumulative": 0,
+        "storage": "process-local RAM",
+        "workAvoidanceCaveat": "Prior observed rebuild cost, not a measured speedup; nested cache estimates must not be summed"
+      },
+      {
+        "allocation": {
+          "configured_bytes": 161061273,
+          "effective_target_bytes": 161061273,
+          "explicit": false,
+          "reason": "separate persistent-disk ceiling, derived conservatively from instance size; not reserved RAM"
+        },
+        "averageRetainedEntryBytes": null,
+        "bytesOrWorkReused": 0,
+        "detachedActivePayloadBytes": 0,
+        "effectiveLimitBytes": 0,
+        "estimatedWorkAvoidedNanoseconds": 0,
+        "evictions": 0,
+        "hits": 0,
+        "initialized": true,
+        "misses": 0,
+        "name": "raster_disk",
+        "occupancy": {
+          "bytes": 0,
+          "entries": 0,
+          "externally_held_bytes": 0,
+          "persistence_location": null
+        },
+        "purpose": "Persistent disposable cache; separate from process RAM",
+        "sharedPayloadBytesEvictedCumulative": 0,
+        "storage": "disabled",
+        "workAvoidanceCaveat": "Prior observed rebuild cost, not a measured speedup; nested cache estimates must not be summed"
+      },
+      {
+        "allocation": {
+          "configured_bytes": 4550819,
+          "effective_target_bytes": 4550819,
+          "explicit": false,
+          "reason": "14/100 of remaining coordinated RAM after explicit cache ceilings and headroom"
+        },
+        "averageRetainedEntryBytes": 1593,
+        "bytesOrWorkReused": 23895,
+        "detachedActivePayloadBytes": null,
+        "effectiveLimitBytes": 4550819,
+        "estimatedWorkAvoidedNanoseconds": 23135310,
+        "evictions": 0,
+        "hits": 15,
+        "initialized": true,
+        "misses": 6,
+        "name": "raster_results",
+        "occupancy": {
+          "bytes": 3186,
+          "entries": 2,
+          "externally_held_bytes": 0,
+          "persistence_location": null
+        },
+        "purpose": "Encoded output tiles; avoids preparation, decode and encoding",
+        "sharedPayloadBytesEvictedCumulative": 0,
+        "storage": "process-local RAM",
+        "workAvoidanceCaveat": "Prior observed rebuild cost, not a measured speedup; nested cache estimates must not be summed"
+      }
+    ],
+    "cgroupCurrentBytes": 6378590208,
+    "cgroupWorkingSetBytes": 1197015040,
+    "effectivePressureWorkingSetBytes": 19816448,
+    "externalCache": {
+      "configured": false
+    },
+    "memoryAdmissionWaiters": 0,
+    "nativeAndAdmissionSettings": {
+      "RIVER_DECODE_CONCURRENCY": {
+        "source": "explicit environment/profile",
+        "value": "2"
+      },
+      "RIVER_GROK_NATIVE_THREADS": {
+        "source": "automatic Rust fallback",
+        "value": null
+      },
+      "RIVER_GROK_THREADS_PER_DECODE": {
+        "source": "automatic Rust fallback",
+        "value": null
+      },
+      "RIVER_NVJPEG2000_NATIVE_WORKERS": {
+        "source": "automatic Rust fallback",
+        "value": null
+      },
+      "RIVER_NVJPEG2000_WORKERS": {
+        "source": "automatic Rust fallback",
+        "value": null
+      },
+      "RIVER_OPENHT_WORKERS": {
+        "source": "automatic Rust fallback",
+        "value": null
+      },
+      "RIVER_OPENHT_WORKER_MEMORY_MIB": {
+        "source": "automatic Rust fallback",
+        "value": null
+      },
+      "RIVER_OPENHT_WORKER_THREADS": {
+        "source": "automatic Rust fallback",
+        "value": null
+      },
+      "RIVER_SOURCE_IO_CONCURRENCY": {
+        "source": "automatic Rust fallback",
+        "value": null
+      }
+    },
+    "plan": {
+      "caches": {
+        "asset_locator_disk": {
+          "configured_bytes": 13421772,
+          "effective_target_bytes": 13421772,
+          "explicit": false,
+          "reason": "separate persistent-disk ceiling, derived conservatively from instance size; not reserved RAM"
+        },
+        "asset_metadata": {
+          "configured_bytes": 3250585,
+          "effective_target_bytes": 3250585,
+          "explicit": false,
+          "reason": "10/100 of remaining coordinated RAM after explicit cache ceilings and headroom"
+        },
+        "headers": {
+          "configured_bytes": 1950351,
+          "effective_target_bytes": 1950351,
+          "explicit": false,
+          "reason": "6/100 of remaining coordinated RAM after explicit cache ceilings and headroom"
+        },
+        "index_disk": {
+          "configured_bytes": 107374182,
+          "effective_target_bytes": 107374182,
+          "explicit": false,
+          "reason": "separate persistent-disk ceiling, derived conservatively from instance size; not reserved RAM"
+        },
+        "indexes": {
+          "configured_bytes": 2925527,
+          "effective_target_bytes": 2925527,
+          "explicit": false,
+          "reason": "9/100 of remaining coordinated RAM after explicit cache ceilings and headroom"
+        },
+        "native_tiles": {
+          "configured_bytes": 4550819,
+          "effective_target_bytes": 4550819,
+          "explicit": false,
+          "reason": "14/100 of remaining coordinated RAM after explicit cache ceilings and headroom"
+        },
+        "packet_plans": {
+          "configured_bytes": 2925527,
+          "effective_target_bytes": 2925527,
+          "explicit": false,
+          "reason": "9/100 of remaining coordinated RAM after explicit cache ceilings and headroom"
+        },
+        "parsed_headers": {
+          "configured_bytes": 1950351,
+          "effective_target_bytes": 1950351,
+          "explicit": false,
+          "reason": "6/100 of remaining coordinated RAM after explicit cache ceilings and headroom"
+        },
+        "prepared_prefixes": {
+          "configured_bytes": 1625292,
+          "effective_target_bytes": 1625292,
+          "explicit": false,
+          "reason": "5/100 of remaining coordinated RAM after explicit cache ceilings and headroom"
+        },
+        "ranges": {
+          "configured_bytes": 8776581,
+          "effective_target_bytes": 8776581,
+          "explicit": false,
+          "reason": "27/100 of remaining coordinated RAM after explicit cache ceilings and headroom"
+        },
+        "raster_disk": {
+          "configured_bytes": 161061273,
+          "effective_target_bytes": 161061273,
+          "explicit": false,
+          "reason": "separate persistent-disk ceiling, derived conservatively from instance size; not reserved RAM"
+        },
+        "raster_results": {
+          "configured_bytes": 4550819,
+          "effective_target_bytes": 4550819,
+          "explicit": false,
+          "reason": "14/100 of remaining coordinated RAM after explicit cache ceilings and headroom"
+        }
+      },
+      "decisions": [
+        "Initial cache shares use fixed weights; bounded workload learning can transfer unused automatic shares to repeatedly reused caches under eviction pressure",
+        "Automatic decode slots=min(32, max(1, floor(CPU/2)), max(1, RAM/512MiB)); effective slots=2; explicit environment/profile values take precedence",
+        "Automatic source IO=min(16, CPU, max(1, RAM/256MiB)); effective IO=2; persisted per-source limits and learning stay independent",
+        "More memory increases retention; CPU quotas and source-specific admission remain independent limits",
+        "Cache occupancy counts retained entries; process RSS and active decode reservations are reported separately"
+      ],
+      "decode_concurrency": 2,
+      "decoder_reserve_bytes": 134217728,
+      "detected": {
+        "cpu_affinity": 22,
+        "cpu_quota": null,
+        "effective_cpus": 22,
+        "memory_current_path": "/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/app.slice/app-org.chromium.Chromium-10946.scope/memory.current",
+        "memory_limit_bytes": 24508096512,
+        "memory_stat_path": "/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/app.slice/app-org.chromium.Chromium-10946.scope/memory.stat",
+        "reasons": [
+          "CPU workers use min(affinity=22, floor(quota=None)); minimum one"
+        ]
+      },
+      "explicit_cache_bytes": 0,
+      "memory_allowance_bytes": 536870912,
+      "overcommitted_explicit_bytes": 0,
+      "preview_buffer_bytes": 8388608,
+      "request_reserve_bytes": 134217728,
+      "runtime_reserve_bytes": 134217728,
+      "shared_cache_bytes": 32505856,
+      "source_io_concurrency": 2,
+      "temporary_reserve_bytes": 33554432
+    },
+    "pressure": {
+      "adjustments": 0,
+      "low_samples": 1,
+      "reason": "startup allocation",
+      "scale_per_mille": 1000
+    },
+    "pressureAccounting": "process RSS or cgroup working set exceeding headroom outside River allowance, whichever is larger",
+    "processRssBytes": 19816448,
+    "replicas": "Each process owns independent RAM caches; volumes are separate unless explicitly shared. RAM ceilings are not process memory; active requests can retain Arc payloads after cache eviction. Bytes payloads have no weak-reference API: encoded shared bytes at eviction are cumulative, not current occupancy; active copies and allocator retention remain included in RSS.",
+    "runtimeAssetRegistryFloorBytes": 16384,
+    "storage": {
+      "diskFallbackAllowed": false,
+      "mode": "ram-only",
+      "ramLocatorBytes": 834,
+      "ramLocatorEntries": 2,
+      "ramLocatorLimitBytes": 1048576,
+      "reason": "explicit no-disk constraint",
+      "scratchLimitBytes": 67108864,
+      "scratchReservedBytes": 0,
+      "scratchRoot": "/dev/shm"
+    }
+  }
+}

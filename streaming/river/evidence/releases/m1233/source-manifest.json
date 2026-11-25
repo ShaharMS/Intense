@@ -1,0 +1,1358 @@
+{
+  "version": "m1233",
+  "tag": "river:m1233",
+  "sources": [
+    {
+      "path": ".dockerignore",
+      "sha256": "e7c7846d015046cc3705b5809bd3ff99cf9620392547126311ed5488002ab4b0"
+    },
+    {
+      "path": "Cargo.lock",
+      "sha256": "625c6831bce3a60a9584e342424cf6d7f2f017c92a1146631b0d769fe630fdc0"
+    },
+    {
+      "path": "Cargo.toml",
+      "sha256": "6209228a66843e4f904dfc81f0f34e47ec6fc86686c8bb2f19816bf5ef8a8fdc"
+    },
+    {
+      "path": "Dockerfile.backend",
+      "sha256": "abb358d6aab2596db76d0f5e06b9e5b7fadbc139c25f4facd321a494ed9e84d0"
+    },
+    {
+      "path": "crates/river-core/Cargo.toml",
+      "sha256": "815a301a1f6ea725c969ac0f78bff8be54e7d53c5f432cb0a79245f00b631339"
+    },
+    {
+      "path": "crates/river-core/src/lib.rs",
+      "sha256": "fb8df5b3cdbabdedc7a4de05496d14e92785634659e6987ad7e1fcd5d4520b5c"
+    },
+    {
+      "path": "crates/river-core/src/model.rs",
+      "sha256": "f218ecfd42cc6a5e843d6107ce366499071d607fb816ca963f258c9e1befc983"
+    },
+    {
+      "path": "crates/river-jpeg2k/Cargo.toml",
+      "sha256": "0c667b5974b595a85c75a0b7852285c63800321a101488c6f99ef58b7147147a"
+    },
+    {
+      "path": "crates/river-jpeg2k/LICENSE",
+      "sha256": "99a0f6a15b0d29bcc15432d3a986be42a539a858741d5747ddf5ec2d15af1ed8"
+    },
+    {
+      "path": "crates/river-jpeg2k/README.md",
+      "sha256": "d8d25c2623b73a41214ef3fe22aeda6bbb4921dc93bfef24af5c455dec07c7e3"
+    },
+    {
+      "path": "crates/river-jpeg2k/RIVER-PATCH.md",
+      "sha256": "7d8fbf6b604c506d30cfbb9479b309cd6456b4a65dafc64cf85089524764eedd"
+    },
+    {
+      "path": "crates/river-jpeg2k/src/codec.rs",
+      "sha256": "5964361a3a8d60fbfe4e03a0c66d1111f981b35a6560f533ff342392c0c1aac2"
+    },
+    {
+      "path": "crates/river-jpeg2k/src/dump.rs",
+      "sha256": "bb01fffdbb364481a8ffe76e2b18f168617ac559a3926c619392474f272e0f72"
+    },
+    {
+      "path": "crates/river-jpeg2k/src/error.rs",
+      "sha256": "9f0febe87910b9c96dbcf21bf1aa14cbfae30c2eaa7f8de07a26a469e25cc00c"
+    },
+    {
+      "path": "crates/river-jpeg2k/src/format.rs",
+      "sha256": "fc2619ee188c44c93ad428e983164dd478c7a4e7477a780d5815e54a24db209d"
+    },
+    {
+      "path": "crates/river-jpeg2k/src/j2k_image.rs",
+      "sha256": "f04c136edf8dcae49a554a4e85a28acee28c3a59d8dda52f00edc40b6c3985b7"
+    },
+    {
+      "path": "crates/river-jpeg2k/src/lib.rs",
+      "sha256": "efc1f1d2b0f186b9bea88462538e3c90f0638ca3d47baf151a2fb2651cf88fdd"
+    },
+    {
+      "path": "crates/river-jpeg2k/src/stream.rs",
+      "sha256": "f3dac54dde2fa68d4c5d78f90284382b40a8fad966adeba101f978d6e063b2a9"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/Cargo.toml",
+      "sha256": "ccbe1df8953d906a8f8113d2ce84ebc838cdad3a7fec2dc26069e950ea3a2e08"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/README.md",
+      "sha256": "120cf23a4467e8404fdc605f2a2417f74cb676bcfd98dd75d8dd6ff0f557b91f"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/RIVER-PATCH.md",
+      "sha256": "48953db8a6ea0422a0991739d89a7af686b9a5ae88684e3ab60b8e1c17262697"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/build.rs",
+      "sha256": "82ddcb84199573d74fb5e69e6601fd3e42d08dee2c570487eaebe0a830c36cca"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/config/opj_config.h",
+      "sha256": "2d4c7103ac0eb916e4a1bc10672150e95f49f82e7d7308c781e4707cf544ba97"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/config/opj_config_private.h",
+      "sha256": "2355e32fedb66481fc4ce54c2e0c7250cc70be3c5c8883dbe54736652cf42fd4"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/src/ffi.rs",
+      "sha256": "7a35d830734f4a471a73a52e74d166c057d49a389eadcaef66777223afa33ad3"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/src/lib.rs",
+      "sha256": "cccf2bf3dc42fb9cac5e53e28bf0fd8589b9a9b1f4d7393735058a87d8a779d5"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/tests/mq_decision.c",
+      "sha256": "12b53c623f67e93302ed45b265d427501eda03237d7cb52a6a8847642685383a"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/LICENSE",
+      "sha256": "a6af136f3e15038a666b61f376612a07d9a4e48cb7c01adbf3e33b3f14ab49b6"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/bin/common/color.c",
+      "sha256": "d823e0fce3523cc8a1173841cc761af07888fad0752806b0a25ae3214aeb9134"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/bin/common/color.h",
+      "sha256": "a9b4538ad6c7f7cd2e19cfe4d302b00dfcc02bc67c185b52228b5c785a0ab9ca"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/bin/common/format_defs.h",
+      "sha256": "21813ffc8250f94f6bb3dcc2d1f2217d5d9d3171472e918fae72cb574ca71861"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/bin/common/opj_getopt.c",
+      "sha256": "7dca642e902964f203aa35090628ba96d804882a02f5b34393c7eef8433fdc61"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/bin/common/opj_getopt.h",
+      "sha256": "3a7ff523d1e497fbda3f51ce7b8c8533218e507e314f623ec7bcfe606d6f7045"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/bin/common/opj_string.h",
+      "sha256": "f7d50b892384f9b07847cf5c24e512c7d0d56cee1d7a7f99aa72d8264921023a"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/bin/jp2/convert.c",
+      "sha256": "f57ef543386ea13c6fe1485d68ad35e49453f597d59b4db4447351c4b0444ba7"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/bin/jp2/convert.h",
+      "sha256": "7b9bc731eb0c19da28713c9a0fffe3405bdbf89d0bfa56c713956c53bd2bab4d"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/bin/jp2/convertbmp.c",
+      "sha256": "b006c53707f539938f438381771436cdab36e0b11b8a82bef8ca06408a8d1559"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/bin/jp2/convertpng.c",
+      "sha256": "e20673d8d169c98747f249f41db672a6cc13733a50b7a01f5cfd384d25b03a8c"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/bin/jp2/converttif.c",
+      "sha256": "61ffcd115fead6bd5139e31cfe53d3324153225a4046dc733b5a9735eeb34f0a"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/bin/jp2/index.c",
+      "sha256": "d0b3898d55de852833dbfb129122077dfba2d24e1d3d1ac3582eb68a32c663ec"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/bin/jp2/index.h",
+      "sha256": "71d71b963b8038f33b56b4f1a1433e8f91b94586b67871d89ffd66fab5768eb6"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/bin/jp2/opj_compress.c",
+      "sha256": "bbfc0d48246472d24237c7138798f995eb6ca249818332b01195ce80843e9c20"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/bin/jp2/opj_decompress.c",
+      "sha256": "c359c2f0a44ad38b1d24b1fe4888454692de1b406a7e5b0d5cae20cf75b6aef2"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/bin/jp2/opj_dump.c",
+      "sha256": "caeb2fcb9a51f438fcb600f566522eeebc790146178e73c59e778201ca33cffe"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/bin/jp2/windirent.h",
+      "sha256": "f832145b6d1a9f9d161ce3194b2b20975615248ad319650d1e9f3b7b33b841c3"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/bin/jpip/opj_dec_server.c",
+      "sha256": "ac829c514a56064882f34d7e4eb936291cc8eee22adb1318bf9c6f9e4ef136f6"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/bin/jpip/opj_jpip_addxml.c",
+      "sha256": "ebf36e2ce2818848064071c9c1dcc1cc07cccdbe9a14d78ae83e80d379f25516"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/bin/jpip/opj_jpip_test.c",
+      "sha256": "022f1b90241adb473b452a751d8570a2cb4719aaa17666b1700d54b7cffb82dd"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/bin/jpip/opj_jpip_transcode.c",
+      "sha256": "2b031a045b3286e2a46b8719b499b971b058c35e6c6c90ad0b29802b1b0d4fc4"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/bin/jpip/opj_server.c",
+      "sha256": "3d3d5e8217a5551a15948203b0ff0b98b9112dbb38fc21ffed445a767526ae43"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/bin/wx/OPJViewer/source/OPJViewer.h",
+      "sha256": "492f663ef1ac9739c4e6511f77b61b3d648b4782136e37075266e168ebbfac64"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/bin/wx/OPJViewer/source/about_htm.h",
+      "sha256": "540d73c3cafbe1e1f2405d0164112f2f724c078f8cf8159cdf0f4fe01078284e"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/bin/wx/OPJViewer/source/build.h",
+      "sha256": "176d913e75485468dfa38f31b55323bee3e33acf8e6bc1b50a5bf0371e5ea428"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/bin/wx/OPJViewer/source/imagjpeg2000.h",
+      "sha256": "b1ab790f830a59af35e0c988126ca55622f1ac9b39fd36bce996ac5631bd2ec1"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/bin/wx/OPJViewer/source/imagmxf.h",
+      "sha256": "4a05b64b7242bf302c22cc4dc9f03cbc7d17a9f995d688a054e063adacb8bfc7"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjp2/bench_dwt.c",
+      "sha256": "86e31278dc29840b08c34ebb2fa915fdc27abcbe468078f3386ce21ecbdf0158"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjp2/bio.c",
+      "sha256": "eab2df6d857ce33b73b9dde04c18e4b5906fa50064a1511b370104583f23e110"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjp2/bio.h",
+      "sha256": "25a12f4ad6b8cb68819094d0d671f431a34843e34d6358c495b18c9ee3b786a9"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjp2/cidx_manager.c",
+      "sha256": "a79245f742bbdb67e057a3c73c809bd9fd66523e5ef8b84d5fc298a1d532e306"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjp2/cidx_manager.h",
+      "sha256": "a042f133118342cab678f32d1fabc855033b52495e463c8f300940e7ddaaaf14"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjp2/cio.c",
+      "sha256": "5a70f55f8b655f06af55f4750a69a41d12cd813dffd9a6d3f103c28b4dc63b3e"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjp2/cio.h",
+      "sha256": "91c84cc511735466e880b30b06c1d5c858e136e876c34fc325be39cc6457c5d7"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjp2/dwt.c",
+      "sha256": "a105c8ff212bbafef0bb5b80c9a918c3a2601ffaaa731f7a76fdd833c06841f2"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjp2/dwt.h",
+      "sha256": "5b2efbadc57042cf9c1865d87f0d2c46712003bb67bb059f41ed073fc8e9407c"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjp2/event.c",
+      "sha256": "6af6dad4e683c22d7ba67159a4e644fee029aea4ec1aa4c4dca754f1b950378e"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjp2/event.h",
+      "sha256": "3e451c164a8ad9b4bc58b1f0cf321388764b494c66c4ed20d7d196247a397c26"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjp2/function_list.c",
+      "sha256": "4e1888dd7c21911b2baf954ad9cab498433ac37e4cb1ce39220904ae80455869"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjp2/function_list.h",
+      "sha256": "df25ddfab444d485eabd9da4fdd6843b6b6d5f61b7513438c6d497a4b1e5817b"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjp2/ht_dec.c",
+      "sha256": "7a5c66ddd5c9c159368230397c9e762d75bff399df6d59022b1a30ea9671c4e1"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjp2/image.c",
+      "sha256": "d8cc7e7dd380aa39e8aeebea8bee62790d0fe4f02472eb7cc0e0617fc657ecd9"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjp2/image.h",
+      "sha256": "3890c9fa361ebee6e276b56e25b80f44145516b6d15fa1655d8588b1da4fad1e"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjp2/indexbox_manager.h",
+      "sha256": "c85cfa0feca00d01bb0bc2619199917a08717c5536d581724f4560a403b8a137"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjp2/invert.c",
+      "sha256": "387fd5e2b3446b6caf3e29cec51713c0f698c086dca695b67a432e774930197a"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjp2/invert.h",
+      "sha256": "52980bf14becaf7189e367e87c87f9f7c4bc0ddcc7bf4939237788332aca9830"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjp2/j2k.c",
+      "sha256": "a6ad86347e52b0108f4a3dedf5f844f274c35a61a08dafc4d15af0b4413f3194"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjp2/j2k.h",
+      "sha256": "9fc3343f01f6ce7998c001b44a324230a20664e9d27709bc1582d1aa6eddc5c0"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjp2/jp2.c",
+      "sha256": "1d3ce373e785ae4b7c340fe2cad1785b20f7ee2fcc7f470e9617e306d8d21b2e"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjp2/jp2.h",
+      "sha256": "7ba31d730591a7a6465ced2d62f5b50a2abca4cefc4077be248ec875d67e7bda"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjp2/mct.c",
+      "sha256": "d19ec7420ffa852d3ce823a36349979348b2287d3e5fd66ff74cffa12960a3bf"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjp2/mct.h",
+      "sha256": "274ba52a3638998b1714fac81b8e2238199bffd5bb1d2604f6b8f1ab8ec6e1a2"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjp2/mqc.c",
+      "sha256": "a789076f4857773da80af5ed0d2759d483a3586d1709baf6b14a91f47b113637"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjp2/mqc.h",
+      "sha256": "26b1e8d3f9ecb400bef906fe39114a8713f4ccfb90c55fc9ee990f572c1569c1"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjp2/mqc_inl.h",
+      "sha256": "1d8d17908204e6c5c7f3ab7708beb0f9524af0531a5773f979cc8c598636e694"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjp2/openjpeg.c",
+      "sha256": "88e5154fbd83966adaa430ab51af989095d96bf862f1d56f04b65399d3dc522a"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjp2/openjpeg.h",
+      "sha256": "a4d612777a74fc6986b508a4ed7bafeb69501f1253ff5921ac75621ae014f772"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjp2/opj_clock.c",
+      "sha256": "426f6681f19fc1ea061d31137da7cdb906508775bf8db628a3e471f920d3b95c"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjp2/opj_clock.h",
+      "sha256": "43ac54b84019c391d14b29f1a22e4ca095b3451a6e27a4b897231d391371e9b9"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjp2/opj_codec.h",
+      "sha256": "f5451538219c6f2fcef7ff817c802f57eb64e7e409ff4dc56876316e31cf5d38"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjp2/opj_common.h",
+      "sha256": "1b2b8fb706888c37bbef7d3854fad71321c1e2d12701f318aca8892bc36bcbcc"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjp2/opj_includes.h",
+      "sha256": "5800ff257eb62e0f5100b915b7e1ececc42702f270b3dfd1c138080ef124bca0"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjp2/opj_intmath.h",
+      "sha256": "d8fe3e8b08059835705941dcf9cf763ca55fbae9178421f36ea1214ee3b4eebb"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjp2/opj_malloc.c",
+      "sha256": "774d07a811c71b096950d218138d3d2788a87462ccb8e2b5f10d6de411717929"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjp2/opj_malloc.h",
+      "sha256": "0f376f3c19215395416d25548f212f03abe56a7362cd9461e7200826ab84aa41"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjp2/phix_manager.c",
+      "sha256": "b3dc924692cd361b783a8c266fc3bdbe881f670bd5f5bb1013df218b6518cd23"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjp2/pi.c",
+      "sha256": "02eb5d074e1621b5077c5d5f0c6c2c626f519ff5a275559b3529d0e1974c6496"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjp2/pi.h",
+      "sha256": "d6fb17dafb0ed68fa9f771df3f7ba45d741a82cdeb6e67c2d00398fd75ab5286"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjp2/ppix_manager.c",
+      "sha256": "b2f8587377fa7d810cb02bfc5a2b788f020355bc0552a521307c5de00bb8eec9"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjp2/sparse_array.c",
+      "sha256": "5159bf88dd47abcf73425b478821431183241557c92ce870809e95cb37697a13"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjp2/sparse_array.h",
+      "sha256": "14a2b65c50e9bf1a2e0dbe821edcc1c7a3129021897160485f30d261f02eb3ff"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjp2/t1.c",
+      "sha256": "8613051fd3c3cf23e515a7ac013213bc6a59380cd1633361da3d972aeea26e92"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjp2/t1.h",
+      "sha256": "e4e7ad9ffc4c1334526c44384947dd01a7cb4d7e4cb63837e0fcc776c8c29f88"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjp2/t1_generate_luts.c",
+      "sha256": "c31a1be28c47b9ef37860a9d6319dcd8eb76fa4ae31e3ed103e8263816e92f6c"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjp2/t1_ht_generate_luts.c",
+      "sha256": "6bc6dd8e6e63a2a023a07ba033c6f3d5d76d2d073a8767c5df76ed3596ea82ea"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjp2/t1_ht_luts.h",
+      "sha256": "5988bb6f3da45c4db3f233db782b24b18951f37e38b326c83beb350587e7928e"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjp2/t1_luts.h",
+      "sha256": "1c6cd64611fc56641e7f48ae0575808e0ed135b845cd4806f6e7f47d7bbf7c79"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjp2/t2.c",
+      "sha256": "1b27cf64477b6c083868b2c66011abb354ec2deda23e09558e20bac359a8dc03"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjp2/t2.h",
+      "sha256": "3f9937680969cbb406373061246cf45e045ec81028b4f4db7e000fb3b54c0663"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjp2/tcd.c",
+      "sha256": "e00bea808036aa74b4b46b59e8bf721505ee59c8332f7b8c4d5032d47255d7bd"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjp2/tcd.h",
+      "sha256": "b694dd954f7f14f5f98323144ca486b450d51248010b6432d88a30d997c3df45"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjp2/test_sparse_array.c",
+      "sha256": "e9a84b7b65a48f6d6f23193a0c464532a2b896ee599cdb5cacbddd3fb0dc6837"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjp2/tgt.c",
+      "sha256": "df13b7632362da3e096f5f4103d92a4a92e6ba602f020f0d8ad10918bfcd8ec7"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjp2/tgt.h",
+      "sha256": "24ecd11aa6a66a0e0b57c1ecb73229a5b05fab3c9199350a394d903e921907e7"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjp2/thix_manager.c",
+      "sha256": "63072d557c294bf93cc8e7be82d9415af241303adc1ce5d3c0a867828baf517a"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjp2/thread.c",
+      "sha256": "a801cc656c232ed6f3d3d8be0bae21b3c89389d0bf03613b5de483c692916b01"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjp2/thread.h",
+      "sha256": "cce16c74c4906d3fdf4422f27484b580cf7e80ade7c1ec67db0eccf1ff3944c7"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjp2/tls_keys.h",
+      "sha256": "95d63265be9028bd394ca4188d31373a4c1fb611f6db53ca28d956a15b527054"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjp2/tpix_manager.c",
+      "sha256": "42b69c8b32f7d9476535d4c1832b6e417e2a0958fc537a7b57d8462298e5056d"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjpip/auxtrans_manager.c",
+      "sha256": "1e627126df076eb51e6b92439ff6b3ea01406cc3b5978b0065db7b414ea1aebd"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjpip/auxtrans_manager.h",
+      "sha256": "d1456085de9cd95b111fc61e40f0a7585a1b826246aac65088c3cc2af168e576"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjpip/box_manager.c",
+      "sha256": "9bc37700d37e994715d10d3b1c716686bd648cd09d109e46ed136b5c26868b97"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjpip/box_manager.h",
+      "sha256": "3d7d27aa7facbaf99b276333a42e789d57b58dce5153dc33bfc3273761c62bee"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjpip/boxheader_manager.c",
+      "sha256": "7d5e053b88fbcaf41125f8b7d415a1dc8e3a2846e38f0774f04d47045df78034"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjpip/boxheader_manager.h",
+      "sha256": "1065a08926491264cbec3a62c9ebf0c84d561691da407a8d519500a883742463"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjpip/byte_manager.c",
+      "sha256": "7ba6fa17dab7656510f3184dfdb6b6fda2627ef04b7722749eb41c4a9845a1d3"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjpip/byte_manager.h",
+      "sha256": "302957409363779338ed9fedf6cefe25fc38f09788acad6aaf0dcac17e9d05c3"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjpip/cache_manager.c",
+      "sha256": "8cf62cf45436675efc73c398e3be2fdfd4e675b5d29100516b6a286bf6fde0a1"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjpip/cache_manager.h",
+      "sha256": "b583c61da96d87e8b4fd3d14a7aabc288128e804e3832992ebabb6e530b6cf4b"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjpip/cachemodel_manager.c",
+      "sha256": "42973ba116ef39e6f516bdc07f266e98b4733b484dce45f2a4eea1b2dd0a383d"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjpip/cachemodel_manager.h",
+      "sha256": "5f54aaea6b51787b73cf68ec4069df1657020be2abdf087b7f477f44de55b099"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjpip/channel_manager.c",
+      "sha256": "315de62d411dd29deabfb120c5868745faa60c3a720c7e33040642671152e42d"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjpip/channel_manager.h",
+      "sha256": "0db1030d884f387ecceb47d343585e5633652631348e84dd91e2c079f8a01ad5"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjpip/codestream_manager.c",
+      "sha256": "9a68897e930b802f8fb4a446af3136abd9bcc5151f5f8c737bb8c92703216739"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjpip/codestream_manager.h",
+      "sha256": "d84c6059fed46559baa957c8fe01a1bf725b4dee6ec11199bad4d9feea067173"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjpip/dec_clientmsg_handler.c",
+      "sha256": "e218b85e30969c961e18811d43f23733515d53afbd017478973babb5ff0f3218"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjpip/dec_clientmsg_handler.h",
+      "sha256": "1030a2feec481d2f68b67cd1938b000232dccb7e170985bf253a6168b1121e0b"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjpip/faixbox_manager.c",
+      "sha256": "56105a3b486647746275072423d15c59905edf20c6e85f42cb9cdace9be1d35c"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjpip/faixbox_manager.h",
+      "sha256": "fda9a841cd4fa055471c87835d84c7679b93c3a60e0af55c71535d2861b51c6a"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjpip/ihdrbox_manager.c",
+      "sha256": "e2a6a3ae88757b3462845f10587302a74d916aaed4a61d4d17fbb88f30fdd9b9"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjpip/ihdrbox_manager.h",
+      "sha256": "039353beb9c6aef0c3c34e15957730dd31d98ca11f4241ddae9699e547e6e951"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjpip/imgreg_manager.c",
+      "sha256": "a73630f4e3c37e997367271a3e7eeae0c8a993ae32f706c9150fa49d071cef49"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjpip/imgreg_manager.h",
+      "sha256": "35eb2245e4213ce3cbc1d0e3c0ba0d1f5ae69a7602030a65e3565ee3c1bf5907"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjpip/imgsock_manager.c",
+      "sha256": "78f4abe8f61e21fb617811f7dc06c199ed4ca0ef65f700382576dd95215944de"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjpip/imgsock_manager.h",
+      "sha256": "1302a8257b6d5f2fe0140276eeee42d2c10d91fabd5bb8d4af362db1fe9beca6"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjpip/index_manager.c",
+      "sha256": "30eb3da34a89e0ae066204a11b9bd36ac380806aeea38f06627890565a8f0720"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjpip/index_manager.h",
+      "sha256": "cefe7cf1c3294aa187b1320a5273ac36e96d058e8bc396b1e17fc7e49d7ff654"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjpip/j2kheader_manager.c",
+      "sha256": "d9b1f272b14eeef487df73ccf16a0b6aa8708e78ba976b7b34cbbb42d9aa21d6"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjpip/j2kheader_manager.h",
+      "sha256": "a40d18ac4bdb4568b0d6ebf2e017f558baff729be68ad8a1780249065352131c"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjpip/jp2k_decoder.c",
+      "sha256": "8f51d76582e2f90bfa41e818cfbcf19a02185638185374f2e5c498c49d6804dd"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjpip/jp2k_decoder.h",
+      "sha256": "debf513efceffc5c18c90943ff634740b64a052df4c328c838e23b70f0d21c96"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjpip/jp2k_encoder.c",
+      "sha256": "5c18070da15f7a7d589c7738c789237ade67c7c48ebaee066ce2296c9bf5741e"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjpip/jp2k_encoder.h",
+      "sha256": "640fec6a4411a478009fa4cb49bdd05c40e50dc50a6d2437268b365db163cf9e"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjpip/jpip_parser.c",
+      "sha256": "4e38919ca593909b4abd680ee192c16c5fa69d5c95f48f6e1ee834b3af862c0b"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjpip/jpip_parser.h",
+      "sha256": "1e97303a08e371830a39e685bf6f7def6cdd3b33e9676f8852f058e973c12154"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjpip/jpipstream_manager.c",
+      "sha256": "f4a72d313d12e2e35a0b4ef92990f24f0b3e19c6790311c6fe52c50e93240c3a"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjpip/jpipstream_manager.h",
+      "sha256": "c1e52be6170c8f4eea83c320dfcbb9531c27262e94cebe81d7b1f05623e795b2"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjpip/manfbox_manager.c",
+      "sha256": "56d409137b3d0363c2ccc91dcb0082182b6f285a99c141f72e5c9f8e75dfab9a"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjpip/manfbox_manager.h",
+      "sha256": "a67cfc2af63d52f854fd26634e99ea81f86880bf80ed7d6129e7b0e596b6eff2"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjpip/marker_manager.c",
+      "sha256": "5d3161bb5eb700c0071e80c290d9b83358d28b06d40d4cda683c64a85ccb3795"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjpip/marker_manager.h",
+      "sha256": "ec4e836d246012f714c0d689356671caaab2e43dca968314f465d8f304b88f55"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjpip/metadata_manager.c",
+      "sha256": "5f1453c1704a6e71fead7e1d658d2d36bea418b6963885305bd328ea6b524ce0"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjpip/metadata_manager.h",
+      "sha256": "b74455b8a23c41290a87ef9ac9db0fb103c8f1f8957ef5cc40616e734c4ae9c1"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjpip/mhixbox_manager.c",
+      "sha256": "71f82ff852dbef3df356d304f2ed5b5b142a3823e250c4e026960af0098223cf"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjpip/mhixbox_manager.h",
+      "sha256": "85b121ebf50e68d460f4baaebcea0f10ead055839509e103d67e70cef199d5fd"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjpip/msgqueue_manager.c",
+      "sha256": "c446d16b20533d299486fec82614d56910943355e1a21db1a617547d9da767b2"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjpip/msgqueue_manager.h",
+      "sha256": "3242a8573d682fc19a7d119e22361ed96d09a1d36544794f36ed6f1d5afa5dc4"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjpip/openjpip.c",
+      "sha256": "883d6984b17c4d7d6274efa01390800cad00f7e9f720824d1361612a3c902faa"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjpip/openjpip.h",
+      "sha256": "fa3afdf98de06e36a8637b6d7f87e8e658b9530d56880449d94e7e7f38dc7d09"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjpip/placeholder_manager.c",
+      "sha256": "d4848e37ebea58afdd611822cbfd284b64c28f71f56a56fbdde60494f445325c"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjpip/placeholder_manager.h",
+      "sha256": "7889cd1037384af064dc8cd34881bbebb7669129beecc19df2dd425bde482d4a"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjpip/query_parser.c",
+      "sha256": "40b874716a6ae5191075246f66e9a9e2bb497daa1049ad6676b5b0eadd48badd"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjpip/query_parser.h",
+      "sha256": "b61e18b916034ea62738add961e7f7452dabcb4d52ff41eca22d7b80771efd14"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjpip/session_manager.c",
+      "sha256": "1c5742408248c8cad4c758c9dc40c3746f99d1fd98f685efcb8a2663d0e78598"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjpip/session_manager.h",
+      "sha256": "ee12308ed07922356811503aed32f1469731d2b3bf8022d12144a9659e17bca2"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjpip/sock_manager.c",
+      "sha256": "886a8054e741ecea40fc24daff7c5b5d44684d7996b1aa16b1ded6a385a4557f"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjpip/sock_manager.h",
+      "sha256": "0b59f2371ec101d1e42817df7e5aedc0e38d51045fbf7c5c28676e4ce9b0efe2"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjpip/target_manager.c",
+      "sha256": "ccf7f2622f20b61b693ce3896102956c5650998965592ecbc4075dc86f7e5f6c"
+    },
+    {
+      "path": "crates/river-openjpeg-sys/vendor/src/lib/openjpip/target_manager.h",
+      "sha256": "2c62b3a48c7bcda7a103aae060d8b8a3960e075d1ed9152e37be8bd99375541f"
+    },
+    {
+      "path": "crates/river-server/Cargo.toml",
+      "sha256": "f698e66338de31f03cd8783c3b7605693e7c04f5234b2cc8a4f6d458891e5aa3"
+    },
+    {
+      "path": "crates/river-server/src/caching/cache_inventory.rs",
+      "sha256": "0e5dd1d6b801b8dfa2b55fa9a686b2dc236d794f9a9c3608ecea807059c34092"
+    },
+    {
+      "path": "crates/river-server/src/caching/image_state.rs",
+      "sha256": "a044f235bff48b6903bd93c1d005f331b4561cf7b9f868b76a7496b74f33dd39"
+    },
+    {
+      "path": "crates/river-server/src/caching/raster_cache/disk.rs",
+      "sha256": "d2cc88ebbd566bc736ae2d36df378973551821422ed83a884c617e840fde8c60"
+    },
+    {
+      "path": "crates/river-server/src/caching/raster_cache.rs",
+      "sha256": "9d64f6b93b4c7c8c9940ce71352d82f6c78386fc7ad7ea9e83b00b68e1115cc1"
+    },
+    {
+      "path": "crates/river-server/src/caching/shared_cache.rs",
+      "sha256": "eccf21460590087a31761a519ee4f02ee6da18b3e35e6fc24f3e59cbdcdb875d"
+    },
+    {
+      "path": "crates/river-server/src/caching/source_cache.rs",
+      "sha256": "9fa92cda2f4e92fb97346944d7d228d62cacca30e00bd54e8780deee8cd8ea25"
+    },
+    {
+      "path": "crates/river-server/src/compatibility.rs",
+      "sha256": "5eaa5066a1f28b2f156c6a8eecde5d09bc4a87096a3a88549be35f1928afa38b"
+    },
+    {
+      "path": "crates/river-server/src/cuda_native.rs",
+      "sha256": "d26bc61c47d8acfba0a57252497a91ae7660df05336aeedb210123b88e0ffd3a"
+    },
+    {
+      "path": "crates/river-server/src/decoder/block_reuse.rs",
+      "sha256": "3e185d68daa21bbd0673b4929b8f7b9642c7a0cf631dcc0e23ed1e22b3c57f9d"
+    },
+    {
+      "path": "crates/river-server/src/decoder/empty_precinct_tests.rs",
+      "sha256": "739d0bccdd8325716764c56e2ed524a537defee1dfd66f0e74a9251af51c9394"
+    },
+    {
+      "path": "crates/river-server/src/decoder/grok/block-reuse-v20.4.15.patch",
+      "sha256": "28427a7651c23c5976c4231e35a1130ca43aab7ee9b260c2546e7a301d5327c2"
+    },
+    {
+      "path": "crates/river-server/src/decoder/grok/cancellation.rs",
+      "sha256": "7cc08d1722ee9ad9773aef089fbb7f1d14589533c6590c48d9ddd7c44e82ed76"
+    },
+    {
+      "path": "crates/river-server/src/decoder/grok/native.rs",
+      "sha256": "bcbbecf24c202463b449d385288fec7ad0392e3e643bcb0986d43d5d80e2a59e"
+    },
+    {
+      "path": "crates/river-server/src/decoder/grok/openht_worker.rs",
+      "sha256": "9df9c57a36e0c7a6092e49b650075f244e88427e221973003c8d0b535dba2cc6"
+    },
+    {
+      "path": "crates/river-server/src/decoder/grok/packed.rs",
+      "sha256": "2e0d219982fd99a99e71f81f18de80c5ca7d7b922161859059b2a88a40242251"
+    },
+    {
+      "path": "crates/river-server/src/decoder/grok.rs",
+      "sha256": "1e2e827b675b78121c6d9163d303532a1eff19c8a5cae37c171438eaa0de426b"
+    },
+    {
+      "path": "crates/river-server/src/decoder/grok_bridge.cpp",
+      "sha256": "61f1ab8dd7ea2c679b3e2d617e3491491b4b4bc6276084badbf1bbc9cd02be34"
+    },
+    {
+      "path": "crates/river-server/src/decoder/native.rs",
+      "sha256": "d8eda97eb2a96729c3d88f85ae7bf3452e84a15b2082f1c6ba866870e2c4da25"
+    },
+    {
+      "path": "crates/river-server/src/decoder/openht-portable.patch",
+      "sha256": "5a78d84f4dc0c47c77b399ee98c8d132390ce59cbf4b2ef99c95ecb6b584e57d"
+    },
+    {
+      "path": "crates/river-server/src/decoder/openht_direct.hpp",
+      "sha256": "73ca56034c55477c518fe97fc1e43253b9afc22efeeb5a567df6bb60b84739f1"
+    },
+    {
+      "path": "crates/river-server/src/decoder/openht_policy.rs",
+      "sha256": "caf0eedffb2850455e22946076e6cda8cdd877fb5c715e333883a99d16d087ae"
+    },
+    {
+      "path": "crates/river-server/src/decoder/openht_worker.cpp",
+      "sha256": "8309d036cecdf197a77810c24fd6f217846bfa0ce24a7b83b9c25beb3128dfc0"
+    },
+    {
+      "path": "crates/river-server/src/decoder/pixels.rs",
+      "sha256": "13fe47a35610739da007f25b455033b15f8e41d1709caa58096525383177ba60"
+    },
+    {
+      "path": "crates/river-server/src/decoder/reduced_tiles.rs",
+      "sha256": "6b8502838c6def4e90761e4e4e8f900c3abd7393a76e1d7fa066a5ad949dfe42"
+    },
+    {
+      "path": "crates/river-server/src/decoder/thread_budget.rs",
+      "sha256": "071d74f45ddea8a2370c55b6fe1fb87dc85dc5de6bd512e2b334e41ce20ff8b7"
+    },
+    {
+      "path": "crates/river-server/src/decoder/tier1_resume.rs",
+      "sha256": "f967a1f004a9757e7a2f5d3c3f68d51ad7552f6f40c89c574da2f17cd516866e"
+    },
+    {
+      "path": "crates/river-server/src/decoder.rs",
+      "sha256": "8eb42759960fe8a0a49b02023d90d387fdd07765396d143e1bcfdb8a88936825"
+    },
+    {
+      "path": "crates/river-server/src/display.rs",
+      "sha256": "85c396f75b462a920e382d9bceb94518c716574014339556ad7980fb6af9e7b1"
+    },
+    {
+      "path": "crates/river-server/src/edges.rs",
+      "sha256": "c2b095c07c7395ecc9b4e0e565143d739875b55b6ec8141338233c57f13a4cd1"
+    },
+    {
+      "path": "crates/river-server/src/engine.rs",
+      "sha256": "251056c4cc2cd8570a67994a015f33885a723ff1fe88b125cd0e8ee5abab0e00"
+    },
+    {
+      "path": "crates/river-server/src/errors.rs",
+      "sha256": "30010cec94816335c5057d064f0ad12db337fd446365eaf616115bac43416b84"
+    },
+    {
+      "path": "crates/river-server/src/hosting/api_docs.rs",
+      "sha256": "6693ba0c5d027f21c003b6c4259828bc674f589c793e90d64fdda2a9e6cda260"
+    },
+    {
+      "path": "crates/river-server/src/hosting/console_log.rs",
+      "sha256": "690aecd9c3b427ead11908c79ca537e149a64c9a462efda85dab9f6374673ff5"
+    },
+    {
+      "path": "crates/river-server/src/hosting/cors.rs",
+      "sha256": "a3ded2e207cd105efeee87f28c9a72508285f554397bccdb4fa863c5e3c7365a"
+    },
+    {
+      "path": "crates/river-server/src/hosting/http3.rs",
+      "sha256": "34af841e481c1959d4450045bf4baed125ee6b7f5e7025ab12dbcf9be2de091a"
+    },
+    {
+      "path": "crates/river-server/src/hosting/tls.rs",
+      "sha256": "c3aee18729a51dffe139c0717c331befad68cfe311e55f31897da567ce0c8afa"
+    },
+    {
+      "path": "crates/river-server/src/ht_cache.rs",
+      "sha256": "96cc95ee625b0b87c0ab7be0e6067c87358ec9c41965f29ced0b77e6df7074bd"
+    },
+    {
+      "path": "crates/river-server/src/main.rs",
+      "sha256": "89da9fa3316b35adda34db80dd46804ebc64e9fb00eada9070cb569200f1d147"
+    },
+    {
+      "path": "crates/river-server/src/maps/index.html",
+      "sha256": "08d1f6baa679a6e2dcbdf55ff53a7b49999ef4b9cafeb76433409d195158fd02"
+    },
+    {
+      "path": "crates/river-server/src/maps/transparent.png",
+      "sha256": "c2153f77e11087fcb078ae38527fa83bef29791e3700e30cc87fec4405a66d0f"
+    },
+    {
+      "path": "crates/river-server/src/maps/viewer.js",
+      "sha256": "3c8da05a3283e26fdbaa3acdcd857691052861979507d264ff1936249c8ed965"
+    },
+    {
+      "path": "crates/river-server/src/maps.rs",
+      "sha256": "79330eae352a6e8000a07ec580da5c44aeb0dd1becd593f664cc6f78b1a77cda"
+    },
+    {
+      "path": "crates/river-server/src/read_policy.rs",
+      "sha256": "4ceaa42be51e29deda929b68678451135d47152e0e979979123e4af20b49f485"
+    },
+    {
+      "path": "crates/river-server/src/remote_source/codeblock_roi/arrival.rs",
+      "sha256": "442daa1b94675a8c2709e57faf59a0c5c137e2bd048f0946417988d4f506ed36"
+    },
+    {
+      "path": "crates/river-server/src/remote_source/codeblock_roi.rs",
+      "sha256": "077b6cb97a6274fc48c0b868218f47a8bceb09db1965d05bd345f96651c2e687"
+    },
+    {
+      "path": "crates/river-server/src/remote_source/curl_bridge.cpp",
+      "sha256": "cd71ef8df4de6e43856d5309fbc479c0c1f9722baa271d34eba9d73ec7d8c6e9"
+    },
+    {
+      "path": "crates/river-server/src/remote_source/curl_transport.rs",
+      "sha256": "7be62dd87b377b8fca3b96672eca1b8d7f411b200aee06fe917979c6f341f243"
+    },
+    {
+      "path": "crates/river-server/src/remote_source/index_cache.rs",
+      "sha256": "8e3b79f7314bb6b75cbfc6a5f4d9f3c259242301ce9390ff60699097c62b59a0"
+    },
+    {
+      "path": "crates/river-server/src/remote_source/index_only_prefix.rs",
+      "sha256": "9fcf3d0090147fb0b17599c85b1d9d5114c6d0ad09045649b55fa20d76ff4258"
+    },
+    {
+      "path": "crates/river-server/src/remote_source/index_shards.rs",
+      "sha256": "afaa92f9a5573fd4113c7ccdcf527b7c129e1c7bf54d30113dc85dcd8115abb9"
+    },
+    {
+      "path": "crates/river-server/src/remote_source/jpip_index.rs",
+      "sha256": "38b239b5de5652f9cd8f69a5bb4de93760956b47c1085199e3169401163a506c"
+    },
+    {
+      "path": "crates/river-server/src/remote_source/layered_arrival.rs",
+      "sha256": "1373af9a03a40bd1575ea5b0dda5073893b50a3005f19894621c80980e0f6b02"
+    },
+    {
+      "path": "crates/river-server/src/remote_source/layered_packets.rs",
+      "sha256": "38f73d0aa4390a60237eb12cc7b5a1f23fdae9030e0883314b5227d40047295b"
+    },
+    {
+      "path": "crates/river-server/src/remote_source/multipart.rs",
+      "sha256": "f1a65239bad92ea0aeb291a69f756f5da822ac7d179b11cefe1fe8c7bc7432d7"
+    },
+    {
+      "path": "crates/river-server/src/remote_source/multipart_prefix.rs",
+      "sha256": "8b74ed432bde069dd2f56a1ceeee12d78c096166c3e41504d85200a1eb427926"
+    },
+    {
+      "path": "crates/river-server/src/remote_source/original_reader.rs",
+      "sha256": "99baa666435da87628922bef7e2a9f0b9411cab10edeee4df4a60dd2d17a8f8f"
+    },
+    {
+      "path": "crates/river-server/src/remote_source/packet_plan_cache.rs",
+      "sha256": "e327367aa63776e1aa3d6e79d10a476554191923008854cbff2302dc82a9039a"
+    },
+    {
+      "path": "crates/river-server/src/remote_source/payload_live.rs",
+      "sha256": "0409fdb9617a9c51c0b91258d7552213d5798ed2e472256d814c684d0022c4de"
+    },
+    {
+      "path": "crates/river-server/src/remote_source/pipeline.rs",
+      "sha256": "9a004f1f9438cf626c9b7310474aea43f8f8629a77379e4bef3e8a3a309973a3"
+    },
+    {
+      "path": "crates/river-server/src/remote_source/precinct_roi.rs",
+      "sha256": "dd3f4da3a95f9ea96909525aeeb04f47b16fbff77c9cf79c8b7a737999990a28"
+    },
+    {
+      "path": "crates/river-server/src/remote_source/range_flights.rs",
+      "sha256": "238c061e2eaa9880b19847a25cd0d11256dbf942f85c47c698995f21c78b0a9d"
+    },
+    {
+      "path": "crates/river-server/src/remote_source/read_feedback.rs",
+      "sha256": "8b528d45a463aeab17ad6d6d80bb0ff197da116e931d6c2a9ac3e8afe8221d3f"
+    },
+    {
+      "path": "crates/river-server/src/remote_source/read_trace.rs",
+      "sha256": "8f269beda66c004de4378ceeb85032d0a384ff8dbbd16a6b6c2bb748d6724afb"
+    },
+    {
+      "path": "crates/river-server/src/remote_source/ready_parts_tests.rs",
+      "sha256": "10b8abbcb892e140f98629a51f8a0e5108a9224157c4c00e3e4f458dd006f43f"
+    },
+    {
+      "path": "crates/river-server/src/remote_source/recent_reads.rs",
+      "sha256": "a8af5a8d6c1e19d936e7cd61cf27d318c4fb0d4492dbf635513ed7b591039235"
+    },
+    {
+      "path": "crates/river-server/src/remote_source/resolution_view.rs",
+      "sha256": "272098304399154cdd41168bbc6e6dfb62066c07b0833053811918259cca1912"
+    },
+    {
+      "path": "crates/river-server/src/remote_source/seekable_probe.rs",
+      "sha256": "b98b05e15c6703632bcc2392e5307cd06967ca99138f71a6afb7035909b87e26"
+    },
+    {
+      "path": "crates/river-server/src/remote_source/single_prefix.rs",
+      "sha256": "a653a33d2c1b9daf68df9ddb1a29ead68595ab1661ace913ee60f2b1b095b921"
+    },
+    {
+      "path": "crates/river-server/src/remote_source/single_roi.rs",
+      "sha256": "c5384c64e9a4ef5848fc681d2884622820ebb0a055e4bfc3b1a0a9220e099c7c"
+    },
+    {
+      "path": "crates/river-server/src/remote_source/streamed_header.rs",
+      "sha256": "34009235ea0652dfb41144c9e6bd8e26da7bc3969f8638ce4394d3d5616f1c7e"
+    },
+    {
+      "path": "crates/river-server/src/remote_source/structure.rs",
+      "sha256": "9f9d58afa39e2cc296c297160d2f963c62ee3d5a49749de3a99edf5ef9b4f46a"
+    },
+    {
+      "path": "crates/river-server/src/remote_source/tile_header_cache.rs",
+      "sha256": "1ca80d887137ab4e1dbc9ca45b59a900a69cc4a57b4614a66715ae7c59fef526"
+    },
+    {
+      "path": "crates/river-server/src/remote_source/wire_budget.rs",
+      "sha256": "317cf398bf9b9c56a03144974e4326ef7501728a4b0b31934181d5ab4da371db"
+    },
+    {
+      "path": "crates/river-server/src/remote_source.rs",
+      "sha256": "76bb88881af94e30400eb8bd31692fedf374d6819b2f4899ba78f8578ffe7002"
+    },
+    {
+      "path": "crates/river-server/src/runtime/adaptation.rs",
+      "sha256": "4db7a7e570fea001091ef599b939aecef62761a3de667502bf152a3da1a881c5"
+    },
+    {
+      "path": "crates/river-server/src/runtime/cache_learning.rs",
+      "sha256": "30d99a812dafc65d06d84494fd434737d9ccf0cea9f5c6578d85738b4152de72"
+    },
+    {
+      "path": "crates/river-server/src/runtime/lease_pool.rs",
+      "sha256": "a749db98d6e58a05e7d4ee7e0227dc195587f767520f5df881d90b710f0076ea"
+    },
+    {
+      "path": "crates/river-server/src/runtime/resources.rs",
+      "sha256": "dddce6a29f5d47f9afc0c48f522d014ff72f94985bbf9a06147bfa959fa4e911"
+    },
+    {
+      "path": "crates/river-server/src/runtime/source_admission.rs",
+      "sha256": "2fd533c6e70e5e806e87bf748bc31c13021a377fd125a265274e741311e3dbec"
+    },
+    {
+      "path": "crates/river-server/src/runtime/storage_mode.rs",
+      "sha256": "6265ab3b8c607bfe839cad5b04de1c0ac23e58daaf4c7c48ca697901780ab767"
+    },
+    {
+      "path": "crates/river-server/src/runtime/worker_sizing.rs",
+      "sha256": "13decd69f048d0a74bafdd74d12567189e83eb5dc7ee3c103764489e4fa03e23"
+    },
+    {
+      "path": "crates/river-server/src/settings/configuration.rs",
+      "sha256": "72935cb76ddd984e26784c834afe1458cb37c115595261913e4cd36bd84e786e"
+    },
+    {
+      "path": "crates/river-server/src/settings/encoding_settings.rs",
+      "sha256": "7cc779e3b329e48984b0908db6456f0746bc517a2871f7541315152c0e14922a"
+    },
+    {
+      "path": "crates/river-server/src/settings/settings_api.rs",
+      "sha256": "ab33a06347b1e1e7a4ad42a270e461afc7ed05476c994be00f8743c4b9ed9548"
+    },
+    {
+      "path": "crates/river-server/src/source_connections.rs",
+      "sha256": "d0f36cf6781f98fcd3c660ecfe7c21580cb4cfa06060ebe71f0745191e5ac8de"
+    },
+    {
+      "path": "crates/river-server/src/tile_diagnostics.rs",
+      "sha256": "633260312c9819560ef27c6235a63bfec085a29eeb26a391d82ee62be515abb7"
+    },
+    {
+      "path": "crates/river-server/tests/fixtures/color-layout/argb.jp2",
+      "sha256": "00863a81eb89802477e14d178e4107c5965d3b7266bfbfb35865bdf070e0031e"
+    },
+    {
+      "path": "crates/river-server/tests/fixtures/color-layout/bgr_aux.jp2",
+      "sha256": "ad02ffeb6eba872f21b62f3d5ecd5260ffc253e26b2de569f4ae59e5a8f69bf8"
+    },
+    {
+      "path": "crates/river-server/tests/fixtures/color-layout/bgr_partial.jp2",
+      "sha256": "4ebb1a1dc7faabbaa5f8eb423d912c8dfe6b8fd2c07df07aaf5d578833620b26"
+    },
+    {
+      "path": "crates/river-server/tests/fixtures/color-layout/gdal_fixed.jp2",
+      "sha256": "fee64d09775b7fded9ab443c8d95bce9a0970eb047f91c74a5ee3139d1afb4d7"
+    },
+    {
+      "path": "crates/river-server/tests/fixtures/color-layout/gdal_legacy.jp2",
+      "sha256": "9189aa643280bfd3969e724b174ed0f9cdfb5af71579bc3ec503484d5c855c7a"
+    },
+    {
+      "path": "crates/river-server/tests/fixtures/color-layout/gray_3aux.jp2",
+      "sha256": "b1c3b37aa905739433f6a9491ac386586afd6c1dd171fe7bbaf9631cc7b387e2"
+    },
+    {
+      "path": "crates/river-server/tests/fixtures/color-layout/gray_aux_alpha.jp2",
+      "sha256": "f18c4c25a097d31fc79008f92b35ae61ec466497c1df4120f34d7a7f5787aba1"
+    },
+    {
+      "path": "crates/river-server/tests/fixtures/color-layout/sparse8.jp2",
+      "sha256": "a67692d7b13d352fd7caf14165e37cb44efae1a39eb8546f865619778bc2587e"
+    },
+    {
+      "path": "crates/river-server/tests/fixtures/color-layout/sparse8_alpha.jp2",
+      "sha256": "bdc0fbff56e7d66ce832bb5df9fc5efce0649ba335af522c0843b6708184afba"
+    },
+    {
+      "path": "crates/river-server/tests/fixtures/color-layout/sparse8_aux.jp2",
+      "sha256": "edd17bdffa8eb2717f5210b46ac8726b2ff07482fb353d3794592068f1e5b34d"
+    },
+    {
+      "path": "crates/river-server/tests/fixtures/color-layout/undefined4.jp2",
+      "sha256": "fdeec26e0d1f6b72820d7338cafa2009afc2d0543c92a6d4954832ea45e7063a"
+    },
+    {
+      "path": "crates/river-server/tests/fixtures/empty-precincts/README.txt",
+      "sha256": "cbc2efd408c1a46fed9be7c137d54add3e108d062ee79e913c81fab840e84cb6"
+    },
+    {
+      "path": "crates/river-server/tests/fixtures/empty-precincts/quadrants16-mct0.j2k",
+      "sha256": "daaa18c8a8cec650e7eda3a34a276be3b780d15b3879c3f731ab3d50c66b9542"
+    },
+    {
+      "path": "crates/river-server/tests/fixtures/empty-precincts/quadrants16-mct1.j2k",
+      "sha256": "ff4a7e46976d2d0e785f035fd70e528b6cda0a2b27878d2e15c53913cd2e55e5"
+    },
+    {
+      "path": "crates/river-server/tests/fixtures/empty-precincts/quadrants8-mct0.j2k",
+      "sha256": "429ee1c637e4082a0c05a6d6d627894a61ead799cef9044ee4bcbd2f19827ba4"
+    },
+    {
+      "path": "crates/river-server/tests/fixtures/empty-precincts/quadrants8-mct1-dwt2.j2k",
+      "sha256": "5c154522be7612329d5984a22d1e1b13e1b19d1c6f38f1f2d3f7688cc393f405"
+    },
+    {
+      "path": "crates/river-server/tests/fixtures/empty-precincts/quadrants8-mct1.j2k",
+      "sha256": "16bcef073d7b35384b657c7638cc512a590e027c079fc5812757313c1c9e5636"
+    },
+    {
+      "path": "crates/river-server/tests/fixtures/empty-precincts/view-r14.j2k",
+      "sha256": "c4c83f8f16860365cef552b6976bd3ecbad1cbda2dac430047c5263fbc7061cd"
+    },
+    {
+      "path": "crates/river-server/tests/fixtures/indexed-cidx/README.md",
+      "sha256": "ac4e35b583b1b9ed3c1a4d6cf9297e2416c538652a3785c759d7bf61dae9792d"
+    },
+    {
+      "path": "crates/river-server/tests/fixtures/indexed-cidx/provenance.json",
+      "sha256": "161327940bb6f01f2e58d82b710bc927a7e9da7aa6202f4bbb674c1cbb6ebc0c"
+    },
+    {
+      "path": "crates/river-server/tests/fixtures/indexed-cidx/r2-all.gray",
+      "sha256": "0b3e9652f6259997778e7e43efd0cf6f2eeb5c079871e54674ee0b3783ca7dcb"
+    },
+    {
+      "path": "crates/river-server/tests/fixtures/indexed-cidx/r2-provenance.json",
+      "sha256": "b99f60ad78bc946daf04986628540c0490a15adc79d51f6f45fb45c0e62af5b2"
+    },
+    {
+      "path": "crates/river-server/tests/fixtures/indexed-cidx/r3-all.gray",
+      "sha256": "2cc097a29a0be07592aabda3ea8032e3331554e4819f3d6ef6055866c364f082"
+    },
+    {
+      "path": "crates/river-server/tests/fixtures/indexed-cidx/r3-l1.gray",
+      "sha256": "6c04e41d18724031b157024bf856b24aef4cc00b5ff4c2febbb632cd461320e1"
+    },
+    {
+      "path": "crates/river-server/tests/fixtures/indexed-cidx/reduction-reference.json",
+      "sha256": "4e64255ce5d2b68372b4c455e6e705f2845b5ecea9659d268379f34ea6765683"
+    },
+    {
+      "path": "crates/river-server/tests/fixtures/indexed-cidx/reference.jp2",
+      "sha256": "54d416d2fa29e052a8f9a4ad340ca0d55f4cc10168eaa900993e99b1ddbd53ad"
+    },
+    {
+      "path": "crates/river-server/tests/fixtures/indexed-cidx/unindexed-provenance.json",
+      "sha256": "88b481f339f0d758637534405e33f7f5ea96c06b62cc73871e89fb2c42ded0ec"
+    },
+    {
+      "path": "crates/river-server/tests/fixtures/indexed-cidx/unindexed-quality-split.jp2",
+      "sha256": "541ed4c1fc3ef5944739626b8b4a10fd00fe1a2c462a901411ab91cbae134c39"
+    },
+    {
+      "path": "crates/river-server/tests/fixtures/indexed-cidx/unindexed-resolution-major.jp2",
+      "sha256": "8a232a3345a6e375b68d85ab05c875d344228520bbd8d8682d24f088f553280a"
+    },
+    {
+      "path": "crates/river-server/tests/fixtures/indexed-cidx/unindexed-tile-major.jp2",
+      "sha256": "ee5c4124761416c90c2d6e6ea728c21d6c35225b075738c5cc5db7224d75ed86"
+    },
+    {
+      "path": "crates/river-server/tests/fixtures/rgb12/README.md",
+      "sha256": "ed3ecb71c03f394e7f0a852b334702037d1e64b9a60b6329ec1337882ffa9f83"
+    },
+    {
+      "path": "crates/river-server/tests/fixtures/rgb12/mct0.jp2",
+      "sha256": "567ea75991ee4eb51efced6772eb015321be972c7cba4c54cdbd510efcccba02"
+    },
+    {
+      "path": "crates/river-server/tests/fixtures/rgb12/mct1.jp2",
+      "sha256": "ca4a28da3a3177a4d675be61647bb35a7d69a2f03ff3af26a9c3648b6a6fdeec"
+    },
+    {
+      "path": "crates/river-server/tests/fixtures/tiny-groups/gray16-r2-l0-0.u16be",
+      "sha256": "05fa8672d031aba041df47e196bebbcd49024d3d189dd58caf399ace2851ffa8"
+    },
+    {
+      "path": "crates/river-server/tests/fixtures/tiny-groups/gray16.jp2",
+      "sha256": "6264861bfb0cfb647b33a5b2dba371e77fe22253e7979018377e6c52725e3448"
+    },
+    {
+      "path": "crates/river-server/tests/fixtures/tiny-groups16/gray16-r2-l0-0.u16be",
+      "sha256": "05fa8672d031aba041df47e196bebbcd49024d3d189dd58caf399ace2851ffa8"
+    },
+    {
+      "path": "crates/river-server/tests/fixtures/tiny-groups16/gray16.jp2",
+      "sha256": "6264861bfb0cfb647b33a5b2dba371e77fe22253e7979018377e6c52725e3448"
+    },
+    {
+      "path": "crates/river-server/tests/fixtures/tiny-groups16-kdu/gray16.jp2",
+      "sha256": "6264861bfb0cfb647b33a5b2dba371e77fe22253e7979018377e6c52725e3448"
+    },
+    {
+      "path": "crates/river-server/tests/fixtures/tiny-groups16-kdu444/gray16-r2-l0-0.u16be",
+      "sha256": "05fa8672d031aba041df47e196bebbcd49024d3d189dd58caf399ace2851ffa8"
+    },
+    {
+      "path": "crates/river-server/tests/fixtures/tiny-groups16-kdu444/gray16-r2-l1-0.u16be",
+      "sha256": "9af6d1dac7467088d1e7b54acfe4a548254530ef85994962617290851de6f72d"
+    },
+    {
+      "path": "crates/river-server/tests/fixtures/tiny-groups16-kdu444/gray16.jp2",
+      "sha256": "6264861bfb0cfb647b33a5b2dba371e77fe22253e7979018377e6c52725e3448"
+    },
+    {
+      "path": "crates/river-server/tests/fixtures/tiny-groups16-kdu444/provenance.json",
+      "sha256": "4213a93b86b1a61daa23ea537ab40460a3e7719464c1ae642f7aeb3a6e9c99d6"
+    },
+    {
+      "path": "crates/river-server/tests/fixtures/tiny-groups16-kdu444/rgb16-r2-l0-0.u16be",
+      "sha256": "05fa8672d031aba041df47e196bebbcd49024d3d189dd58caf399ace2851ffa8"
+    },
+    {
+      "path": "crates/river-server/tests/fixtures/tiny-groups16-kdu444/rgb16-r2-l0-1.u16be",
+      "sha256": "cea8546d0196a900bb11693ce4cb528f90a070ec2a33d77b8f4d359f41e21cc0"
+    },
+    {
+      "path": "crates/river-server/tests/fixtures/tiny-groups16-kdu444/rgb16-r2-l0-2.u16be",
+      "sha256": "92a16248dcd4b325a016f39f99c9a6adb3c0257530213a0ad9ccc563f2821132"
+    },
+    {
+      "path": "crates/river-server/tests/fixtures/tiny-groups16-kdu444/rgb16-r2-l1-0.u16be",
+      "sha256": "56da70b87713635ad471f44ba4240ec2c2d58ff26ea7f468b46b41ba6eee6d96"
+    },
+    {
+      "path": "crates/river-server/tests/fixtures/tiny-groups16-kdu444/rgb16-r2-l1-1.u16be",
+      "sha256": "5f2df7d842459e5fc5263b802602d8a78373d30edf348544653a216d63eb86e7"
+    },
+    {
+      "path": "crates/river-server/tests/fixtures/tiny-groups16-kdu444/rgb16-r2-l1-2.u16be",
+      "sha256": "e754b5d174935535f734b8d26cf44e2c31de0ae8cf03117e15d399eacc28880e"
+    },
+    {
+      "path": "crates/river-server/tests/fixtures/tiny-groups16-kdu444/rgb16.jp2",
+      "sha256": "86ef164a656d64ed1d47bdf95bd3b85c15f74b65bcb7542d03be918ef9cb974b"
+    },
+    {
+      "path": "crates/river-server/tests/fixtures/two-band/alpha.jp2",
+      "sha256": "c9972b7a7aa84da72003ab90ad0fccd98bf69a33b96d515091398d7fb7f6ed96"
+    },
+    {
+      "path": "crates/river-server/tests/fixtures/two-band/associated.jp2",
+      "sha256": "758c2daf9cc8cb7e9b7c13bf551084e44ab535170f7016157182b8473425e65b"
+    },
+    {
+      "path": "crates/river-server/tests/fixtures/two-band/aux.jp2",
+      "sha256": "beb4597418d5c528d74e848855ab51d4e19b5d43cc01c312124f33aaba210615"
+    },
+    {
+      "path": "crates/river-server/tests/fixtures/two-band/two.j2k",
+      "sha256": "4953c356a8c3620ff00f7fc7484e936045c6953549f1c66812c5efd0804c8e67"
+    },
+    {
+      "path": "deploy/backend/build_warmup.py",
+      "sha256": "a0774e56597a5e3bf58bf4df62f0fe66e974f2d748290dfc47ef0ec6add6cace"
+    },
+    {
+      "path": "deploy/backend/entrypoint.py",
+      "sha256": "f5b6dc325c5d0a4bd7c90b3c590d1e975aefcbf0b3804200e2923f74b527d1a2"
+    },
+    {
+      "path": "deploy/backend/river_profiles.py",
+      "sha256": "2c017994c6d89600a143c60439a164354d2a28808e9f2aadb69db76e64818e50"
+    },
+    {
+      "path": "deploy/openapi.json",
+      "sha256": "fa69e28ae00a26ed1b6c580c1f1e9376b0a03e764f9fcd5ac31ffcb46f30423e"
+    },
+    {
+      "path": "deploy/swagger/LICENSE",
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    {
+      "path": "deploy/swagger/NOTICE",
+      "sha256": "0d20d1adef18aee3f40dd258172155521ce702ac445cb5f7b7d60ed32dad2fb2"
+    },
+    {
+      "path": "deploy/swagger/VERSION.json",
+      "sha256": "212a4162d1c6fb1b6236c044a90bea793643d0b244beb530c27d366bf4746e86"
+    },
+    {
+      "path": "deploy/swagger/index.html",
+      "sha256": "59371bc363e53e70cce4a41fec4d92d0d1d1843b23d889243a269265414a9aaa"
+    },
+    {
+      "path": "deploy/swagger/swagger-ui-bundle.js",
+      "sha256": "6b3bfcaff3fc82c0e6992ca4b370c4f22970dec35fff60d229302b3ee7688715"
+    },
+    {
+      "path": "deploy/swagger/swagger-ui.css",
+      "sha256": "1ac324f7dcd27e4b9386b4bd6421271ec147e922a22c05ba24b11515e9aa6321"
+    },
+    {
+      "path": "licenses/grok-AGPL-3.0.txt",
+      "sha256": "533acb8581ee10c9a101cd71204eef2d4e7c8a1d03c15db7bd54b7bb4e590dc3"
+    },
+    {
+      "path": "licenses/jpeg2k-MIT.txt",
+      "sha256": "99a0f6a15b0d29bcc15432d3a986be42a539a858741d5747ddf5ec2d15af1ed8"
+    },
+    {
+      "path": "licenses/openhtj2k-BSD-3-Clause.txt",
+      "sha256": "5369097362538b0a5b348476248240ab713674fa2fa4bdde511906d949985b63"
+    },
+    {
+      "path": "licenses/openhtj2k-thirdparty-highway-Apache-2.0.txt",
+      "sha256": "43070e2d4e532684de521b885f385d0841030efa2b1a20bafb76133a5e1379c1"
+    },
+    {
+      "path": "nvjpeg2000-sidecar/.gitignore",
+      "sha256": "32dae3052f331ee34d628ef535709b301259a45df7c7522c4d35dcf49873f00b"
+    },
+    {
+      "path": "nvjpeg2000-sidecar/Dockerfile",
+      "sha256": "24e5947ff21cb20211fc44e795173bbea507b697aed770da28ebd680c4e49f7b"
+    },
+    {
+      "path": "nvjpeg2000-sidecar/native.py",
+      "sha256": "af04b834704fccbcf3b16b24a155d5441e3717a320d4600e356d9acdd5b8384e"
+    },
+    {
+      "path": "nvjpeg2000-sidecar/resolution_view.py",
+      "sha256": "83a728aa8e04a649729c9ec029c36c55d63f261c2bbdce5d1a941201096a6a83"
+    },
+    {
+      "path": "nvjpeg2000-sidecar/rpc_codec.py",
+      "sha256": "e56954504631107342c6a12ba717db334f8e466adfa160f32240dc38ff16a62e"
+    },
+    {
+      "path": "nvjpeg2000-sidecar/server.py",
+      "sha256": "bcb7686517420495bfc75bdc0c6cc72c59be612478316155a67b0ed96d8ddb4b"
+    },
+    {
+      "path": "rust-toolchain.toml",
+      "sha256": "f551701b35d5a41f19bfed8c68b13a03a703590ba30bfa4cf820b193db0ee103"
+    }
+  ]
+}

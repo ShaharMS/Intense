@@ -44,20 +44,22 @@ impl State {
   if bytes.first().is_some_and(|byte|byte&0x80==0) {self.length(bytes,layer)}else{self.parse(bytes,layer)}
  }
  fn parse(&mut self,bytes:&[u8],layer:u16)->Result<(usize,u64)> {
+  self.contributions(bytes,layer,|_,_,_,_,_,_| ())
+ }
+ pub(super) fn contributions(&mut self,bytes:&[u8],layer:u16, mut record:impl FnMut(usize,usize,u32,u64,u64,u64))->Result<(usize,u64)> {
   ensure!(layer==self.next_layer,"multilayer packet order is not consecutive");
   self.initialize();
   let mut bits=Bits {bytes,offset:0,remaining:0,byte:0,previous:0};let mut length=0u64;
   if bits.bit()?!=0 {
-   for band in &mut self.bands {for (index,block) in band.blocks.iter_mut().enumerate() {
+   for (bi,band) in self.bands.iter_mut().enumerate() {for (index,block) in band.blocks.iter_mut().enumerate() {
     let first=block.passes==0;
     let included=if first {band.inclusion.decode(index,u32::from(layer)+1,&mut bits)?}else{bits.bit()?!=0};
     if !included {continue;}
     if first {ensure!(band.zero_planes.decode(index,32,&mut bits)?,"invalid multilayer zero-bitplane tree");}
-    let passes=if bits.bit()?==0 {1}else if bits.bit()?==0 {2}else {
-     let n=bits.bits(2)?;if n<3 {3+n}else{let n=bits.bits(5)?;if n<31 {6+n}else{37+bits.bits(7)?}}
-    };
+    let passes=bits.coding_passes()?;
     ensure!(block.passes+passes<=109,"multilayer codeblock exceeds supported segment passes");
     while bits.bit()?!=0 {block.lblock+=1;ensure!(block.lblock<=31,"invalid multilayer Lblock");}
+    let start=length;
     let mut remaining=passes;
     while remaining>0 {
      let segment=remaining.min(segment_remaining(self.style,block.passes));
@@ -67,6 +69,8 @@ impl State {
      length=length.checked_add(bits.bits(count)?).context("multilayer body length overflow")?;
      block.passes+=segment;remaining-=segment;
     }
+    let zeros=if band.zero_planes.nodes.is_empty() {band.zero_planes.single.value}else{band.zero_planes.nodes[index].value};
+    record(bi,index,zeros,block.passes,start,length);
    }}
   }
   if bits.previous==255 {bytes.get(bits.offset).ok_or(ProbeTooShort)?;bits.offset+=1;}

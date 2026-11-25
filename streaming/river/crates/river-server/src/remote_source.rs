@@ -10,18 +10,21 @@ use tracing::Instrument;
 use std::sync::atomic::{AtomicU64, Ordering};
 use crate::decoder::NativeTileLayoutHint;
 mod index_cache;
+mod read_feedback;
 mod jpip_index;
-mod progressive_prefix;
 mod index_shards;
 mod recent_reads;
 mod tile_header_cache;
 mod packet_plan_cache;
+mod range_flights;
+mod codeblock_roi;
 pub(crate) mod read_trace;
 pub(crate) mod wire_budget;
 mod precinct_roi;
 mod multipart;
 mod multipart_prefix;
 mod layered_packets;
+mod layered_arrival;
 mod structure;
 mod single_prefix;
 mod index_only_prefix;
@@ -32,6 +35,7 @@ mod single_roi;
 mod resolution_view;
 mod payload_live;
 #[cfg(test)] mod seekable_probe;
+pub(crate) mod original_reader;
 #[cfg(all(feature="grok",unix))] mod pipeline;
 #[cfg(all(feature="grok",unix))] mod curl_transport;
 
@@ -152,7 +156,7 @@ impl InitialRead {
 pub struct PreparedSubset {
     pub view_reduction:u8,
     pub technical_origin:Option<(u32,u32)>,
-    pub bytes: Vec<u8>, pub route: &'static str, jp2: bool,
+    pub bytes: axum::body::Bytes, pub route: &'static str, jp2: bool,
     pub width: u32, pub height: u32, pub layout: NativeTileLayoutHint,
     pub offset_x: u32, pub offset_y: u32,
 }
@@ -168,11 +172,16 @@ impl PreparedSubset {
 }
 
 #[derive(Debug)]
-struct CachedBlock { data: Arc<[u8]>, touched: u64 }
+struct CachedBlock { gap:Option<std::sync::Weak<crate::read_policy::Profile>>, data: Arc<[u8]>, touched: u64, work_ns:u64 }
 #[derive(Debug, Default)]
 struct CacheState { blocks: HashMap<(Arc<str>, u64, u64), CachedBlock>, touched: BTreeMap<u64, (Arc<str>, u64, u64)>, bytes: usize, clock: u64 }
 #[derive(Debug)]
 pub struct RangeCache { limit: usize, state: Mutex<CacheState> }
+// Two indexes, one Arc allocation and allocator/table slack per block.
+// Charge a conservative estimate even for one-byte tails.
+const RANGE_ENTRY_OVERHEAD:usize = 192;
+fn range_cost(payload:usize)->usize {payload.saturating_add(RANGE_ENTRY_OVERHEAD)}
+
 impl RangeCache {
     pub fn from_env() -> Arc<Self> {
         let cache=Arc::new(Self{limit:crate::resources::budget("ranges"),state:Mutex::new(CacheState::default())});
@@ -181,7 +190,8 @@ impl RangeCache {
     fn effective_limit(&self)->usize {crate::resources::effective("ranges",self.limit)}
     fn trim(&self,limit:usize)->crate::resources::Occupancy {
         let mut state=self.state.lock().unwrap_or_else(|e|e.into_inner());
-        while state.bytes>limit {let Some((_,key))=state.touched.pop_first()else{break;};if let Some(old)=state.blocks.remove(&key){state.bytes-=old.data.len();crate::resources::retain("ranges",old.data.len(),&old.data);crate::resources::evict("ranges",1);}}
+        while state.bytes>limit {let Some((_,key))=state.touched.pop_first()else{break;};if let Some(old)=state.blocks.remove(&key){state.bytes-=range_cost(old.data.len());crate::resources::range_evicted(&old.data);crate::resources::evict("ranges",1);}}
+        if state.blocks.capacity()>1024 && state.blocks.len()<state.blocks.capacity()/4 {state.blocks.shrink_to_fit();}
         crate::resources::Occupancy{bytes:state.bytes,entries:state.blocks.len(),..Default::default()}
     }
     fn get(&self, id: &Arc<str>, block_size: u64, offset: u64) -> Option<Arc<[u8]>> {
@@ -190,12 +200,29 @@ impl RangeCache {
         let clock = state.clock;
         let key = (id.clone(), block_size, offset);
         let Some(block)=state.blocks.get(&key)else{crate::resources::miss("ranges");return None;};
-        let old=block.touched;crate::resources::hit("ranges",block.data.len());
+        let old=block.touched;crate::resources::hit("ranges",block.data.len());crate::resources::reused_cost("ranges",block.work_ns);
         state.touched.remove(&old);
         state.touched.insert(clock, key.clone());
         let block = state.blocks.get_mut(&key).unwrap();
+        if let Some(p)=block.gap.take().and_then(|p|p.upgrade()) {p.gap_bytes(block.data.len() as u64,true);}
         block.touched = clock;
         Some(block.data.clone())
+    }
+    fn mark_gaps(&self,id:&Arc<str>,size:u64,blocks:&[(u64,Arc<[u8]>)],required:&Option<BTreeSet<u64>>,profile:&Arc<crate::read_policy::Profile>) {
+        let Some(required)=required else{return;};
+        let mut state=self.state.lock().unwrap_or_else(|e|e.into_inner());
+        let mut total=0;
+        for (pos,data) in blocks {
+            if !required.contains(pos) {
+                if let Some(b)=state.blocks.get_mut(&(id.clone(),size,*pos)).filter(|b|Arc::ptr_eq(&b.data,data)) {
+                    b.gap=Some(Arc::downgrade(profile));total+=data.len();
+                }
+            }
+        }
+        if total>0 {profile.gap_bytes(total as u64,false);}
+    }
+    fn contains(&self,id:&Arc<str>,block_size:u64,offset:u64)->bool {
+        self.state.lock().unwrap_or_else(|e|e.into_inner()).blocks.contains_key(&(id.clone(),block_size,offset))
     }
     /// Reuse only cached edges of a compatibility chunk. A missing interior
     /// remains one GET, so fragmentation never increases storage request count.
@@ -227,6 +254,32 @@ impl RangeCache {
         (prefix, start..end, suffix)
     }
     fn put(&self, id: &Arc<str>, block_size: u64, offset: u64, data: &[u8]) -> Vec<(u64, Arc<[u8]>)> {
+        self.put_measured(id,block_size,offset,data,0)
+    }
+    fn insert_native_view(&self, id: &Arc<str>, tile: u16, bytes: Arc<[u8]>) {
+        let limit = self.effective_limit();
+        if bytes.len() <= limit {
+            let mut state = self.state.lock().unwrap_or_else(|e| e.into_inner());
+            Self::insert(&mut state, (id.clone(), 0, u64::from(tile)), bytes, limit, 0);
+        }
+    }
+
+    fn insert(state: &mut CacheState, key: (Arc<str>, u64, u64), bytes: Arc<[u8]>, limit: usize, work_ns: u64) {
+        let cost=range_cost(bytes.len());
+        if cost>limit {return}
+        if let Some(old) = state.blocks.remove(&key) { state.bytes -= range_cost(old.data.len()); state.touched.remove(&old.touched); }
+        while state.bytes > limit-cost {
+            let Some((_, key)) = state.touched.pop_first() else { break; };
+            let old = state.blocks.remove(&key).unwrap();
+            state.bytes -= range_cost(old.data.len());crate::resources::range_evicted(&old.data);crate::resources::evict("ranges",1);
+        }
+        state.clock += 1;
+        let touched = state.clock;
+        state.touched.insert(touched, key.clone());
+        state.bytes += cost;
+        state.blocks.insert(key, CachedBlock { gap:None,work_ns,data: bytes, touched });
+    }
+    fn put_measured(&self,id:&Arc<str>,block_size:u64,offset:u64,data:&[u8],work_ns:u64)->Vec<(u64,Arc<[u8]>)> {
         let limit=self.effective_limit();
         let mut state = self.state.lock().unwrap_or_else(|e| e.into_inner());
         let mut leases = vec![];
@@ -236,17 +289,8 @@ impl RangeCache {
             leases.push((position, bytes.clone()));
             if chunk.len() > limit { continue; }
             let key = (id.clone(), block_size, position);
-            if let Some(old) = state.blocks.remove(&key) { state.bytes -= old.data.len(); state.touched.remove(&old.touched); }
-            while state.bytes + chunk.len() > limit {
-                let Some((_, key)) = state.touched.pop_first() else { break; };
-                let old = state.blocks.remove(&key).unwrap();
-                state.bytes -= old.data.len();crate::resources::retain("ranges",old.data.len(),&old.data);crate::resources::evict("ranges",1);
-            }
-            state.clock += 1;
-            let touched = state.clock;
-            state.touched.insert(touched, key.clone());
-            state.bytes += chunk.len();
-            state.blocks.insert(key, CachedBlock { data: bytes, touched });
+            let work = work_ns.saturating_mul(bytes.len() as u64)/data.len().max(1) as u64;
+            Self::insert(&mut state, key, bytes, limit, work);
         }
         leases
     }
@@ -255,10 +299,11 @@ fn env_limit(name: &str, default: usize) -> usize {
     std::env::var(name).ok().and_then(|v| v.parse().ok()).filter(|&n| n > 0).unwrap_or(default)
 }
 
-/// Dropping the HTTP/WebSocket request cancels pending network reads even when
+/// Dropping the last interested HTTP request cancels pending network reads even when
 /// its decoder is already running in spawn_blocking.
 pub struct CancelOnDrop(watch::Sender<bool>);
 impl CancelOnDrop {
+    pub fn subscribe(&self) -> watch::Receiver<bool> { self.0.subscribe() }
     pub fn new() -> (Self, watch::Receiver<bool>) { let (tx, rx) = watch::channel(false); (Self(tx), rx) }
 }
 impl Drop for CancelOnDrop { fn drop(&mut self) { let _ = self.0.send(true); } }
@@ -291,13 +336,14 @@ impl AutoSerial {
     }
 }
 pub struct ReadContext {
-    progressive_prefix_probe: Option<u64>,
-    last_prefix_recovery_index: Option<usize>,
+    ready_blocks: Option<std::sync::mpsc::Sender<Vec<(u64,Arc<[u8]>)>>>,
+    pub allow_codeblock_roi: bool,
+    pub(crate) tier1_threads: usize,
+    pub(crate) planning_driver_grok: Option<bool>,
+    feedback:Arc<read_feedback::Ledger>,
     wide_index_pilot: bool,
     saved_index_headers: bool,
     indexed_still_headers: bool,
-    indexed_progressive_headers: bool,
-    pub progressive_final_reduction: Option<u8>,
     trace_id:u64,
     trace_index:Option<usize>,
     #[cfg(all(feature="grok",unix))] curl_lease:Option<curl_transport::Lease>,
@@ -332,7 +378,7 @@ pub struct ReadContext {
 impl ReadContext {
     pub fn new(cancel: Option<watch::Receiver<bool>>) -> Self {
         let configured_ranges=std::env::var("RIVER_S3_REQUEST_RANGES").ok().and_then(|v|v.parse::<u64>().ok()).filter(|&n|n>0);
-        Self { progressive_final_reduction:None,progressive_prefix_probe:None,last_prefix_recovery_index:None,wide_index_pilot:false,saved_index_headers:false,indexed_still_headers:false,indexed_progressive_headers:false, trace_id:read_trace::context_id(),trace_index:None,cache_only:false,curl_requests:0,serial_transport:crate::read_policy::settings().effective_serial_transport(),auto_serial:AutoSerial::default(),
+        Self { tier1_threads:0, ready_blocks:None, allow_codeblock_roi:false, planning_driver_grok:None, feedback:Arc::new(read_feedback::Ledger::default()), wide_index_pilot:false,saved_index_headers:false,indexed_still_headers:false, trace_id:read_trace::context_id(),trace_index:None,cache_only:false,curl_requests:0,serial_transport:crate::read_policy::settings().effective_serial_transport(),auto_serial:AutoSerial::default(),
             #[cfg(test)] legacy_multipart_plan:false,
             #[cfg(all(feature="grok",unix))] curl_lease:None,
             #[cfg(all(feature="grok",unix))] pipeline:None,
@@ -424,7 +470,7 @@ impl ReadContext {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Header {
     pub image_origin: (u32,u32),
-    pub width: u32, pub height: u32, pub components: u8, pub display_rgb_only:bool, pub bit_depth: u8,
+    pub width: u32, pub height: u32, pub components: u8, pub display_rgb_only:bool, pub band_fallback:Option<jpeg2k::BandFallback>, pub bit_depth: u8,
     pub levels: u8, pub layers: u16, pub layout: NativeTileLayoutHint,
     pub progression: u8,
     pub is_ht: bool,
@@ -433,9 +479,56 @@ pub struct Header {
     codestream_end: u64,
     packet_compatible: bool,
     prefix_compatible: bool,
+    component_specs: Vec<[u8; 3]>,
     payload_digest: [u8; 32],
 }
 impl Header {
+    fn deep_rgb_native_tile(&self) -> bool {
+        (10..=12).contains(&self.levels) && self.components == 3 && self.bit_depth == 8
+            && !self.is_ht && self.packet_compatible && self.progression == 0
+            && self.cod.first() == Some(&0) && self.cod.get(8..10) == Some(&[0, 1])
+            && self.image_origin == (0, 0) && (self.layout.origin_x, self.layout.origin_y) == (0, 0)
+            && self.layout.width == self.layout.height && matches!(self.layout.width, 1024 | 2048 | 4096)
+    }
+
+    pub(crate) fn single_codeword_layout(&self) -> bool {
+        self.layers == 1 && self.cod.first() == Some(&0) && self.cod.get(8..10) == Some(&[0,1])
+    }
+    fn range_block_size(&self, object_bytes: u64, bulk_reads: bool) -> u64 {
+        if self.packet_compatible && self.progression >= 3 {
+            return 256;
+        }
+        // On native tiled RPCL images a full-quality read supplies all layers
+        // of the selected precinct. Keep those arrivals in codeblock-sized
+        // cache entries instead of publishing thousands of 1 KiB fragments.
+        if bulk_reads && self.packet_compatible && !self.is_ht && self.progression==2
+            && (2..=16).contains(&self.layers) && self.components<=4 && self.components!=0
+            && (self.layout.columns>1 || self.layout.rows>1) && object_bytes>=8<<20
+            && self.cod.first()==Some(&0) && self.cod.get(8..10)==Some(&[0,1])
+        {
+            let pixels=u64::from(self.width)*u64::from(self.height);
+            let block_area=1u64 << (u32::from(self.cod[6])+u32::from(self.cod[7])+4);
+            let blocks=pixels.div_ceil(block_area).saturating_mul(u64::from(self.components)).max(1);
+            return object_bytes.div_ceil(blocks).saturating_mul(2).clamp(BLOCK,8192).next_power_of_two();
+        }
+        // A sparse ROI fetches runs of neighboring compressed codeblocks. Charging
+        // each KiB to a separate allocation and LRU entry dominates cache work for
+        // large reversible tiles. Estimate the compressed bytes in four codeblocks.
+        if !bulk_reads || !self.packet_compatible || self.is_ht || self.layers != 1
+            || self.layout.columns != 1 || self.layout.rows != 1 || object_bytes < 8 << 20
+            || !(512..=32768).contains(&self.width) || !(512..=32768).contains(&self.height)
+            || self.cod.first() != Some(&0) || self.cod.get(8..10) != Some(&[0, 1])
+        {
+            return BLOCK;
+        }
+        let block_width = 1u64 << (self.cod[6] + 2);
+        let block_height = 1u64 << (self.cod[7] + 2);
+        let count = u64::from(self.width).div_ceil(block_width)
+            * u64::from(self.height).div_ceil(block_height) * u64::from(self.components);
+        let average = object_bytes.div_ceil(count.max(1));
+        average.saturating_mul(4).clamp(BLOCK, 16 * 1024).next_power_of_two()
+    }
+
     fn tile_bounds(&self, tile: u16) -> (u32,u32,u32,u32) {
         let tx = u32::from(tile) % self.layout.columns;
         let ty = u32::from(tile) / self.layout.columns;
@@ -463,13 +556,14 @@ impl HeaderPayload {
     }
 }
 #[derive(Default)]
-struct HeaderCacheState {entries:HashMap<String,(Arc<HeaderPayload>,usize,u64)>,lru:BTreeMap<u64,String>,bytes:usize,clock:u64}
+struct HeaderCacheState {entries:HashMap<String,(Arc<HeaderPayload>,usize,u64,u64)>,lru:BTreeMap<u64,String>,bytes:usize,clock:u64}
 struct HeaderCache {limit:usize,state:Mutex<HeaderCacheState>}
 impl HeaderCache {
  fn shared()->&'static Self {static CACHE:std::sync::OnceLock<HeaderCache>=std::sync::OnceLock::new();static REGISTER:std::sync::Once=std::sync::Once::new();let cache=CACHE.get_or_init(||Self{limit:crate::resources::budget("headers"),state:Mutex::new(HeaderCacheState::default())});REGISTER.call_once(||crate::resources::register("headers",move|limit|cache.trim(limit)));cache}
  fn trim(&self,limit:usize)->crate::resources::Occupancy {let mut s=self.state.lock().unwrap_or_else(|e|e.into_inner());while s.bytes>limit||s.entries.len()>crate::resources::entry_limit("RIVER_S3_HEADER_CACHE_ENTRIES",limit){let Some((_,key))=s.lru.pop_first()else{break;};if let Some(old)=s.entries.remove(&key){s.bytes-=old.1;crate::resources::retain("headers",old.1,&old.0);crate::resources::evict("headers",1);}}crate::resources::Occupancy{bytes:s.bytes,entries:s.entries.len(),..Default::default()}}
- fn get(&self,id:&str)->Option<Arc<HeaderPayload>> {let mut s=self.state.lock().unwrap_or_else(|e|e.into_inner());s.clock+=1;let now=s.clock;let Some(e)=s.entries.get_mut(id)else{crate::resources::miss("headers");return None;};let old=e.2;e.2=now;let payload=e.0.clone();let bytes=e.1;s.lru.remove(&old);s.lru.insert(now,id.into());crate::resources::hit("headers",bytes);Some(payload)}
- fn put(&self,id:&str,payload:Arc<HeaderPayload>){let bytes=payload.bytes();let limit=crate::resources::effective("headers",self.limit);if bytes>limit||limit==0{return;}let mut s=self.state.lock().unwrap_or_else(|e|e.into_inner());if let Some(old)=s.entries.remove(id){s.bytes-=old.1;s.lru.remove(&old.2);}while s.bytes+bytes>limit||s.entries.len()>=crate::resources::entry_limit("RIVER_S3_HEADER_CACHE_ENTRIES",limit){let Some((_,key))=s.lru.pop_first()else{break;};if let Some(old)=s.entries.remove(&key){s.bytes-=old.1;crate::resources::retain("headers",old.1,&old.0);crate::resources::evict("headers",1);}}s.clock+=1;let now=s.clock;s.bytes+=bytes;s.lru.insert(now,id.into());s.entries.insert(id.into(),(payload,bytes,now));}
+ fn get(&self,id:&str)->Option<Arc<HeaderPayload>> {let mut s=self.state.lock().unwrap_or_else(|e|e.into_inner());s.clock+=1;let now=s.clock;let Some(e)=s.entries.get_mut(id)else{crate::resources::miss("headers");return None;};let old=e.2;e.2=now;let payload=e.0.clone();let bytes=e.1;crate::resources::reused_cost("headers",e.3);s.lru.remove(&old);s.lru.insert(now,id.into());crate::resources::hit("headers",bytes);Some(payload)}
+ fn put(&self,id:&str,payload:Arc<HeaderPayload>){self.put_measured(id,payload,0)}
+ fn put_measured(&self,id:&str,payload:Arc<HeaderPayload>,work_ns:u64){let bytes=payload.bytes();let limit=crate::resources::effective("headers",self.limit);if bytes>limit||limit==0{return;}let mut s=self.state.lock().unwrap_or_else(|e|e.into_inner());if let Some(old)=s.entries.remove(id){s.bytes-=old.1;s.lru.remove(&old.2);}while s.bytes+bytes>limit||s.entries.len()>=crate::resources::entry_limit("RIVER_S3_HEADER_CACHE_ENTRIES",limit){let Some((_,key))=s.lru.pop_first()else{break;};if let Some(old)=s.entries.remove(&key){s.bytes-=old.1;crate::resources::retain("headers",old.1,&old.0);crate::resources::evict("headers",1);}}s.clock+=1;let now=s.clock;s.bytes+=bytes;s.lru.insert(now,id.into());s.entries.insert(id.into(),(payload,bytes,now,work_ns));}
 }
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 struct TilePart { tile: u16, offset: u64, length: u64, ordinal: u8, total: u8 }
@@ -500,16 +594,19 @@ fn ready_parts(index:&PartIndex,selected:&HashSet<u16>)->Option<Vec<TilePart>> {
 
 #[derive(Debug)]
 pub struct RemoteSource {
-    pub(crate) metadata_cost:Arc<crate::asset_registry::Cost>,
+    pub(crate) has_tier1_preview: std::sync::atomic::AtomicBool,
+    pub(crate) block_namespace: [u8; 32],
+    pub(crate) metadata_cost:Arc<crate::image_state::Cost>,
     #[cfg(all(feature="grok",unix))] curl:Option<curl_transport::Source>,
     #[cfg(all(feature="grok",unix))] native_max_retries:usize,
     pub source_id: String,
     pub id: String,
-    pub key: String,
     pub meta: ObjectMeta,
     pub header: Header,
     pub sequential_prefix: bool,
     pub(crate) native_grok_single_deep: bool,
+    pub(crate) deep_rgb_native_tile: bool,
+    pub(crate) native_grok_indexed_overview: bool,
     /// SOT discovery uses the shared mutable index rather than explicit TLM entries.
     pub serial_index: bool,
     pub preparation_gate:Arc<tokio::sync::Mutex<()>>,
@@ -523,8 +620,12 @@ pub struct RemoteSource {
     block_size: u64,
     network_min_us: Arc<AtomicU64>,
     read_profile: Arc<crate::read_policy::Profile>,
+    codeblocks: Mutex<codeblock_roi::Index>,
+    index_warmup: Mutex<()>,
+    flights: Arc<range_flights::Flights>,
     fetch_lock: tokio::sync::Mutex<()>,
     compatibility_lock: Mutex<()>,
+    native_view_flights: Mutex<HashMap<u16, std::sync::Weak<Mutex<()>>>>,
     parts: Mutex<PartIndex>,
     speculative_index:Mutex<index_shards::State>,
 }
@@ -532,6 +633,7 @@ pub struct RemoteSource {
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum RangePass {
     Initial,
+    IndexedCodeblocks,
     PayloadSample,
     PayloadReplanned,
     Replanned,
@@ -579,19 +681,53 @@ impl RemoteSource {
         Some(file)
     }
 
+    // Keep the scratch reservation for the entire lifetime of the shared input.
+    // Bytes owns the Vec allocation directly, including when a request is cloned.
+    pub fn compatibility_memory(&self, context: &mut ReadContext) -> Result<axum::body::Bytes> {
+        struct Input { data: Vec<u8>, _reservation: crate::storage_mode::Reservation }
+        impl AsRef<[u8]> for Input {
+            fn as_ref(&self) -> &[u8] { &self.data }
+        }
+        let _flight = lock_cancellable(&self.compatibility_lock, context)?;
+        context.check()?;
+        self.check_compatibility_size()?;
+        let reservation = crate::storage_mode::reserve(self.meta.size)?;
+        let mut data = Vec::new();
+        data.try_reserve_exact(usize::try_from(self.meta.size)?)?;
+        self.write_compatibility(context, &mut data)?;
+        Ok(axum::body::Bytes::from_owner(Input { data, _reservation: reservation }))
+    }
+
+    fn check_compatibility_size(&self) -> Result<()> {
+        let limit = env_limit("RIVER_S3_COMPATIBILITY_BYTES", 2 * 1024 * 1024 * 1024) as u64;
+        ensure!(self.meta.size <= limit, "source exceeds the compatibility limit ({limit} bytes); configure RIVER_S3_COMPATIBILITY_BYTES for this source");
+        Ok(())
+    }
+
     pub fn compatibility_file(&self, context: &mut ReadContext) -> Result<Arc<crate::storage_mode::ScratchFile>> {
         // Serialize misses only for this source; unrelated objects transfer concurrently.
         let _flight = lock_cancellable(&self.compatibility_lock, context)?;
         context.check()?;
         if let Some(file) = self.cached_compatibility_file(context) { return Ok(file); }
-        let limit = env_limit("RIVER_S3_COMPATIBILITY_BYTES", 2 * 1024 * 1024 * 1024) as u64;
-        ensure!(self.meta.size <= limit, "source exceeds the file-based compatibility limit ({limit} bytes); configure RIVER_S3_COMPATIBILITY_BYTES for this source");
+        self.check_compatibility_size()?;
         context.check()?;
         let root = std::env::var_os("RIVER_S3_CACHE_ROOT").map(std::path::PathBuf::from)
             .unwrap_or_else(|| std::env::temp_dir().join("river-s3-cache")).join("range-views");
         let payload = self.acquire_header(context)?;
         let suffix = if payload.container.is_empty() { ".j2k" } else { ".jp2" };
         let mut file = crate::storage_mode::ScratchFile::create("river-compatible-", suffix, self.meta.size, Some(&root))?;
+        let bytes = self.write_compatibility(context, &mut file)?;
+        let file = Arc::new(file);
+        let cache_limit = std::env::var("RIVER_S3_COMPATIBILITY_CACHE_BYTES").ok().and_then(|value| value.parse().ok())
+            .unwrap_or(2 * 1024 * 1024 * 1024);
+        if crate::storage_mode::disk_cache_enabled() && !crate::adaptation::conserve_disk() {
+            CompatibilityCache::shared().lock().unwrap_or_else(|error| error.into_inner())
+                .put(self.id.clone(), file.clone(), bytes, cache_limit);
+        }
+        Ok(file)
+    }
+
+    fn write_compatibility(&self, context: &mut ReadContext, output: &mut impl Write) -> Result<u64> {
         let mut cancel = context.cancel.clone();
         // Compatibility transfer has a separate byte/deadline policy. Preserve
         // its allowed object sizes while explicit range caps remain absolute.
@@ -615,24 +751,23 @@ impl RemoteSource {
                     async move {
                         let (mut prefix, missing, suffix) = self.cache.compatibility_edges(
                             &self.cache_key, self.block_size, start..(start+1024*1024).min(self.meta.size));
-                        let cached = prefix.len()+suffix.len();
-                        let mut fetched = 0;
+                        let mut stats=ReadStats {cache_bytes:(prefix.len()+suffix.len()) as u64,..Default::default()};
                         if !missing.is_empty() {
                             let body = range_client.fetch(missing,deadline,cancel).await?;
-                            fetched = body.len();
+                            body.account(&mut stats);
                             prefix.extend_from_slice(&body);
                         }
                         prefix.extend_from_slice(&suffix);
-                        Ok::<_,anyhow::Error>((prefix, fetched, cached))
+                        Ok::<_,anyhow::Error>((prefix, stats))
                     }
                 })).buffered(concurrency);
-                while let Some((chunk, fetched, cached)) = chunks.try_next().await? {
-                    context.stats.cache_bytes += cached as u64;
-                    context.stats.bytes += fetched as u64;
+                while let Some((chunk, stats)) = chunks.try_next().await? {
+                    context.stats.cache_bytes += stats.cache_bytes;
+                    context.stats.bytes += stats.bytes;
                     bytes = bytes.checked_add(chunk.len() as u64).context("source size overflow")?;
                     ensure!(bytes <= self.meta.size, "S3 compatibility response exceeds source extent");
-                    file.write_all(&chunk)?;
-                    requests += u64::from(fetched != 0);
+                    output.write_all(&chunk)?;
+                    requests += stats.requests;
                 }
                 ensure!(bytes == self.meta.size, "truncated S3 compatibility response");
                 Ok::<_, anyhow::Error>(bytes)
@@ -648,19 +783,12 @@ impl RemoteSource {
                 _ = cancelled => bail!("S3 request superseded"),
             }
         })?;
-        file.flush()?;
+        output.flush()?;
         context.stats.requests += requests;
         // The compatibility route has its own bounded transfer deadline.
         context.deadline = Instant::now() + Duration::from_secs(30);
         context.check()?;
-        let file = Arc::new(file);
-        let cache_limit = std::env::var("RIVER_S3_COMPATIBILITY_CACHE_BYTES").ok().and_then(|value| value.parse().ok())
-            .unwrap_or(2 * 1024 * 1024 * 1024);
-        if crate::storage_mode::disk_cache_enabled() && !crate::adaptation::conserve_disk() {
-            CompatibilityCache::shared().lock().unwrap_or_else(|error| error.into_inner())
-                .put(self.id.clone(), file.clone(), bytes, cache_limit);
-        }
-        Ok(file)
+        Ok(bytes)
     }
 
     pub fn open_file(path: &std::path::Path, runtime: tokio::runtime::Handle, cache: Arc<RangeCache>) -> Result<(Arc<Self>, ReadStats)> {
@@ -703,37 +831,51 @@ impl RemoteSource {
         meta:ObjectMeta,runtime:tokio::runtime::Handle,cache:Arc<RangeCache>,seed:Option<HeaderSeed>,local_path:Option<std::path::PathBuf>)->Result<(Arc<Self>,ReadStats)> {
         ensure!(meta.e_tag.is_some() || meta.version.is_some(), "S3 source must expose an ETag or version for consistent range reads");
         // Header parsing uses the same reader and shared cache as later passes.
+        use sha2::{Digest, Sha256};
+        let block_namespace = Sha256::digest(serde_json::to_vec(&(
+            &source_id, &id, location.as_ref(), meta.size, &meta.version, &meta.e_tag,
+        ))?).into();
         let cache_key = Arc::from(id.as_str());
         let read_profile=crate::read_policy::profile(&source_id);
         let mut source = Self {
             #[cfg(all(feature="grok",unix))] curl:None,
             #[cfg(all(feature="grok",unix))] native_max_retries:2,
-            local_path, read_profile, source_id, id, key: location.as_ref().to_owned(), meta, store, location, runtime, cache, cache_key, block_size: BLOCK,
-            sequential_prefix: false, native_grok_single_deep: false, serial_index: false, preparation_gate:Arc::new(tokio::sync::Mutex::new(())), network_min_us: Arc::new(AtomicU64::new(u64::MAX)),
-            header: Header { image_origin: (0,0), width: 0, height: 0, components: 0,display_rgb_only:false, bit_depth: 0, levels: 0, layers: 0,
+            has_tier1_preview: false.into(),
+            block_namespace,
+            local_path, read_profile, source_id, id, meta, store, location, runtime, cache, cache_key, block_size: BLOCK,
+            sequential_prefix: false, deep_rgb_native_tile: false, native_grok_single_deep: false, native_grok_indexed_overview: false, serial_index: false, preparation_gate:Arc::new(tokio::sync::Mutex::new(())), network_min_us: Arc::new(AtomicU64::new(u64::MAX)),
+            header: Header { image_origin: (0,0), width: 0, height: 0, components: 0,display_rgb_only:false,band_fallback:None, bit_depth: 0, levels: 0, layers: 0,
                 layout: NativeTileLayoutHint { origin_x: 0, origin_y: 0, width: 0, height: 0, columns: 0, rows: 0 },
                 progression: 0, is_ht: false, cod: vec![], first_part: 0, codestream_end: 0,
-                packet_compatible: false, prefix_compatible: false, payload_digest: [0; 32] },
+                packet_compatible: false, prefix_compatible: false, component_specs:Vec::new(), payload_digest: [0; 32] },
             header_payload: Mutex::new(std::sync::Weak::new()),
-            metadata_cost:Arc::new(crate::asset_registry::Cost::default()),fetch_lock: tokio::sync::Mutex::new(()), compatibility_lock: Mutex::new(()), speculative_index:Mutex::new(index_shards::State::default()), parts: Mutex::new(PartIndex::default()) };
+            index_warmup:Mutex::default(),codeblocks:Mutex::default(), flights:Arc::default(),metadata_cost:Arc::new(crate::image_state::Cost::default()),fetch_lock: tokio::sync::Mutex::new(()), compatibility_lock: Mutex::new(()),native_view_flights: Mutex::default(), speculative_index:Mutex::new(index_shards::State::default()), parts: Mutex::new(PartIndex::default()) };
         let mut context = ReadContext::new(None);
         context.limit = MAX_HEADER as u64 + 2 * BLOCK;
         if let Some(seed)=seed {
             context.limit+=seed.stats.bytes;
             context.stats=seed.stats;context.wire_budget=seed.budget;
+            context.feedback.bind(source.read_profile.clone());context.feedback.bind_budget(context.wire_budget.clone());
+            context.feedback.fetched(0..context.stats.bytes,context.stats.bytes,seed.elapsed_us.saturating_mul(1000));
             source.network_min_us.store(seed.elapsed_us,Ordering::Relaxed);
             let elapsed=Duration::from_micros(seed.elapsed_us);source.read_profile.record(context.stats.bytes,elapsed,elapsed);
             if let Some(bytes)=seed.prefix {
-                let blocks=source.cache.put(&source.cache_key,source.block_size,0,&bytes);
+                let blocks=source.cache.put_measured(&source.cache_key,source.block_size,0,&bytes,seed.elapsed_us.saturating_mul(1000));
                 if source.cache.effective_limit()<8*1024*1024 {context.recent.remember(source.block_size,&blocks);}
             }
         }
+        let header_began=Instant::now();
         let (header, payload) = source.read_header(&mut context)?;
         // Keep an already materialized, version-keyed index when recreating
         // a reader for the same immutable header.
         let payload=HeaderCache::shared().get(&source.id).filter(|cached|cached.jpip_locator.is_none() && cached.digest()==header.payload_digest).unwrap_or(payload);
         // Restrict this Auto preference to the measured plain sRGB,
         // lossless RPCL layout. Classify once using the parsed main header.
+        source.deep_rgb_native_tile = source.local_path.is_none() && header.deep_rgb_native_tile()
+            && payload.main.get(42..51) == Some(&[7,1,1,7,1,1,7,1,1])
+            && (payload.container.is_empty()
+                || (payload.container.get(32..48) == Some(b"\0\0\0-jp2h\0\0\0\x16ihdr")
+                    && payload.container.get(56..) == Some(b"\0\x03\x07\x07\0\0\0\0\0\x0fcolr\x01\0\0\0\0\0\x10")));
         source.native_grok_single_deep = source.local_path.is_none()
             && !header.is_ht && header.packet_compatible && header.prefix_compatible
             && header.progression == 2 && header.layers == 1 && header.levels == 7
@@ -750,14 +892,25 @@ impl RemoteSource {
             // palettes, channel mappings, alpha definitions and ICC profiles.
             && payload.container.get(32..48) == Some(b"\0\0\0-jp2h\0\0\0\x16ihdr")
             && payload.container.get(56..) == Some(b"\0\x03\x07\x07\0\0\0\0\0\x0fcolr\x01\0\0\0\0\0\x10");
+        source.native_grok_indexed_overview = !payload.tlm.is_empty() && payload.tlm.iter().all(|(tile,_)|tile.is_some()) && !header.is_ht
+            && header.packet_compatible && header.prefix_compatible && header.components==3
+            && header.bit_depth==8 && header.layers==1 && header.cod.get(8..10)==Some(&[0,1])
+            && header.image_origin==(0,0) && header.layout.origin_x==0 && header.layout.origin_y==0
+            && u64::from(header.layout.columns)*u64::from(header.layout.rows)<=16
+            && source.meta.size<=64*1024*1024
+            && payload.container.get(32..48)==Some(b"\0\0\0-jp2h\0\0\0\x16ihdr")
+            && payload.container.get(56..)==Some(b"\0\x03\x07\x07\0\0\0\0\0\x0fcolr\x01\0\0\0\0\0\x10");
         source.header = header;
         source.sequential_prefix=payload.tlm.is_empty() && source.header.prefix_compatible && source.header.layers==1;
         source.serial_index=payload.tlm.is_empty() || payload.tlm.iter().any(|(tile,_)|tile.is_none());
         *source.header_payload.get_mut().unwrap() = Arc::downgrade(&payload);
-        HeaderCache::shared().put(&source.id, payload);
+        HeaderCache::shared().put_measured(&source.id, payload,header_began.elapsed().as_nanos().min(u64::MAX as u128) as u64);
         // Spatially interleaved PCRL/CPRL packets benefit from finer reads.
         // Other layouts retain larger blocks to avoid unnecessary cache nodes.
-        if source.header.packet_compatible && source.header.progression >= 3 { source.block_size = 256; }
+        let bulk_reads = source.local_path.is_none() && source.cache.effective_limit() >= 8 << 20
+            && !context.explicit_request_limit && std::env::var_os("RIVER_S3_REQUEST_BYTES").is_none()
+            && crate::read_policy::explicit_overfetch_cap() != Some(1);
+        source.block_size = source.header.range_block_size(source.meta.size, bulk_reads);
         source.parts.get_mut().unwrap().cursor = source.header.first_part;
         Ok((Arc::new(source), context.stats))
     }
@@ -791,6 +944,8 @@ impl RemoteSource {
     }
     #[track_caller]
     fn read_blocks(&self, range: Range<u64>, context: &mut ReadContext, retain:bool) -> Result<Vec<u8>> {
+        context.feedback.bind(self.read_profile.clone());context.feedback.bind_budget(context.wire_budget.clone());
+        context.feedback.need(range.clone());
         context.check()?;
         let retain=retain && self.cache.effective_limit()<8*1024*1024;
         ensure!(range.start <= range.end && range.end <= self.meta.size, "JPEG 2000 read exceeds object size");
@@ -814,21 +969,52 @@ impl RemoteSource {
                 context.stats.cache_bytes += count as u64;
                 continue;
             }
+            // Opening the source caches the versioned header probe on the
+            // bootstrap grid. Its SOT and PLT bytes remain valid after the
+            // payload grid is chosen. Do not admit a short bootstrap block
+            // as a complete payload block or pin it under a payload offset.
+            if self.block_size != BLOCK && cursor < INITIAL_PROBE {
+                let offset = cursor / BLOCK * BLOCK;
+                if let Some(block) = self.cache.get(&self.cache_key, BLOCK, offset) {
+                    let within = (cursor - offset) as usize;
+                    if let Some(bytes) = block.get(within..).filter(|bytes| !bytes.is_empty()) {
+                        let count = bytes.len().min((range.end - cursor) as usize);
+                        output.extend_from_slice(&bytes[..count]);
+                        cursor += count as u64;
+                        context.stats.cache_bytes += count as u64;
+                        continue;
+                    }
+                }
+            }
             #[cfg(all(feature="grok",unix))] if context.cache_only {return Err(pipeline::PrefixNotCached.into());}
-            // Coalesce concurrent misses for this object, not unrelated objects.
-            let _fetch = self.fetch_admission(context)?;
-            if self.cache.get(&self.cache_key, self.block_size, block_start).is_some() { continue; }
+            let shared_sdk=self.local_path.is_none() && context.serial_transport==crate::read_policy::SerialTransport::Sdk;
+            let _fetch=if shared_sdk {None}else{Some(self.fetch_admission(context)?)};
+            if self.cache.contains(&self.cache_key, self.block_size, block_start) { continue; }
             context.check()?;
             let mut end = range.end.div_ceil(self.block_size).saturating_mul(self.block_size)
                 .min(self.meta.size).min(block_start + 1024 * 1024);
             let mut probe = block_start + self.block_size;
             while probe < end {
-                if self.cache.get(&self.cache_key, self.block_size, probe).is_some() { end = probe; break; }
+                if self.cache.contains(&self.cache_key, self.block_size, probe) { end = probe; break; }
                 probe += self.block_size;
             }
             ensure!(context.stats.bytes + end - block_start <= context.limit,
                 "S3 compressed-read budget exceeded; source needs a packet index or smaller viewport (usedBytes={}, nextRangeBytes={}, limitBytes={}, phase={})",context.stats.bytes,end-block_start,context.limit,if context.trace_index.is_some() {"sotDiscovery"} else {"headerOrPacket"});
             ensure!(context.stats.requests < context.requests_limit, "S3 range request limit exceeded; source needs a tile-part index (used={}, limit={}, phase={})",context.stats.requests,context.requests_limit,if context.trace_index.is_some() {"sotDiscovery"} else {"headerOrPacket"});
+            if shared_sdk {
+                let mut client=self.range_client(context);
+                client.stage=if context.main_header {"mainHeader"}else if context.trace_index.is_some() {"sotDiscovery"}else if retain {"packetHeader"}else{"headerOrPacket"};
+                let fetched=self.runtime.block_on(client.fetch(block_start..end,context.deadline,context.cancel.clone()))?;
+                fetched.account(&mut context.stats);
+                self.read_profile.serial_counts(fetched.requests,0);
+                let blocks=self.cache.put_measured(&self.cache_key,self.block_size,block_start,&fetched,context.feedback.cost(block_start..end));
+                if self.cache.effective_limit()<8*1024*1024 {context.recent.remember(self.block_size,&blocks);}
+                if retain {context.pin_packet_blocks(blocks.into_iter().collect());}
+                let stop=end.min(range.end);
+                output.extend_from_slice(&fetched[(cursor-block_start) as usize..(stop-block_start) as usize]);
+                cursor=stop;
+                continue;
+            }
             let opts = GetOptions { range: Some(GetRange::Bounded(block_start..end)),
                 if_match: self.meta.e_tag.clone(), version: self.meta.version.clone(), ..Default::default() };
             let store = self.store.clone();
@@ -848,6 +1034,7 @@ impl RemoteSource {
             let remaining=context.deadline.saturating_duration_since(Instant::now());
             context.wire_budget.set_limit(context.requests_limit);
             let before_curl=context.curl_requests;
+            let mut feedback_guard=read_feedback::TransferGuard::new(context.feedback.clone());
             let network_started = Instant::now();
             #[cfg(all(feature="grok",unix))]
             let native = if let Some(builder)=self.curl.as_ref().filter(|_| {
@@ -930,7 +1117,8 @@ impl RemoteSource {
                 context.stats.bytes += data.len() as u64;context.stats.requests += 1;
                 if self.local_path.is_none(){self.read_profile.serial_counts(1,0);}
             }
-            let blocks=self.cache.put(&self.cache_key, self.block_size, block_start, &data);
+            context.feedback.fetched(block_start..end,data.len() as u64,network_started.elapsed().as_nanos().min(u128::from(u64::MAX)) as u64);feedback_guard.complete();
+            let blocks=self.cache.put_measured(&self.cache_key, self.block_size, block_start, &data,context.feedback.cost(block_start..end));
             if self.cache.effective_limit()<8*1024*1024 {context.recent.remember(self.block_size,&blocks);}
             if retain {context.pin_packet_blocks(blocks.into_iter().collect());}
             // Copy directly as a tiny configured cache may evict this block.
@@ -943,6 +1131,7 @@ impl RemoteSource {
     }
 
     fn read_header(&self, context: &mut ReadContext) -> Result<(Header, Arc<HeaderPayload>)> {
+        context.feedback.bind(self.read_profile.clone());context.feedback.bind_budget(context.wire_budget.clone());
         let previous=context.main_header;context.main_header=true;
         let result=self.read_header_inner(context);
         context.main_header=previous;result
@@ -1039,7 +1228,7 @@ impl RemoteSource {
         if width==0||height==0{return Err(header_constraint("image_dimensions",format!("JPEG2000 SIZ has empty dimensions: width={width}, height={height}"),serde_json::json!({"width":width,"height":height})));}
         if !(1..=16).contains(&components){return Err(header_constraint("component_count",format!("JPEG2000 SIZ component count {components} is unsupported; supported range is1..16"),serde_json::json!({"components":components,"supportedMinimum":1,"supportedMaximum":16,"width":width,"height":height})));}
         if siz.len()!=36+3*components{return Err(header_constraint("siz_length",format!("JPEG2000 SIZ length {} does not match Csiz={components} (expected {})",siz.len(),36+3*components),serde_json::json!({"sizPayloadBytes":siz.len(),"expectedPayloadBytes":36+3*components,"components":components,"width":width,"height":height})));}
-        let display_rgb_only=crate::display::rgb_only(components,&container);
+        let (display_rgb_only,band_fallback)=crate::display::mapping(components,&container).map_err(|reason| header_constraint("channel_layout",format!("Cannot determine a safe display mapping: {reason}"),serde_json::json!({"components":components,"jp2ChannelMetadata":structure::channel_metadata(&container)})))?;
         let bit_depth = (0..components).map(|i| (siz[36 + i * 3] & 0x7f) + 1).max().unwrap();
         if bit_depth>16{return Err(header_constraint("component_precision",format!("JPEG2000 component precision {bit_depth}bits exceeds supported16bits"),serde_json::json!({"maximumComponentPrecisionBits":bit_depth,"supportedMaximumBits":16,"components":components})));}
         ensure!(cod[5]<16&&cod[6]<=8&&cod[7]<=8,"unsupported resolution count or codeblock size");
@@ -1070,21 +1259,22 @@ impl RemoteSource {
         // Save the advertised locator and load it only when rendering needs it.
         let jpip_locator=if tlm.is_empty() && self.meta.size>env_limit("RIVER_S3_SMALL_OBJECT_BYTES",8*1024*1024) as u64 {jpip_locator.map(|locator|(locator,start))}else{None};
         let payload = Arc::new(HeaderPayload { main, container, tlm, jpip:vec![],jpip_locator });
-        Ok((Header { image_origin: (be32(&siz,10)?,be32(&siz,14)?), width, height, components: components as u8, display_rgb_only, bit_depth, levels,
+        Ok((Header { image_origin: (be32(&siz,10)?,be32(&siz,14)?), width, height, components: components as u8, display_rgb_only, band_fallback, bit_depth, levels,
             layers, layout, progression, is_ht,
             cod: descriptor_cod, first_part: cursor, codestream_end,
-            packet_compatible: compatible, prefix_compatible, payload_digest: payload.digest() }, payload))
+            packet_compatible: compatible, prefix_compatible, component_specs:siz[36..].chunks_exact(3).map(|c|[c[0],c[1],c[2]]).collect(), payload_digest: payload.digest() }, payload))
     }
 
     fn acquire_header(&self, context: &mut ReadContext) -> Result<Arc<HeaderPayload>> {
         if let Some(payload) = HeaderCache::shared().get(&self.id) { return Ok(payload); }
         let mut weak = lock_cancellable(&self.header_payload, context)?;
         if let Some(payload) = weak.upgrade() { return Ok(payload); }
+        let header_began=Instant::now();
         let (header, payload) = self.read_header(context)?;
         ensure!(header == self.header,
             "reloaded header differs from immutable snapshot");
         *weak = Arc::downgrade(&payload);
-        HeaderCache::shared().put(&self.id, payload.clone());
+        HeaderCache::shared().put_measured(&self.id, payload.clone(),header_began.elapsed().as_nanos().min(u64::MAX as u128) as u64);
         Ok(payload)
     }
     fn acquire_render_header(&self,context:&mut ReadContext)->Result<Arc<HeaderPayload>> {
@@ -1124,6 +1314,13 @@ impl RemoteSource {
             other=>other,
         }
     }
+    // read_blocks can consume complete probe bytes on their original grid.
+    // Header prefetch is advisory: eviction falls back to the ordinary reader.
+    fn probe_covers_header(&self, range: &Range<u64>) -> bool {
+        self.block_size != BLOCK && range.end <= INITIAL_PROBE
+            && (range.start / BLOCK..range.end.div_ceil(BLOCK))
+                .all(|i| self.cache.contains(&self.cache_key, BLOCK, i * BLOCK))
+    }
     fn selected_parts_inner(&self, selected: &HashSet<u16>, payload: &HeaderPayload, scan_ahead: u64, selected_prefix: u64, complete_parts:bool, whole_view:bool, context: &mut ReadContext) -> Result<Vec<TilePart>> {
         let before = context.stats.clone();
         let span = tracing::Span::current();
@@ -1138,14 +1335,13 @@ impl RemoteSource {
             tracing::info!(context=context.trace_id,optimization="direct_tile_part_lookup",index_source="tlm",parts=payload.tlm.len(),action="validate_selected_sot","Using file tile-part index");
         }
         if !payload.tlm.is_empty() && payload.tlm.iter().all(|(tile, _)| tile.is_some()) {
-            span.record("index_source", "tlm");
+            crate::tile_diagnostics::index("tlm"); span.record("index_source","tlm");
             let mut offset = header.first_part;
             let mut parts = vec![];
             let candidates = payload.tlm.iter().zip(&tlm_offsets).filter(|((tile,_),_)| selected.contains(&tile.unwrap())).collect::<Vec<_>>();
             // Only widen the existing large reduced-preview probe. Deep tiles,
-            // small layouts, progressive views and SOT fallback keep their lanes.
+            // small layouts and SOT fallback keep their lanes.
             let wide_still_probe = whole_view && !complete_parts
-                && context.progressive_final_reduction.is_none()
                 && selected.len() >= 128 && payload.tlm.len() <= 512
                 && self.block_size == 1024 && selected_prefix >= 8 * self.block_size;
             // The first tile's cached PLT size can justify reading a second
@@ -1154,7 +1350,7 @@ impl RemoteSource {
             let plt_header_hint = if !whole_view && !complete_parts && selected_prefix == 14
                 && candidates.len() == 1 && payload.tlm.len() <= 512
                 && header.packet_compatible && header.progression == 2 && (5..=7).contains(&header.levels)
-                && self.block_size == 1024 && context.progressive_final_reduction.is_none()
+                && self.block_size == 1024
                 && (18_000..u64::MAX).contains(&self.discovery_latency_us())
                 && context.limit.saturating_sub(context.stats.bytes) >= 2 * self.block_size
                 && policy.mode == crate::read_policy::Mode::Adaptive && policy.max_overfetch_ratio >= 2
@@ -1198,7 +1394,7 @@ impl RemoteSource {
                     let two_blocks = 2 * self.block_size - offset % self.block_size;
                     let length = selected_prefix.max(12).max(plt_header_hint.unwrap_or(0).min(two_blocks));
                     (true, offset..(offset + length).min(offset + u64::from(entry.1)))
-                }).collect::<Vec<_>>()};
+                }).filter(|(_, range)| !self.probe_covers_header(range)).collect::<Vec<_>>()};
                 context.indexed_still_headers = wide_still_probe;
                 let leases = self.prefetch_ranges(&spans,context,usize::MAX);
                 context.indexed_still_headers = false;
@@ -1221,12 +1417,12 @@ impl RemoteSource {
         }
         if !payload.jpip.is_empty() {
             match self.jpip_selected_parts(&payload.jpip,selected,selected_prefix,complete_parts,context) {
-                Ok(parts)=>{span.record("index_source","jpip-tpix");crate::source_admission::index_finished();return Ok(parts);}
+                Ok(parts)=>{crate::tile_diagnostics::index("jpip-tpix"); span.record("index_source","jpip-tpix");crate::source_admission::index_finished();return Ok(parts);}
                 Err(error)=>{context.check()?;tracing::info!(context=context.trace_id,optimization="embedded_tile_part_lookup",reason=%error,action="bounded_discovery","Optional JPIP index rejected by source validation");}
             }
         }
         if let Some(parts)=index_cache::ready(&self.id,header,self.meta.size,selected) {
-            span.record("index_source","published-prefix");
+            crate::tile_diagnostics::index("published-prefix"); span.record("index_source","published-prefix");
             tracing::info!(context=context.trace_id,optimization="learned_tile_part_index",index_source="published_prefix",selected_parts=parts.len(),action="reuse_validated_offsets","Reusing learned tile-part offsets");
             crate::source_admission::index_finished();
             return Ok(parts);
@@ -1249,7 +1445,9 @@ impl RemoteSource {
             tracing::info!(context=context.trace_id,optimization="direct_tile_part_lookup",reason="no_usable_tlm",action="discover_sot_offsets", "File index optimization unavailable; using bounded discovery");
         }
         let anonymous_tlm = payload.tlm.iter().any(|(tile,_)| tile.is_none());
-        span.record("index_source", if anonymous_tlm { "tlm-offsets" } else if backed { "metadata-cache" } else if previous_count > 0 { "retained" } else { "cold-sot" });
+        let index_source = if anonymous_tlm { "tlm-offsets" } else if backed { "metadata-cache" } else if previous_count > 0 { "retained" } else { "cold-sot" };
+        crate::tile_diagnostics::index(index_source);
+        span.record("index_source",index_source);
         let mut speculative=lock_cancellable(&self.speculative_index,context)?;
         let index_shards::State {attempted,lanes,last_calibration}=&mut *speculative;
         let mut prefetched_until = 0;
@@ -1279,21 +1477,13 @@ impl RemoteSource {
              // Use a shorter calibration only after this request has observed
              // four physical reads and a clearly nonlocal source latency.
              let latency = self.discovery_latency_us();
-             let early_progressive = context.progressive_final_reduction.is_some()
-                 && !context.explicit_request_limit
-                 && settings.mode == crate::read_policy::Mode::Adaptive
-                 && context.stats.requests >= 4
-                 && (7000..u64::MAX).contains(&latency)
-                 && !std::env::var("RIVER_S3_PROGRESSIVE_EARLY_DISCOVERY")
-                     .is_ok_and(|value| value == "0" || value.eq_ignore_ascii_case("false"));
-             let early_standalone = context.progressive_final_reduction.is_none()
-                 && whole_view && !context.explicit_request_limit
+             let early_standalone = whole_view && !context.explicit_request_limit
                  && settings.mode == crate::read_policy::Mode::Adaptive
                  && context.stats.requests >= 4
                  && (7000..u64::MAX).contains(&latency)
                  && u64::from(header.layout.columns) * u64::from(header.layout.rows) >= 128
                  && std::env::var("RIVER_S3_EARLY_STANDALONE_DISCOVERY").map_or(true, |value| value == "1");
-             if let Some(calibrated_reads)=index_shards::calibration_reads(last_calibration,context.stats.requests,reuse || early_progressive || early_standalone) {
+             if let Some(calibrated_reads)=index_shards::calibration_reads(last_calibration,context.stats.requests,reuse || early_standalone) {
                 match index_shards::calibration(u64::from(header.layout.columns)*u64::from(header.layout.rows),calibrated_reads,self.discovery_latency_us()) {
                     index_shards::Calibration::Fast=>{},
                     index_shards::Calibration::Waiting=>{},
@@ -1319,7 +1509,7 @@ impl RemoteSource {
             context.trace_index=Some(position);
             let cached_sot = (index.cursor/self.block_size..index.cursor.saturating_add(12).div_ceil(self.block_size))
                 .all(|block| { let offset = block*self.block_size;
-                    context.pinned.contains_key(&offset) || context.recent.contains(self.block_size,offset) || self.cache.get(&self.cache_key,self.block_size,offset).is_some() });
+                    context.pinned.contains_key(&offset) || context.recent.contains(self.block_size,offset) || self.cache.contains(&self.cache_key,self.block_size,offset) });
             if anonymous_tlm && !cached_sot && position >= prefetched_until && position < tlm_offsets.len() {
                 let end = (position+16).min(tlm_offsets.len());
                 let spans = tlm_offsets[position..end].iter().map(|&offset| (true,offset..offset+12)).collect::<Vec<_>>();
@@ -1327,7 +1517,6 @@ impl RemoteSource {
                 context.pin_packet_blocks(leases);
                 prefetched_until = end;
             }
-            let scan_ahead=self.progressive_probe(scan_ahead,u64::from(header.layout.columns)*u64::from(header.layout.rows),context);
             if !cached_sot && (!lanes.is_empty() || (*attempted && primary_chunks && self.deep_index_depth(whole_view,context)>1)) {self.advance_index_lanes(lanes,index.cursor,scan_ahead,&pending,selected.len() as u64==u64::from(header.layout.columns)*u64::from(header.layout.rows),context)?;if lanes.iter().any(|lane|lane.parts.iter().any(|part|part.offset==index.cursor)) {continue;}}
             // A prior probe can already contain another small tile's SOT and
             // its complete low-resolution payload. Do not extend that cached
@@ -1459,16 +1648,18 @@ impl RemoteSource {
     /// Returns a valid compressed subset in the shared decoder filesystem.
     /// Original packet bytes are retained; unused packets become empty packets.
     pub fn prepare_gpu_preview(&self,reduction:u8,layers:u32,context:&mut ReadContext)->Result<Option<PreparedSubset>> {
+        context.feedback.payload();
         // Keep the original low-resolution entropy, with bounded geometry.
         let payload=self.acquire_render_header(context)?;
         self.prepare_single_prefix(&payload,reduction,layers,context)
     }
     pub fn prepare(&self, tiles: &[(u32, u32)], source_tile: u32, reduction: u8, layers: u32, whole_view: bool, complete_grid: bool,
         context: &mut ReadContext) -> Result<PreparedSubset> {
+        context.feedback.payload();
         let _source_preparation=self.read_profile.preparation();
         let mut total=SourceProfile::new(context);
         let result=self.prepare_inner(tiles,source_tile,reduction,layers,whole_view,complete_grid,context);
-        profile_stage("total",context,&mut total);
+        profile_stage("source_total",context,&mut total);
         result
     }
     fn prepare_inner(&self, tiles: &[(u32, u32)], source_tile: u32, reduction: u8, layers: u32, whole_view: bool, complete_grid: bool,
@@ -1477,17 +1668,30 @@ impl RemoteSource {
         let mut profile = SourceProfile::new(context);
         ensure!(reduction < h.levels, "unsupported remote resolution");
         ensure!(!complete_grid || h.image_origin == (0,0), "GPU range subset needs a zero-origin reference grid");
-        let payload = self.acquire_render_header(context)?;
+        // Finish a stage before propagating errors or taking a fast return.
+        macro_rules! source_stage {
+            ($name:literal, $work:expr) => {{
+                let value = $work;
+                profile_stage($name, context, &mut profile);
+                value
+            }};
+        }
+        let payload = source_stage!("source_main_header", self.acquire_render_header(context))?;
         let selected=self.native_selection(tiles,source_tile)?;
+        if context.allow_codeblock_roi && !context.explicit_request_limit && !complete_grid && (!whole_view || reduction>0) && selected.len() == 1 {
+            if let Some(view) = source_stage!("source_codeblock_view", self.codeblock_view(&payload, tiles, source_tile, reduction, false, context))? {
+                return Ok(view);
+            }
+        }
         if !complete_grid {
-            if whole_view {if let Some(prepared)=self.prepare_sequential_plt_prefix(&payload,reduction,layers,context)? {return Ok(prepared);}}
-            if let Some(prepared)=self.prepare_index_only_prefix(&payload,reduction,layers,context)? {return Ok(prepared);}
-            if let Some(prepared)=self.prepare_single_prefix(&payload,reduction,layers,context)? {return Ok(prepared);}
+            if whole_view {if let Some(prepared)=source_stage!("source_sequential_plt_prefix", self.prepare_sequential_plt_prefix(&payload,reduction,layers,context))? {return Ok(prepared);}}
+            if let Some(prepared)=source_stage!("source_index_only_prefix", self.prepare_index_only_prefix(&payload,reduction,layers,context))? {return Ok(prepared);}
+            if let Some(prepared)=source_stage!("source_single_prefix", self.prepare_single_prefix(&payload,reduction,layers,context))? {return Ok(prepared);}
         }
         let roi=precinct_roi::Selection::new(h,tiles,source_tile,reduction,context).filter(|roi| !selected.iter().all(|&tile|roi.covers(h.tile_bounds(tile))));
-        if !complete_grid {if let Some(roi)=roi.as_ref() {if let Some(prepared)=self.prepare_streamed_single_roi(&payload,reduction,layers,roi,context)? {return Ok(prepared);}}}
-        if !complete_grid && roi.is_none() {if let Some(prepared)=self.prepare_multipart_prefix(&selected,&payload,reduction,layers,context)? {return Ok(prepared);}}
-        if !complete_grid && roi.is_none() {if let Some(prepared)=self.prepare_unindexed_coarse_prefix(&selected,&payload,reduction,layers,context)? {return Ok(prepared);}}
+        if !complete_grid {if let Some(roi)=roi.as_ref() {if let Some(prepared)=source_stage!("source_streamed_single_roi", self.prepare_streamed_single_roi(&payload,reduction,layers,roi,context))? {return Ok(prepared);}}}
+        if !complete_grid && roi.is_none() {if let Some(prepared)=source_stage!("source_multipart_prefix", self.prepare_multipart_prefix(&selected,&payload,reduction,layers,context))? {return Ok(prepared);}}
+        if !complete_grid && roi.is_none() {if let Some(prepared)=source_stage!("source_unindexed_coarse_prefix", self.prepare_unindexed_coarse_prefix(&selected,&payload,reduction,layers,context))? {return Ok(prepared);}}
         let rebase=if !complete_grid {roi.as_ref().and_then(|roi|roi.rebase(h))}else{None};
         #[cfg(all(feature="grok",unix))]
         if context.pipeline_requested && rebase.is_none() {
@@ -1500,7 +1704,8 @@ impl RemoteSource {
             let leases = self.prefetch_packets(&spans, context)?;
             context.pin_small_object(leases);
             let bytes = self.read(0..self.meta.size, context)?;
-            return Ok(PreparedSubset {view_reduction:0,technical_origin:None,bytes, route: "s3-required-object-ranges", jp2: !payload.container.is_empty(),
+            profile_stage("source_whole_object", context, &mut profile);
+            return Ok(PreparedSubset {view_reduction:0,technical_origin:None,bytes: bytes.into(), route: "s3-required-object-ranges", jp2: !payload.container.is_empty(),
                 width: h.width, height: h.height, layout: h.layout, offset_x: 0, offset_y: 0 });
         }
         let x_min = selected.iter().map(|&tile| u32::from(tile) % h.layout.columns).min().unwrap();
@@ -1557,9 +1762,6 @@ impl RemoteSource {
         let lowest_prefix_probe = if fuse_lowest_prefix {
             env_limit("RIVER_S3_COLD_PREFIX_PROBE_BYTES",2048).clamp(64,4096) as u64
         } else {14};
-        context.progressive_prefix_probe=if fuse_lowest_prefix && u64::from(h.layout.columns)*u64::from(h.layout.rows)>=128 {
-            progressive_prefix::target(h.levels,reduction,context.progressive_final_reduction)
-        }else{None};
         let cold_probe = whole_view && fuse_lowest_prefix;
         let ll_window = self.ll_initial_window_estimate();
         context.wide_index_pilot = cold_probe
@@ -1603,42 +1805,74 @@ impl RemoteSource {
             && (1..=512).contains(&payload.tlm.len()) && payload.tlm.iter().all(|(tile, _)| tile.is_some())
             && (self.cache.effective_limit() as u64) >= 8 * 1024 * 1024
             && std::env::var("RIVER_S3_TLM_REDUCED_PREFIX").map_or(true, |value| value == "1");
-        let progressive_indexed_prefix = if whole_view && h.prefix_compatible && !h.is_ht
-            && (h.layers == 1 || layers == 1) && self.block_size == 1024
-            && (1..=512).contains(&payload.tlm.len()) && payload.tlm.iter().all(|(tile, _)| tile.is_some())
-            && self.cache.effective_limit() >= 8 * 1024 * 1024
-            && std::env::var("RIVER_TRIAL_TLM_PROGRESSIVE_PREFIX").is_ok_and(|value| value == "1")
-        {
-            progressive_prefix::target(h.levels, reduction, context.progressive_final_reduction)
-                .map(|target| target.min(8 * self.block_size + 14))
-        } else {
-            None
-        };
-        let selected_prefix = if let Some(prefix) = progressive_indexed_prefix {
-            lowest_prefix_probe.max(prefix)
-        } else if indexed_coarse_probe {
+        let selected_prefix = if indexed_coarse_probe {
             lowest_prefix_probe.max(prefix_read_ahead(wanted) + 14)
         } else if indexed_adjacent_probe {
             lowest_prefix_probe.max(self.block_size + 12)
         } else {
             lowest_prefix_probe
         };
-        context.indexed_progressive_headers = progressive_indexed_prefix.is_some()
-            && std::env::var("RIVER_TRIAL_TLM_PROGRESSIVE_WIDE_LANES").is_ok_and(|value| value == "1");
+        profile_stage("source_plan",context,&mut profile);
+        // Only unchanged native tile parts may be shared between different WMTS
+        // coordinates. A reduced, cropped or precinct-specific view is not interchangeable.
+        let native_view = (retain_native_parts && !complete_grid && !crop && selected.len() == 1
+            && (h.layout.width > source_tile || h.layout.height > source_tile)
+            && context.allow_codeblock_roi && self.cache.effective_limit() > 0)
+            .then(|| *selected.iter().next().unwrap());
+        // Normal range entries always have a positive alignment. Zero identifies
+        // a complete decoder input in the same versioned, pressure-trimmed LRU.
+        let cached_native_view = |tile: u16| {
+            let bytes = self.cache.get(&self.cache_key, 0, u64::from(tile))?;
+            Some(PreparedSubset { bytes: axum::body::Bytes::from_owner(bytes), jp2: !payload.container.is_empty(),
+                route: "s3-shared-native-view", view_reduction: 0, technical_origin: None,
+                width, height, layout, offset_x, offset_y })
+        };
+        if let Some(view) = native_view.and_then(cached_native_view) {
+            context.stats.cache_bytes += view.bytes.len() as u64;
+            context.finish_index_ranges(allowance);
+            profile_stage("source_shared_native_view", context, &mut profile);
+            return Ok(view);
+        }
+        if retain_native_parts && self.meta.size > env_limit("RIVER_S3_COMPATIBILITY_BYTES", 2 << 30) as u64
+            && std::env::var_os("RIVER_S3_REQUEST_BYTES").is_none()
+        {
+            // A complete native part can be cheaper than materializing a multi-GiB
+            // object. Only use the compressed-input allowance reserved for this lane.
+            let plan = crate::resources::plan();
+            context.limit = context.limit.max((plan.request_reserve_bytes / plan.source_io_concurrency) as u64);
+        }
         let parts = self.selected_parts(&selected, &payload, scan_ahead, selected_prefix, retain_native_parts, whole_view, context);
-        context.indexed_progressive_headers = false;
         let index_credit=context.finish_index_ranges(allowance);
+        profile_stage("source_index",context,&mut profile);
         let parts=parts?;
-        profile_stage("index",context,&mut profile);
+        let native_view = native_view.filter(|_| {
+            let required = parts.iter().map(|part| part.length).sum::<u64>()
+                + payload.main.len() as u64 + payload.container.len() as u64 + 10;
+            required <= self.cache.effective_limit() as u64 && required <= context.limit
+        });
+        let flight = native_view.map(|tile| {
+            let mut flights = self.native_view_flights.lock().unwrap_or_else(|e| e.into_inner());
+            flights.retain(|_, flight| flight.strong_count() > 0);
+            if let Some(existing) = flights.get(&tile).and_then(std::sync::Weak::upgrade) { return existing; }
+            let new = Arc::new(Mutex::new(()));
+            flights.insert(tile, Arc::downgrade(&new));
+            new
+        });
+        let _flight = flight.as_ref().map(|gate| lock_cancellable(gate,context)).transpose()?;
+        if let Some(view) = native_view.and_then(cached_native_view) {
+            context.stats.cache_bytes += view.bytes.len() as u64;
+            profile_stage("source_shared_native_view", context, &mut profile);
+            return Ok(view);
+        }
         let discovered_tiles: HashSet<_> = parts.iter().map(|part| part.tile).collect();
         ensure!(selected.is_subset(&discovered_tiles), "missing requested JPEG 2000 tile parts");
         if learned_prefix_candidate {
-            if let Some(prepared)=self.prepare_discovered_multipart_prefix(&selected,&payload,&parts,reduction,layers,context)? {return Ok(prepared);}
+            if let Some(prepared)=source_stage!("source_discovered_prefix", self.prepare_discovered_multipart_prefix(&selected,&payload,&parts,reduction,layers,context))? {return Ok(prepared);}
         }
         #[cfg(all(feature="grok",unix))] {
             self.pipeline_final(&parts,context,payload_base,index_credit)?;
-            if self.resolve_pipeline(context)? {
-                return Ok(PreparedSubset {view_reduction:0,technical_origin:None,bytes:vec![],jp2:false,route:"s3-packet-ranges",width,height,layout,offset_x,offset_y});
+            if source_stage!("source_pipeline", self.resolve_pipeline(context))? {
+                return Ok(PreparedSubset {view_reduction:0,technical_origin:None,bytes: (vec![]).into(),jp2:false,route:"s3-packet-ranges",width,height,layout,offset_x,offset_y});
             }
         }
         // A spatial mask cannot skip packets without their lengths. At full
@@ -1653,7 +1887,7 @@ impl RemoteSource {
             }
             retain_native_parts=unindexed;
         }
-        if !complete_grid {if let Some(prepared)=self.prepare_multipart(&parts,&payload,reduction,layers,roi.as_ref(),context)? {return Ok(prepared);}}
+        if !complete_grid {if let Some(prepared)=source_stage!("source_multipart", self.prepare_multipart(&parts,&payload,reduction,layers,roi.as_ref(),context))? {return Ok(prepared);}}
         if let Some(window)=rebase {
             if parts.len()==1 && parts[0].ordinal==0 && parts[0].total<=1 {
                 let part=&parts[0];
@@ -1686,7 +1920,8 @@ impl RemoteSource {
                         let mut container=payload.container.clone();resize_jp2(&mut container,window.width(),window.height())?;
                         container.extend(u32::try_from(main.len()+8)?.to_be_bytes());container.extend(b"jp2c");container.extend(main);container
                     }else{main};
-                    return Ok(PreparedSubset {view_reduction:0,technical_origin:Some((window.x0,window.y0)),bytes,jp2,route:"s3-precinct-window-ranges",width:h.width,height:h.height,layout:h.layout,offset_x:0,offset_y:0});
+                    profile_stage("source_precinct_window", context, &mut profile);
+                    return Ok(PreparedSubset {view_reduction:0,technical_origin:Some((window.x0,window.y0)),bytes: bytes.into(),jp2,route:"s3-precinct-window-ranges",width:h.width,height:h.height,layout:h.layout,offset_x:0,offset_y:0});
                 }}
             }
         }
@@ -1699,6 +1934,7 @@ impl RemoteSource {
                 let leases=self.prefetch_ranges(&spans,context,usize::MAX)?;
                 context.pin_packet_blocks(leases);
             }
+            profile_stage("source_payload", context, &mut profile);
         } else {
         // Persisted/TLM offsets let cold processes overlap tile-header reads.
         // A fresh sequential traversal has already cached these blocks.
@@ -1709,7 +1945,7 @@ impl RemoteSource {
         let mut header_spans: Vec<_> = parts.iter().map(|part| {
             let cached_sot = (part.offset/self.block_size..part.offset.saturating_add(14).div_ceil(self.block_size))
                 .all(|block| {let offset=block*self.block_size;
-                    context.pinned.contains_key(&offset) || context.recent.contains(self.block_size,offset) || self.cache.get(&self.cache_key,self.block_size,offset).is_some()});
+                    context.pinned.contains_key(&offset) || context.recent.contains(self.block_size,offset) || self.cache.contains(&self.cache_key,self.block_size,offset)});
             // A persisted index removes SOT traversal, but a header-only probe
             // would then require another RTT for nearly every LL packet body.
             // Match the bounded cold-walk prefix for supported single-part views,
@@ -1725,11 +1961,12 @@ impl RemoteSource {
             header_spans=parts.iter().map(|part| {
                 let cached_sot=(part.offset/self.block_size..part.offset.saturating_add(14).div_ceil(self.block_size))
                     .all(|block| {let offset=block*self.block_size;
-                        context.pinned.contains_key(&offset) || context.recent.contains(self.block_size,offset) || self.cache.get(&self.cache_key,self.block_size,offset).is_some()});
+                        context.pinned.contains_key(&offset) || context.recent.contains(self.block_size,offset) || self.cache.contains(&self.cache_key,self.block_size,offset)});
                 let bytes=known_header_probe(cached_sot,fuse_lowest_prefix.then_some(lowest_prefix_probe),None,part);
                 (true,part.offset..part.offset.saturating_add(bytes).min(part.offset+part.length))
             }).collect();
         }
+        header_spans.retain(|(_, range)| !self.probe_covers_header(range));
         let header_leases = self.prefetch_ranges(&header_spans, context, usize::MAX);
         context.saved_index_headers = false;
         let header_leases = header_leases?;
@@ -1778,15 +2015,15 @@ impl RemoteSource {
         }
         let prefix_leases = self.prefetch_ranges(&prefix_spans, context, usize::MAX)?;
         if self.cache.effective_limit()<8*1024*1024 {context.pin_packet_blocks(prefix_leases);}
-        profile_stage("headers",context,&mut profile);
+        profile_stage("source_headers",context,&mut profile);
         self.prefetch_lowest_prefixes(&lowest_prefixes, context)?;
-        profile_stage("prefix",context,&mut profile);
+        profile_stage("source_prefix",context,&mut profile);
         self.prefetch_plt_packets(&parts,reduction,layers,roi.as_ref(),context)?;
-        profile_stage("plt",context,&mut profile);
+        profile_stage("source_plt",context,&mut profile);
         }
         #[cfg(all(feature="grok",unix))] self.pipeline_final(&parts,context,payload_base,index_credit)?;
         if let Some(view)=self.prepare_reduced_prefix_view(&parts,&payload,reduction,whole_view,complete_grid,context)? {
-            profile_stage("reduced-view",context,&mut profile);return Ok(view);
+            profile_stage("source_reduced_view",context,&mut profile);return Ok(view);
         }
         let mut codestream = payload.main.clone();
         if crop { resize_siz(&mut codestream, width, height)?; }
@@ -1823,7 +2060,9 @@ impl RemoteSource {
                         spans.push((keep, offset..end)); offset = end;Ok(())
                     })?;
                     ensure!(offset == part.offset + part.length as u64, "PLT lengths do not cover the tile payload");
-                    self.selected_payload(&spans, context)?
+                    if reduction==0 && layers==0 && parts.len()==1 && tiles.len()==1 && !crop {
+                        self.layered_payload(&payload.main,&tile_header,part,&spans,tiles[0],source_tile,context)?
+                    } else {self.selected_payload(&spans, context)?}
                 } else if h.prefix_compatible && reduction > 0 && part.total <= 1 && (h.layers == 1 || layers == 1) {
                     let (packets, total) = self.ordered_packets(part.tile, Some(h.levels - 1 - reduction), context)?;
                     if let Some(bytes) = self.prefix_payload(part, payload_start, &packets, total, reduction, roi.as_ref(),context)? { bytes }
@@ -1861,6 +2100,15 @@ impl RemoteSource {
             bytes.extend(codestream);
             bytes
         } else { codestream };
+        let bytes = match native_view.filter(|_| retain_native_parts && bytes.len() <= self.cache.effective_limit()) {
+            Some(tile) => {
+                let data: Arc<[u8]> = bytes.into();
+                self.cache.insert_native_view(&self.cache_key, tile, data.clone());
+                axum::body::Bytes::from_owner(data)
+            }
+            None => bytes.into(),
+        };
+        profile_stage("source_assemble",context,&mut profile);
         Ok(PreparedSubset {view_reduction:0,technical_origin:None,bytes, jp2, route: if packet_subset { "s3-packet-ranges" } else { "s3-tile-part-ranges" },
             width, height, layout, offset_x, offset_y })
     }
@@ -1907,6 +2155,7 @@ impl RemoteSource {
             // Bound request-local metadata retention; oversized plans keep the
             // existing per-part reader instead of fetching data twice.
             if !context.can_pin_ranges(self.block_size,&spans) && (self.cache.effective_limit() as u64)<context.limit {return Ok(());}
+            spans.retain(|(_, range)| !self.probe_covers_header(range));
             let leases=self.prefetch_ranges(&spans,context,usize::MAX)?;
             context.pin_packet_blocks(leases);active=next;
         }
@@ -1937,6 +2186,7 @@ impl RemoteSource {
     fn tile_header(&self, part: &TilePart, context: &mut ReadContext) -> Result<ParsedTileHeader> {
         context.check()?;
         if let Some(header)=self.cached_tile_header(part,context) {return Ok(header);}
+        let header_began=Instant::now();
         ensure!(self.part_at(part.offset, context)? == *part, "cached tile-part index disagrees with source SOT");
         let mut cursor = part.offset + 12;
         let mut header = vec![];
@@ -1963,7 +2213,8 @@ impl RemoteSource {
             let policy=crate::read_policy::settings();
             let complete=part.ordinal==0 && (part.total==1 || (part.total==0 && part.offset+part.length==self.header.codestream_end.saturating_sub(2)));
             let packets=if code==0xff58 && complete && compatible && self.header.packet_compatible {tile_packet_count(&self.header,part.tile).unwrap_or(0)}else{0};
-            let cached=header_window_prefix(cursor..required_end,&ahead).len() as u64==required_end-cursor;
+            let cached=self.probe_covers_header(&(cursor..required_end))
+                || header_window_prefix(cursor..required_end,&ahead).len() as u64==required_end-cursor;
             let read_end=if cached {required_end}else{plt_read_ahead_end(cursor,required_end,part.offset+part.length,part.offset+MAX_HEADER as u64,
                 packets,policy.mode==crate::read_policy::Mode::Adaptive,self.planning_latency_us(),
                 u64::from(policy.max_overfetch_ratio).min(crate::read_policy::explicit_overfetch_cap().unwrap_or(16)),context.limit.saturating_sub(context.stats.bytes))};
@@ -1993,7 +2244,11 @@ impl RemoteSource {
             tracing::info!(context=context.trace_id,tile=part.tile,optimization="packet_length_lookup",reason="tile_part_has_no_plt",action="try_inline_or_tile_part_reads","File packet index optimization unavailable; using alternate read path");
         }
         let parsed=(header,cursor,lengths,compatible);
-        if parsed.2.as_ref().is_some_and(|v|!v.is_empty()) {tile_header_cache::Cache::shared().put(&self.id,part,&parsed);}
+        // Later quality passes also need the validated payload offset and coding
+        // markers for tile parts without a usable packet-length table.
+        tile_header_cache::Cache::shared().put_measured(
+            &self.id, part, &parsed, header_began.elapsed().as_nanos().min(u64::MAX as u128) as u64,
+        );
         let bytes=parsed.0.capacity()+parsed.2.as_ref().map_or(0,|v|v.capacity()*8)+128+std::mem::size_of::<TilePart>();
         if context.tile_headers.len()<16384 && context.admit_metadata(bytes) {context.tile_headers.insert(part.offset,(part.clone(),parsed.clone()));}
         Ok(parsed)
@@ -2051,6 +2306,9 @@ impl RemoteSource {
                 .map(|(&offset,bytes)|(offset,bytes.clone())).collect();
             context.pin_packet_blocks(blocks);
         }
+        self.assemble_payload(spans,&leases,context)
+    }
+    fn assemble_payload(&self,spans:&[(bool,Range<u64>)],leases:&HashMap<u64,Arc<[u8]>>,context:&ReadContext)->Result<Vec<u8>> {
         let fill=1+usize::from(self.header.cod[0]&2!=0)*6+usize::from(self.header.cod[0]&4!=0)*2;
         let capacity=spans.iter().try_fold(0usize,|n,(keep,range)|n.checked_add(if *keep {usize::try_from(range.end-range.start).ok()?}else{fill}))
             .context("prepared packet size overflow")?;
@@ -2079,23 +2337,34 @@ impl RemoteSource {
     }
 
     #[track_caller]
-    fn prefetch_execution(&self,ranges:&[Range<u64>],payload:bool)->(usize,bool) {
+    fn prefetch_execution(&self,ranges:&[Range<u64>],_payload:bool)->(usize,bool) {
         let bytes=ranges.iter().map(|r|r.end-r.start).sum();
         let native=u64::from(self.header.layout.columns)*u64::from(self.header.layout.rows);
         let latency=self.planning_latency_us();
         let automatic=std::env::var("RIVER_S3_RANGE_TASKS").unwrap_or_else(|_|"auto".into())=="auto"
             && native>1024 && ranges.len()>=4 && bytes<=16*1024*1024 && latency<2000
             && crate::source_admission::active_preparations()<=1 && self.runtime.metrics().num_workers()>=4;
-        let default=if automatic {16}else if payload {payload_range_concurrency(native==1,self.block_size,bytes,ranges,latency)}
-            else {range_concurrency(self.block_size,bytes,ranges,latency)};
-        (env_limit("RIVER_S3_RANGE_CONCURRENCY",default).clamp(1,16),automatic)
+        let default=self.read_profile.dispatch(ranges.len(),bytes);
+        (env_limit("RIVER_S3_RANGE_CONCURRENCY",default).max(1).min(crate::read_policy::settings().effective_source_requests()),automatic)
     }
     #[track_caller]
     fn prefetch_ranges(&self, spans: &[(bool, Range<u64>)], context: &mut ReadContext, max_ranges: usize) -> Result<HashMap<u64, Arc<[u8]>>> {
+        if max_ranges == 48 {
+            for (_, range) in spans.iter().filter(|(keep, _)| *keep) {
+                context.feedback.need(range.clone());
+            }
+        }
         self.prefetch_ranges_inner(spans,context,max_ranges,RangePass::Initial)
+    }
+    fn prefetch_codeblocks(&self, spans: &[(bool, Range<u64>)], context: &mut ReadContext) -> Result<HashMap<u64, Arc<[u8]>>> {
+        for (_, range) in spans.iter().filter(|(keep, _)| *keep) {
+            context.feedback.need(range.clone());
+        }
+        self.prefetch_ranges_inner(spans, context, 48, RangePass::IndexedCodeblocks)
     }
     #[track_caller]
     fn prefetch_ranges_inner(&self, spans: &[(bool, Range<u64>)], context: &mut ReadContext, max_ranges: usize, pass:RangePass) -> Result<HashMap<u64, Arc<[u8]>>> {
+        context.feedback.bind(self.read_profile.clone());context.feedback.bind_budget(context.wire_budget.clone());
         // Cached preview work must not queue behind another index-walk GET.
         context.check()?;
         let mut hits=HashMap::new();
@@ -2108,11 +2377,13 @@ impl RemoteSource {
                 else {complete=false;break 'cached;}
             }
         }
-        if complete {context.stats.cache_bytes+=hits.values().map(|v|v.len() as u64).sum::<u64>();return Ok(hits);}
+        if complete {if let Some(tx)=&context.ready_blocks {let _=tx.send(hits.iter().map(|(&offset,data)|(offset,data.clone())).collect());} context.stats.cache_bytes+=hits.values().map(|v|v.len() as u64).sum::<u64>();return Ok(hits);}
         #[cfg(all(feature="grok",unix))] if context.cache_only {return Err(pipeline::PrefixNotCached.into());}
-        let _fetch = self.fetch_admission(context)?;
         let mut blocks = BTreeSet::new();
-        let mut leases = HashMap::new();
+        // Keep the preview blocks leased by the fast path across admission.
+        // Recheck missing blocks because concurrent requests may have filled them.
+        context.stats.cache_bytes += hits.values().map(|bytes| bytes.len() as u64).sum::<u64>();
+        let mut leases = hits;
         for (_, range) in spans.iter().filter(|(keep, _)| *keep) {
             for block in range.start / self.block_size..range.end.div_ceil(self.block_size) {
                 let offset = block * self.block_size;
@@ -2124,6 +2395,10 @@ impl RemoteSource {
                 } else { blocks.insert(offset); }
             }
         }
+        if let Some(tx)=&context.ready_blocks {
+            let _=tx.send(leases.iter().map(|(&offset,data)|(offset,data.clone())).collect());
+        }
+        let demanded = if max_ranges==48 {Some(blocks.clone())}else{None};
         let settings=crate::read_policy::settings();
         let mut contiguous=crate::read_policy::contiguous_decision(&settings,&self.read_profile.snapshot());
         let mut ranges=contiguous_block_ranges(blocks.iter().copied(),self.block_size,self.meta.size,1024*1024);
@@ -2142,7 +2417,12 @@ impl RemoteSource {
         ensure!(ranges.is_empty() || quota > 0, "S3 range request limit exceeded");
         let useful_bytes:u64=ranges.iter().map(|r|r.end-r.start).sum();
         let adaptive_prefix=max_ranges==ADAPTIVE_PREFIX_RANGES && crate::read_policy::settings().mode==crate::read_policy::Mode::Adaptive;
-        if pass == RangePass::Initial && max_ranges==48 && settings.mode==crate::read_policy::Mode::Adaptive {
+        // A sparse tile has an exact codeword plan. Its normal bounded GETs
+        // provide calibration for subsequent tiles without a serial sample
+        // barrier. Honor an explicitly requested payload cost refresh.
+        let sample_payload = pass == RangePass::Initial
+            || (pass == RangePass::IndexedCodeblocks && settings.effective_refresh_payload_costs());
+        if sample_payload && max_ranges==48 && settings.mode==crate::read_policy::Mode::Adaptive {
             let observation=self.read_profile.snapshot();
             let mature=observation.samples>=u64::from(settings.minimum_samples) && observation.throughput_samples>=3;
             let latency=if mature {self.planning_latency_us()}else{self.minimum_range_latency_us()};
@@ -2154,7 +2434,7 @@ impl RemoteSource {
                 }else{false};
                 if let Some(indices)=payload_bootstrap_indices(&ranges,observation.samples,observation.throughput_samples,settings.minimum_samples,quota,latency,refresh) {
                     let first=indices.into_iter().map(|i|(true,ranges[i].clone())).collect::<Vec<_>>();
-                    drop(_fetch);context.pin_packet_blocks(leases);
+                    context.pin_packet_blocks(leases);
                     tracing::info!(context=context.trace_id,required_ranges=first.len(),refresh_mature=refresh,action="learn_then_replan","Learning range costs from required payload reads");
                     let fetched=self.prefetch_ranges_inner(&first,context,usize::MAX,RangePass::PayloadSample)?;
                     context.pin_packet_blocks(fetched);
@@ -2170,7 +2450,7 @@ impl RemoteSource {
                 // reread them when the shared cache is disabled or evicted.
                 if context.can_pin_ranges(self.block_size,spans) {
                     let first=ranges.iter().take(count).cloned().map(|r|(true,r)).collect::<Vec<_>>();
-                    drop(_fetch);context.pin_packet_blocks(leases);
+                    context.pin_packet_blocks(leases);
                     if std::env::var_os("RIVER_PROFILE_SOURCE").is_some() {
                         tracing::info!(samples=observation.samples,throughput_samples=observation.throughput_samples,minimum_samples=settings.minimum_samples,required_bootstrap_ranges=count,"fetching useful prefix ranges before learned planning");
                     }
@@ -2200,44 +2480,7 @@ impl RemoteSource {
         let bytes: u64 = ranges.iter().map(|range| range.end - range.start).sum();
         ensure!(context.stats.bytes + bytes <= context.limit, "S3 compressed-read budget exceeded");
         let mode=std::env::var("RIVER_S3_RANGE_TASKS").unwrap_or_else(|_|"auto".into());
-        let (mut concurrency,automatic)=self.prefetch_execution(&ranges,max_ranges==48);
-        if matches!(pass, RangePass::PayloadSample | RangePass::PayloadReplanned)
-            && !self.serial_index && self.header.layout.columns.max(self.header.layout.rows) > 1
-            && ranges.len() > concurrency && bytes <= 4 * 1024 * 1024
-            && (6_000..u64::MAX).contains(&self.planning_latency_us())
-            && crate::source_admission::active_preparations() <= 1
-            && std::env::var_os("RIVER_S3_RANGE_CONCURRENCY").is_none()
-        {
-            // Dispatch the cold sampling batch and its remaining planned
-            // ranges together when there is capacity. Range selection keeps
-            // its original cost model, including for preview-warmed sources.
-            concurrency = concurrency.max(settings.effective_source_requests().min(8));
-        }
-        if context.indexed_still_headers
-            && ranges.len() >= 64 && bytes <= 8 * 1024 * 1024
-            && settings.mode == crate::read_policy::Mode::Adaptive
-            && crate::source_admission::active_preparations() <= 1
-            && std::env::var_os("RIVER_S3_RANGE_CONCURRENCY").is_none()
-        {
-            // These already-selected prefixes are typically separated by
-            // megabytes. Overlap more of their RTTs on distant sources when
-            // the source admits it, without changing the read plan.
-            let lanes = match self.planning_latency_us() {
-                6_000..12_000 => 8,
-                12_000..u64::MAX => 16,
-                _ => 0,
-            };
-            concurrency = concurrency.max(settings.effective_source_requests().min(lanes));
-        }
-        if ((context.saved_index_headers && ranges.len() >= 128)
-            || (context.indexed_progressive_headers && ranges.len() >= 16))
-            && bytes <= 8 * 1024 * 1024
-            && settings.mode == crate::read_policy::Mode::Adaptive
-            && crate::source_admission::active_preparations() <= 1
-            && std::env::var_os("RIVER_S3_RANGE_CONCURRENCY").is_none()
-        {
-            concurrency = concurrency.max(settings.effective_source_requests().min(16));
-        }
+        let (concurrency,automatic)=self.prefetch_execution(&ranges,max_ranges==48);
         let deadline = context.deadline;
         let cancel = context.cancel.clone();
         let range_client=self.range_client(context);
@@ -2259,16 +2502,18 @@ impl RemoteSource {
             let client=self.range_client(context);
             self.runtime.block_on(async {
                 let mut pending=ranges.iter().cloned();let mut tasks=tokio::task::JoinSet::new();
-                let spawn=|tasks:&mut tokio::task::JoinSet<Result<(Range<u64>,Vec<u8>)>>,range:Range<u64>| {
+                let spawn=|tasks:&mut tokio::task::JoinSet<Result<(Range<u64>,range_flights::Fetched)>>,range:Range<u64>| {
                     let client=client.clone();let cancel=cancel.clone();
                     tasks.spawn(async move {let data=client.fetch(range.clone(),deadline,cancel).await?;Ok((range,data))}.in_current_span());
                 };
                 for range in pending.by_ref().take(concurrency) {spawn(&mut tasks,range);}
                 while let Some(result)=tasks.join_next().await {
                     let (range,data)=result.context("S3 range worker failed")??;context.check()?;
-                    context.stats.bytes+=data.len() as u64;context.stats.requests+=1;
-                    let blocks=self.cache.put(&self.cache_key,self.block_size,range.start,&data);
-                    if self.cache.effective_limit()<8*1024*1024 {context.recent.remember(self.block_size,&blocks);}
+                    data.account(&mut context.stats);
+                    let blocks=self.cache.put_measured(&self.cache_key,self.block_size,range.start,&data,context.feedback.cost(range.clone()));
+                    if let Some(tx)=&context.ready_blocks {let _=tx.send(blocks.clone());}
+                self.cache.mark_gaps(&self.cache_key,self.block_size,&blocks,&demanded,&self.read_profile);
+                if self.cache.effective_limit()<8*1024*1024 {context.recent.remember(self.block_size,&blocks);}
                     leases.extend(blocks);
                     if let Some(range)=pending.next() {spawn(&mut tasks,range);}
                 }
@@ -2287,9 +2532,10 @@ impl RemoteSource {
                 }})).buffer_unordered(concurrency);
             while let Some((range, data)) = pending.try_next().await? {
                 context.check()?;
-                context.stats.bytes += data.len() as u64;
-                context.stats.requests += 1;
-                let blocks=self.cache.put(&self.cache_key, self.block_size, range.start, &data);
+                data.account(&mut context.stats);
+                let blocks=self.cache.put_measured(&self.cache_key, self.block_size, range.start, &data,context.feedback.cost(range.clone()));
+                if let Some(tx)=&context.ready_blocks {let _=tx.send(blocks.clone());}
+                self.cache.mark_gaps(&self.cache_key,self.block_size,&blocks,&demanded,&self.read_profile);
                 if self.cache.effective_limit()<8*1024*1024 {context.recent.remember(self.block_size,&blocks);}
                 leases.extend(blocks);
             }
@@ -2300,7 +2546,7 @@ impl RemoteSource {
     }
 
     #[track_caller]
-    fn range_client(&self,context:&ReadContext)->RangeClient {context.wire_budget.set_limit(context.requests_limit);RangeClient {budget:context.wire_budget.clone(),trace_id:context.trace_id,object_id:self.id.clone(),caller:std::panic::Location::caller(),block_size:self.block_size,part:context.trace_index,store:self.store.clone(),location:self.location.clone(),etag:self.meta.e_tag.clone(),version:self.meta.version.clone(),network_min_us:self.network_min_us.clone(),profile:self.read_profile.clone()}}
+    fn range_client(&self,context:&ReadContext)->RangeClient {context.wire_budget.set_limit(context.requests_limit);RangeClient {stage:"batchedRange",flights:self.flights.clone(),feedback:context.feedback.clone(),budget:context.wire_budget.clone(),trace_id:context.trace_id,object_id:self.id.clone(),caller:std::panic::Location::caller(),block_size:self.block_size,part:context.trace_index,store:self.store.clone(),location:self.location.clone(),etag:self.meta.e_tag.clone(),version:self.meta.version.clone(),network_min_us:self.network_min_us.clone(),profile:self.read_profile.clone()}}
     /// Resolve dependent packet headers in rounds across tiles, then overlap
     /// their required bodies. This keeps a tiny LL probe from serializing RTTs.
     fn prefetch_lowest_prefixes(&self, parts: &[(TilePart,u64)], context: &mut ReadContext) -> Result<()> {
@@ -2476,20 +2722,6 @@ impl RemoteSource {
     }
 }
 
-fn payload_range_concurrency(single_native:bool,block_size:u64,bytes:u64,ranges:&[Range<u64>],latency:u64)->usize {
-    // Reduce RTT waves without changing ranges or bytes. All lanes still share
-    // the source's admission limit; metadata keeps its existing policy.
-    if single_native && (5000..u64::MAX).contains(&latency) && (1024*1024..=8*1024*1024).contains(&bytes) && ranges.len()>=8 {16}
-    else {range_concurrency(block_size,bytes,ranges,latency)}
-}
-fn range_concurrency(block_size: u64, bytes: u64, ranges: &[Range<u64>], network_min_us: u64) -> usize {
-    let remote_latency = (2000..u64::MAX).contains(&network_min_us);
-    // A few merged gaps must not serialize an otherwise tiny-read batch.
-    // Total buffered bytes stay capped even when one range is larger.
-    let small_average=bytes<=ranges.len() as u64*16*1024;
-    if bytes <= 1024*1024 && (block_size == 256 || (remote_latency && small_average)) { 16 } else { 4 }
-}
-
 fn identical_coc(payload: &[u8], components: u8, cod: &[u8]) -> bool {
     payload.len() >= 2 && cod.len() >= 5 && payload[0] < components && payload[1] == cod[0] & 1
         && payload[2..] == cod[5..]
@@ -2518,16 +2750,21 @@ fn adaptive_ranges(ranges:&mut Vec<Range<u64>>,profile:&crate::read_policy::Prof
     }
     let (Some(latency),Some(rate))=(observation.latency_ms,observation.planning_bytes_per_second()) else {profile.decision(decision);return Ok(());};
     let concurrency=execution_concurrency(ranges).min(settings.effective_source_requests());
-    let baseline=read_policy::estimated_ms(ranges.len(),bytes,concurrency,latency,rate);
     let ratio=u64::from(settings.max_overfetch_ratio).min(crate::read_policy::explicit_overfetch_cap().unwrap_or(16));
-    let budget=remaining.min(useful.saturating_mul(ratio));let mut best=ranges.clone();let mut cost=baseline;let mut alternative=false;let mut timeout_risk=false;
+    let budget=read_policy::optional_read_budget(&settings,&observation,remaining,useful);let mut best=ranges.clone();let mut alternative=false;let mut timeout_risk=false;
     let transfer_cap=if maximum_range_bytes>1024*1024 {
         maximum_range_bytes.min((rate*((8000.0-latency).max(0.0)/1000.0)) as u64)
     }else{maximum_range_bytes};
     // Include small batches: a twelve-range packet demand can benefit from
     // one/few bounded reads too. Keep byte,overfetch and timeout guards intact.
-    let targets:&[usize]=&[1,2,4,8,16,32];
-    for &target in targets {
+    let mut targets=vec![1,2,4,8,16,32,concurrency];
+    for wave in 1..=8 {targets.push(ranges.len().saturating_sub(wave*concurrency));}
+    targets.sort_unstable();targets.dedup();
+    let rate=observation.aggregate_bytes_per_second.unwrap_or(rate).max(rate);
+    let baseline=read_policy::estimated_ms(ranges.len(),bytes,concurrency,latency,rate);
+    let mut cost=baseline;
+    let reuse=observation.reused_gap_bytes as f64 / observation.gap_bytes.max(1) as f64;
+    for target in targets.into_iter().filter(|t|*t>0) {
         if target>=ranges.len(){continue;}
         let mut candidate=ranges.clone();merge_ranges_bounded(&mut candidate,target,quota,budget,ratio,transfer_cap)?;
         if maximum_range_bytes>1024*1024 && candidate.iter().any(|r|
@@ -2537,7 +2774,8 @@ fn adaptive_ranges(ranges:&mut Vec<Range<u64>>,profile:&crate::read_policy::Prof
         alternative|=candidate.len()<ranges.len();
         let size=candidate.iter().map(|r|r.end-r.start).sum();
         let proposed=read_policy::estimated_ms(candidate.len(),size,execution_concurrency(&candidate).min(settings.effective_source_requests()),latency,rate);
-        if proposed<cost*0.9 {best=candidate;cost=proposed;}
+        let proposed=proposed-(size-bytes) as f64*reuse.min(1.0)/rate*1000.0;
+        if proposed<cost {best=candidate;cost=proposed;}
     }
     decision.estimated_original_ms=baseline;decision.estimated_planned_ms=cost;decision.planned_requests=best.len();decision.planned_bytes=best.iter().map(|r|r.end-r.start).sum();
     decision.reason=if best.len()<ranges.len(){"predictedRoundTripSavings"}else if alternative {"extraBytesCostMore"}else if timeout_risk {"rangeTimeoutRisk"}else{"overfetchLimitOrRangeGeometry"}.into();
@@ -2680,17 +2918,21 @@ pub(crate) fn resize_jp2(boxes: &mut [u8], width: u32, height: u32) -> Result<()
 }
 
 #[derive(Clone)]
-struct RangeClient {budget:Arc<wire_budget::Budget>,trace_id:u64,object_id:String,caller:&'static std::panic::Location<'static>,block_size:u64,part:Option<usize>,store:Arc<dyn ObjectStore>,location:Path,etag:Option<String>,version:Option<String>,network_min_us:Arc<AtomicU64>,profile:Arc<crate::read_policy::Profile>}
+struct RangeClient {stage:&'static str,flights:Arc<range_flights::Flights>,feedback:Arc<read_feedback::Ledger>,budget:Arc<wire_budget::Budget>,trace_id:u64,object_id:String,caller:&'static std::panic::Location<'static>,block_size:u64,part:Option<usize>,store:Arc<dyn ObjectStore>,location:Path,etag:Option<String>,version:Option<String>,network_min_us:Arc<AtomicU64>,profile:Arc<crate::read_policy::Profile>}
 impl RangeClient {
-    async fn fetch(&self,range:Range<u64>,deadline:Instant,cancel:Option<watch::Receiver<bool>>)->Result<Vec<u8>> {
-        self.fetch_with_network_timeout(range,deadline,cancel,Duration::from_secs(10)).await
+    async fn fetch(&self,range:Range<u64>,deadline:Instant,cancel:Option<watch::Receiver<bool>>)->Result<range_flights::Fetched> {
+        self.shared_read(range,deadline,cancel).await
     }
     async fn fetch_with_network_timeout(&self, range: Range<u64>, deadline: Instant, mut cancel: Option<watch::Receiver<bool>>,network_timeout:Duration) -> Result<Vec<u8>> {
-        let mut range_trace=read_trace::Read::begin(self.trace_id,&self.object_id,self.caller,"batchedRange",range.clone(),self.block_size,None,self.part,"sdk");
+        self.feedback.bind(self.profile.clone());self.feedback.bind_budget(self.budget.clone());
+        let mut feedback_guard=read_feedback::TransferGuard::new(self.feedback.clone());
+        let network_ns=AtomicU64::new(0);
+        let mut range_trace=read_trace::Read::begin(self.trace_id,&self.object_id,self.caller,self.stage,range.clone(),self.block_size,None,self.part,"sdk");
         let opts = GetOptions { range: Some(GetRange::Bounded(range.clone())),
             if_match: self.etag.clone(), version: self.version.clone(), ..Default::default() };
         let get = async {
-            let _source_permit=self.profile.acquire().await;
+            let _source_permit=self.profile.acquire_range().await;
+            let _bytes=crate::adaptation::ByteSlots::network().transfer(range.end-range.start).await;
             range_trace.admitted();
             ensure!(Instant::now()<deadline,"S3 range deadline exceeded during source admission");
             let network_started = Instant::now();
@@ -2706,6 +2948,7 @@ impl RangeClient {
             let elapsed=network_started.elapsed();
             range_trace.transfer_timing(header_time,elapsed);
             self.profile.record(body.len() as u64,header_time,elapsed);
+            network_ns.store(elapsed.as_nanos().min(u128::from(u64::MAX)) as u64,Ordering::Relaxed);
             self.network_min_us.fetch_min(elapsed.as_micros().min(u128::from(u64::MAX)) as u64, Ordering::Relaxed);
             Ok::<_, anyhow::Error>(body)
         };
@@ -2720,7 +2963,9 @@ impl RangeClient {
             result = tokio::time::timeout(remaining, get) => result.context("S3 range timed out waiting for source admission or transfer deadline").and_then(|r|r),
             _ = cancelled => Err(anyhow::anyhow!("S3 request superseded")),
         };
+        if result.is_err() && cancel.as_ref().is_none_or(|rx| !*rx.borrow()) { self.profile.congested(); }
         range_trace.finish(result.as_ref().map_or(0,|b|b.len() as u64),result.is_ok(),None);
+        if let Ok(body)=&result {self.feedback.fetched(range,body.len() as u64,network_ns.load(Ordering::Relaxed));feedback_guard.complete();}
         result
     }
 }
@@ -3015,12 +3260,22 @@ impl std::fmt::Display for ProbeTooShort {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { formatter.write_str("LL packet header exceeds probe") }
 }
 impl std::error::Error for ProbeTooShort {}
+#[derive(Clone)]
 struct Bits<'a> { bytes: &'a [u8], offset: usize, remaining: u8, byte: u8, previous: u8 }
 impl Bits<'_> {
     fn bit(&mut self) -> Result<u8> {
         if self.remaining == 0 { self.byte = *self.bytes.get(self.offset).ok_or(ProbeTooShort)?;
             self.offset += 1; self.remaining = if self.previous == 255 { 7 } else { 8 }; self.previous = self.byte; }
         self.remaining -= 1; Ok((self.byte >> self.remaining) & 1)
+    }
+    fn coding_passes(&mut self) -> Result<u64> {
+        if self.bit()? == 0 { return Ok(1); }
+        if self.bit()? == 0 { return Ok(2); }
+        let short = self.bits(2)?;
+        if short < 3 { return Ok(3 + short); }
+        let medium = self.bits(5)?;
+        if medium < 31 { return Ok(6 + medium); }
+        Ok(37 + self.bits(7)?)
     }
     fn bits(&mut self, count: u32) -> Result<u64> { ensure!(count <= 63, "invalid packet bit count"); let mut value = 0; for _ in 0..count { value = value << 1 | self.bit()? as u64; } Ok(value) }
 }
@@ -3058,9 +3313,7 @@ fn packet_length_coding(bytes: &[u8], grids: &[(usize, usize)], ht: bool, style:
         for block in 0..width * height {
         if !inclusion.decode(block, 1, &mut bits)? { continue; }
         ensure!(zero_planes.decode(block, 32, &mut bits)?, "invalid zero-bitplane tag tree");
-        let passes = if bits.bit()? == 0 { 1 } else if bits.bit()? == 0 { 2 } else {
-            let value = bits.bits(2)?; if value < 3 { 3 + value } else { let value = bits.bits(5)?; if value < 31 { 6 + value } else { 37 + bits.bits(7)? } }
-        };
+        let passes = bits.coding_passes()?;
         let mut lblock = 3; while bits.bit()? != 0 { lblock += 1; ensure!(lblock <= 31, "invalid codeblock length"); }
         if ht {
             let placeholders = (passes-1)/3*3;
@@ -3097,6 +3350,16 @@ fn packet_length_coding(bytes: &[u8], grids: &[(usize, usize)], ht: bool, style:
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn evicting_a_leased_range_leaves_no_diagnostic_owner() {
+        let cache = RangeCache { limit: 1024 * 1024, state: Mutex::default() };
+        let leases = cache.put(&Arc::from("pressure-test"), BLOCK, 0, &[42; 1024]);
+        assert_eq!(cache.trim(0).bytes, 0);
+        assert_eq!(leases[0].1[0], 42);
+        assert_eq!(Arc::strong_count(&leases[0].1), 1);
+        assert_eq!(Arc::weak_count(&leases[0].1), 0);
+    }
+
     #[test] fn main_tlm_lookahead_is_optional_bounded_and_not_used_for_other_markers() {
         assert_eq!(tlm_header_read_end(0xff55,100,65632,200000,true,99328,1024),98398);
         assert_eq!(tlm_header_read_end(0xff55,100,65632,200000,true,99327,1024),65632);
@@ -3122,11 +3385,41 @@ mod tests {
         assert_eq!(parallel_contiguous_limit(4*1024*1024,7*1024*1024,1,1024),4*1024*1024);
         assert_eq!(parallel_contiguous_limit(1024*1024,7*1024*1024,4,1024),1024*1024);
     }
+    #[test]
+    fn sparse_range_blocks_follow_density_and_respect_restricted_reads() {
+        let mut h = Header {
+            image_origin: (0, 0), width: 4096, height: 4096, components: 3,
+            display_rgb_only: false,band_fallback:None, bit_depth: 8, levels: 7, layers: 1,
+            layout: NativeTileLayoutHint { origin_x: 0, origin_y: 0, width: 4096, height: 4096, columns: 1, rows: 1 },
+            progression: 1, is_ht: false, cod: vec![0, 1, 0, 1, 1, 6, 4, 4, 0, 1],
+            first_part: 0, codestream_end: 0, packet_compatible: true,
+            prefix_compatible: true, component_specs:Vec::new(), payload_digest: [0; 32],
+        };
+        assert_eq!(h.range_block_size(48 << 20, true), 16384);
+        assert_eq!(h.range_block_size(48 << 20, false), BLOCK);
+        h.cod[6] = 3;
+        h.cod[7] = 3;
+        assert_eq!(h.range_block_size(48 << 20, true), 4096);
+        h.layers = 3;
+        assert_eq!(h.range_block_size(48 << 20, true), BLOCK);
+        h.progression=2;
+        h.layout.columns=4;
+        h.layout.rows=4;
+        h.layout.width=1024;
+        h.layout.height=1024;
+        h.cod[6]=4;
+        h.cod[7]=4;
+        assert_eq!(h.range_block_size(48<<20,true),8192);
+        assert_eq!(h.range_block_size(48<<20,false),BLOCK);
+        h.progression = 3;
+        assert_eq!(h.range_block_size(48 << 20, true), 256);
+    }
+
     #[test] fn coarse_packet_order_bounds_materialized_prefix_not_unrequested_resolutions() {
         let mut cod=vec![1,2,0,10,1,8,4,4,4,1];cod.extend([0x22;9]);
-        let h=Header {image_origin:(0,0),width:1024,height:1024,components:3,display_rgb_only:false,bit_depth:8,levels:9,layers:10,
+        let h=Header {image_origin:(0,0),width:1024,height:1024,components:3,display_rgb_only:false,band_fallback:None,bit_depth:8,levels:9,layers:10,
             layout:NativeTileLayoutHint {origin_x:0,origin_y:0,width:1024,height:1024,columns:1,rows:1},
-            progression:2,is_ht:false,cod,first_part:0,codestream_end:100,packet_compatible:true,prefix_compatible:false,payload_digest:[0;32]};
+            progression:2,is_ht:false,cod,first_part:0,codestream_end:100,packet_compatible:true,prefix_compatible:false,component_specs:Vec::new(), payload_digest:[0;32]};
         let (packets,total)=packet_order_layers(&h,0,Some(0),true).unwrap();
         assert_eq!(total,2_621_430);assert_eq!(packets.len(),30);
         assert!(packets.iter().all(|p|p.resolution==0));
@@ -3201,7 +3494,7 @@ mod tests {
         store.put(&location,vec![7u8;1024].into()).await.unwrap();
         let profile=Arc::new(crate::read_policy::Profile::default());let mut permits=vec![];
         for _ in 0..crate::read_policy::settings().effective_source_requests() {permits.push(profile.acquire().await);}
-        let client=RangeClient {budget:wire_budget::Budget::new(1),trace_id:0,object_id:"queued-test".into(),
+        let client=RangeClient {stage:"batchedRange",flights:Arc::default(),feedback:Arc::new(read_feedback::Ledger::default()),budget:wire_budget::Budget::new(1),trace_id:0,object_id:"queued-test".into(),
             caller:std::panic::Location::caller(),block_size:1024,part:None,store,location,etag:None,version:None,
             network_min_us:Arc::new(AtomicU64::new(u64::MAX)),profile:profile.clone()};
         let task=tokio::spawn(async move {client.fetch_with_network_timeout(0..1024,Instant::now()+Duration::from_secs(1),None,Duration::from_millis(10)).await});
@@ -3247,6 +3540,21 @@ mod tests {
         let mut capped=(0..4096).map(|n|n*4096..n*4096+1024).collect::<Vec<_>>();
         assert!(merge_ranges_bounded(&mut capped,2,2,useful*2,2,PREFIX_MERGE_BYTES).is_err());
     }
+    #[test] fn measured_amplification_changes_subsequent_optional_ranges() {
+        let settings=crate::read_policy::Settings {mode:crate::read_policy::Mode::Adaptive,..Default::default()};
+        let mut observation=crate::read_policy::Observation::default();
+        let original=vec![0..1000,1500..2500,3000..4000];
+        let mut before=original.clone();
+        let budget=crate::read_policy::optional_read_budget(&settings,&observation,10000,3000);
+        merge_ranges_bounded(&mut before,1,8,budget,2,10000).unwrap();
+        assert_eq!(before,vec![0..4000]);
+        observation.actual_overfetch.learned_ratio_milli=Some(1000);
+        let mut after=original.clone();
+        let budget=crate::read_policy::optional_read_budget(&settings,&observation,10000,3000);
+        merge_ranges_bounded(&mut after,1,8,budget,2,10000).unwrap();
+        assert_eq!(after,original);
+        assert_eq!(after.iter().map(|r|r.end-r.start).sum::<u64>(),3000);
+    }
     #[test] fn small_packet_batches_consider_one_read_without_forcing_overfetch_on_parallel_waves() {
         let profile=crate::read_policy::Profile::default();
         for _ in 0..32 {profile.record(131072,Duration::from_micros(2200),Duration::from_micros(2462));}
@@ -3254,7 +3562,7 @@ mod tests {
         let mut limited=original.clone();
         adaptive_ranges(&mut limited,&profile,64,128*1024,12*3072,1024*1024,|_|3).unwrap();
         let decision=profile.snapshot().last_decision.unwrap();
-        assert_eq!(decision.planned_requests,1);
+        assert_eq!(decision.planned_requests,3, "use all three lanes in the final wave");
         assert!(decision.planned_bytes<=decision.original_bytes*2);
         assert!(decision.estimated_planned_ms<decision.estimated_original_ms*0.9);
         let mut parallel=original;
@@ -3459,16 +3767,6 @@ mod tests {
         assert!(Arc::ptr_eq(context.pinned.get(&0).unwrap(),&first));
     }
     #[test]
-    fn distant_single_tile_payload_parallelism_keeps_other_workloads_conservative() {
-        let ranges=vec![0..256*1024;14];
-        assert_eq!(payload_range_concurrency(true,1024,3*1024*1024,&ranges,20000),16);
-        assert_eq!(payload_range_concurrency(false,1024,3*1024*1024,&ranges,20000),4);
-        assert_eq!(payload_range_concurrency(true,1024,3*1024*1024,&ranges,4999),4);
-        assert_eq!(payload_range_concurrency(true,1024,3*1024*1024,&ranges,u64::MAX),4);
-        assert_eq!(payload_range_concurrency(true,1024,9*1024*1024,&ranges,20000),4);
-        assert_eq!(payload_range_concurrency(true,1024,3*1024*1024,&ranges[..4],20000),4);
-    }
-    #[test]
     fn tlm_offsets_reject_short_overflowing_and_out_of_codestream_extents() {
         assert_eq!(tlm_offsets(100,136,&[(None,14),(Some(1),20)]).unwrap(),vec![100,114]);
         assert!(tlm_offsets(100,135,&[(None,14),(None,20)]).is_err());
@@ -3486,31 +3784,14 @@ mod tests {
         assert!(packet_length_coding(&[0xf8],&grids,true,0x40).is_err());
     }
     #[test]
-    fn compact_range_parallelism_does_not_raise_bulk_transfer_admission() {
-        assert_eq!(range_concurrency(1024,1024*1024,&vec![0..8192;128],2000),16);
-        assert_eq!(range_concurrency(1024,1024*1024,&vec![0..8192;128],1999),4);
-        assert_eq!(range_concurrency(1024,1024*1024,&vec![0..8192;128],u64::MAX),4);
-        assert_eq!(range_concurrency(1024,1024*1024+1,&vec![0..8192;129],10000),4);
-        assert_eq!(range_concurrency(1024,64*1024,&[0..64*1024],10000),4);
-        assert_eq!(range_concurrency(256,64*1024,&[0..64*1024],0),16);
-    }
-    #[test]
-    fn a_merged_gap_does_not_throttle_a_small_remote_batch() {
-        let mut ranges=vec![0..1024;63];ranges.push(0..56*1024);
-        assert_eq!(range_concurrency(1024,119*1024,&ranges,10000),16);
-        assert_eq!(range_concurrency(1024,119*1024,&ranges,1999),4);
-        assert_eq!(range_concurrency(1024,1024*1024,&[0..512*1024,0..512*1024],10000),4);
-        assert_eq!(range_concurrency(1024,48*12*1024,&vec![0..12*1024;48],10000),16);
-    }
-    #[test]
     fn compatibility_cache_evicts_idle_files_and_preserves_active_decoder_leases() {
         let mut cache = CompatibilityCache::default();
-        let first = Arc::new(tempfile::NamedTempFile::new().unwrap());
+        let first = Arc::new(crate::storage_mode::ScratchFile::create("river-test-", ".jp2", 8, None).unwrap());
         let first_path = first.path().to_owned();
         cache.put("first-version".into(), first.clone(), 8, 8);
         assert!(Arc::ptr_eq(&cache.get("first-version").unwrap(), &first));
         assert!(cache.get("new-version").is_none());
-        let second = Arc::new(tempfile::NamedTempFile::new().unwrap());
+        let second = Arc::new(crate::storage_mode::ScratchFile::create("river-test-", ".jp2", 8, None).unwrap());
         let second_path = second.path().to_owned();
         cache.put("second-version".into(), second, 8, 8);
         assert_eq!(cache.bytes, 8);
@@ -3568,6 +3849,8 @@ mod tests {
             data.extend_from_slice(&[0xff,0x52,0,12,0,0,0,1,0,5,4,4,0,1]);
             data.extend_from_slice(&[0xff,0x5c,0,19,0]);data.extend_from_slice(&[0x40;16]);
             if comment_size>0 {data.extend_from_slice(&[0xff,0x64]);data.extend_from_slice(&((comment_size+4) as u16).to_be_bytes());data.extend_from_slice(&[0,1]);data.extend(vec![b'x';comment_size]);}
+            data.extend_from_slice(&[0xff,0x55,0,10,0,0x60,0,0]);
+            data.extend_from_slice(&(14u32 + payload_size as u32).to_be_bytes());
             data.extend_from_slice(&[0xff,0x90,0,10,0,0]);data.extend_from_slice(&(14u32+payload_size as u32).to_be_bytes());
             data.extend_from_slice(&[0,1,0xff,0x93]);data.resize(data.len()+payload_size,0);data.extend_from_slice(&[0xff,0xd9]);
             let filename=format!("initial-{payload_size}.j2k");std::fs::write(directory.path().join(&filename),&data).unwrap();
@@ -3576,11 +3859,28 @@ mod tests {
                 let location=Path::from(filename.clone());let probe=InitialRead::fetch(store.as_ref(),&location).await.unwrap();
                 assert_eq!(probe.meta.size,data.len() as u64);assert!(probe.seed.prefix.is_some());
                 let runtime=tokio::runtime::Handle::current();
-                let (source,stats)=tokio::task::spawn_blocking(move || RemoteSource::open_from_probe("initial".into(),format!("initial-{}",uuid::Uuid::new_v4()),
+                let (mut source,stats)=tokio::task::spawn_blocking(move || RemoteSource::open_from_probe("initial".into(),format!("initial-{}",uuid::Uuid::new_v4()),
                     store,location,probe,runtime,Arc::new(RangeCache {limit,state:Mutex::new(CacheState::default())}))).await.unwrap().unwrap();
                 assert_eq!((source.header.width,source.header.height),(512,384));
                 assert_eq!(stats.requests,1);assert_eq!(stats.bytes,data.len().min(INITIAL_PROBE as usize) as u64);
                 assert_ne!(source.minimum_range_latency_us(),u64::MAX);
+                if limit > 0 && data.len() > 8192 {
+                    // Simulate the grid selected for large tiled multilayer images.
+                    Arc::get_mut(&mut source).unwrap().block_size = 8192;
+                    let expected = data[1018..3100].to_vec();
+                    tokio::task::spawn_blocking(move || {
+                        let mut ctx = ReadContext::new(None);
+                        let payload = source.acquire_header(&mut ctx).unwrap();
+                        let parts = source.selected_parts(&HashSet::from([0]), &payload, 2, 14,
+                            false, false, &mut ctx).unwrap();
+                        assert_eq!(parts.len(), 1);
+                        assert_eq!(ctx.stats.requests, 0, "SOT prefetch must recognize the probe grid");
+                        assert_eq!(source.read(1018..3072, &mut ctx).unwrap(), expected[..2054]);
+                        assert_eq!(ctx.stats.requests, 0);
+                        assert_eq!(source.read(3070..3100, &mut ctx).unwrap(), expected[2052..]);
+                        assert_eq!(ctx.stats.requests, 1);
+                    }).await.unwrap();
+                }
             }
         }
     }
@@ -3642,6 +3942,10 @@ mod tests {
             let reads=context.stats.requests;
             assert_eq!(source.tile_header(&parts[0],&mut context).unwrap(),header);
             assert_eq!(context.stats.requests,reads,"validated request-local header must survive byte-cache eviction without another GET");
+            assert!(header.2.is_none());
+            let mut refinement = ReadContext::new(None);
+            assert_eq!(source.tile_header(&parts[0], &mut refinement).unwrap(), header);
+            assert_eq!(refinement.stats.requests, 0, "refinement should reuse the parsed header");
             let mut different=parts[0].clone();different.length-=1;
             assert!(source.tile_header(&different,&mut context).unwrap_err().to_string().contains("disagrees with source SOT"),"header reuse must validate the complete tile-part identity");
         }).await.unwrap();
@@ -4034,10 +4338,10 @@ mod tests {
     #[test]
     #[ignore = "Isolated release-mode RPCL planner benchmark, not server latency"]
     fn rpcl_plt_planner_benchmark() {
-        let h=Header {image_origin:(0,0),width:1024,height:1024,components:3,display_rgb_only:false,bit_depth:16,
+        let h=Header {image_origin:(0,0),width:1024,height:1024,components:3,display_rgb_only:false,band_fallback:None,bit_depth:16,
             levels:9,layers:10,layout:NativeTileLayoutHint {origin_x:0,origin_y:0,width:1024,height:1024,columns:1,rows:1},
             progression:2,is_ht:false,cod:vec![1,2,0,10,1,8,4,4,4,1,0x33,0x33,0x33,0x33,0x33,0x33,0x33,0x33,0x33],
-            first_part:100,codestream_end:100_000_000,packet_compatible:true,prefix_compatible:false,payload_digest:[0;32]};
+            first_part:100,codestream_end:100_000_000,packet_compatible:true,prefix_compatible:false,component_specs:Vec::new(), payload_digest:[0;32]};
         let build=|stream:bool| {
             let mut spans=Vec::new();let mut offset=100u64;
             let mut append=|p:&Packet,n:usize| {let length=(n%31+1) as u64;spans.push((p.resolution<=2 && p.layer<5,offset..offset+length));offset+=length;Ok(())};
@@ -4056,12 +4360,12 @@ mod tests {
     fn compact_prefix_plan_preserves_packet_order_and_omitted_count() {
         for progression in 0..=2 {
             let layers = if progression == 0 { 3 } else { 1 };
-            let mut header = Header { image_origin: (0,0), width: 1024, height: 1024, components: 3,display_rgb_only:false, bit_depth: 8,
+            let mut header = Header { image_origin: (0,0), width: 1024, height: 1024, components: 3,display_rgb_only:false,band_fallback:None, bit_depth: 8,
                 levels: 5, layers, layout: NativeTileLayoutHint { origin_x: 0, origin_y: 0,
                     width: 1024, height: 1024, columns: 1, rows: 1 }, progression, is_ht: false,
                 cod: vec![1,progression,0,layers as u8,1,4,3,3,0,1,0x44,0x44,0x44,0x44,0x44],
                 first_part: 100, codestream_end: 1_000_000, packet_compatible: true,
-                prefix_compatible: true, payload_digest: [0;32] };
+                prefix_compatible: true, component_specs:Vec::new(), payload_digest: [0;32] };
             for edge in [false, true] {
             let tile = if edge {
                 header.width = 1001; header.height = 777;
@@ -4219,6 +4523,22 @@ mod tests {
         unpinned.pin_small_object(oversized);
         assert!(unpinned.pinned.is_empty());
     }
+    #[test]
+    fn native_view_and_ranges_share_eviction_but_have_distinct_keys() {
+        let cache = RangeCache { limit: 4096+2*RANGE_ENTRY_OVERHEAD, state: Mutex::default() };
+        let id = Arc::from("source-version");
+        let bytes: Arc<[u8]> = Arc::from(vec![3; 3072]);
+        cache.insert_native_view(&id, 0, bytes.clone());
+        cache.put(&id, 1024, 0, &[1; 1024]);
+        assert_eq!(cache.get(&id, 1024, 0).unwrap()[0], 1);
+        let lease = cache.get(&id, 0, 0).unwrap();
+        assert!(Arc::ptr_eq(&lease, &bytes));
+        assert!(cache.get(&Arc::from("replacement-version"), 0, 0).is_none());
+        assert!(cache.get(&id, 0, 1).is_none());
+        assert_eq!(cache.trim(0).bytes, 0);
+        assert!(cache.get(&id, 0, 0).is_none());
+        assert_eq!(lease[0], 3);
+    }
     #[test] fn final_tile_lengths_are_bounded_to_the_codestream_and_support_large_extents() {
         assert_eq!(resolved_part_length(0, 100, 116).unwrap(), 14);
         assert_eq!(resolved_part_length(0, 100, 8 * 1024 * 1024 * 1024 + 102).unwrap(), 8 * 1024 * 1024 * 1024);
@@ -4254,11 +4574,11 @@ mod tests {
         assert!(parse_plt(&[0xff; 10]).is_err());
     }
     #[test] fn shared_cache_evicts_to_its_byte_budget() {
-        let cache = RangeCache { limit: 4096, state: Mutex::new(CacheState::default()) };
+        let cache = RangeCache { limit: 4*range_cost(1024), state: Mutex::new(CacheState::default()) };
         let one = Arc::from("one"); let two = Arc::from("two");
         cache.put(&one, BLOCK, 0, &[1; 4096]); cache.put(&two, BLOCK, 0, &[2; 4096]);
         assert!(cache.get(&one, BLOCK, 0).is_none()); assert_eq!(cache.get(&two, BLOCK, 0).unwrap()[0], 2);
-        assert_eq!(cache.state.lock().unwrap().bytes, 4096);
+        assert_eq!(cache.state.lock().unwrap().bytes, 4*range_cost(1024));
     }
     #[test] fn cache_block_sizes_have_independent_alignment_and_shared_identity() {
         let cache = RangeCache { limit: 4096, state: Mutex::new(CacheState::default()) };
@@ -4269,7 +4589,7 @@ mod tests {
         assert_eq!(cache.get(&identity, 256, 256).unwrap()[0], 2);
         let state = cache.state.lock().unwrap();
         assert!(state.blocks.keys().all(|(key, _, _)| Arc::ptr_eq(key, &identity)));
-        assert_eq!(state.bytes, 1536);
+        assert_eq!(state.bytes, 1536+3*RANGE_ENTRY_OVERHEAD);
     }
     #[test] fn request_drop_propagates_to_a_blocking_reader() {
         let (guard, receiver) = CancelOnDrop::new(); let context = ReadContext::new(Some(receiver));
@@ -4299,18 +4619,26 @@ impl SourceProfile {
         Self {started:Instant::now(),stats:context.stats.clone(),curl_requests:context.curl_requests,cpu}
     }
 }
-fn profile_stage(stage: &str, context: &ReadContext, mark: &mut SourceProfile) {
+fn profile_stage(stage: &'static str, context: &ReadContext, mark: &mut SourceProfile) {
+    if mark.cpu.is_none() && !crate::tile_diagnostics::active() { return; }
+    let ms = mark.started.elapsed().as_secs_f64()*1000.0;
+    let io = ReadStats {requests: context.stats.requests-mark.stats.requests, bytes: context.stats.bytes-mark.stats.bytes,
+        cache_bytes: context.stats.cache_bytes-mark.stats.cache_bytes};
+    let curl = context.curl_requests-mark.curl_requests;
+    let mut cpu_ms = None;
     if let Some(before)=mark.cpu {
         let cpu=source_cpu_counters();
         let delta=|after:Option<u64>,before:Option<u64>|after.zip(before)
             .map(|(a,b)|a.saturating_sub(b) as f64/1_000_000.0).unwrap_or(-1.0);
-        tracing::info!(stage,ms=mark.started.elapsed().as_secs_f64()*1000.0,
+        cpu_ms = Some((delta(cpu.0,before.0), delta(cpu.1,before.1)));
+        tracing::info!(stage=stage.trim_start_matches("source_").replace('_', "-"),ms,
             caller_cpu_ms=delta(cpu.0,before.0),cgroup_cpu_ms=delta(cpu.1,before.1),
             requests=context.stats.requests-mark.stats.requests,bytes=context.stats.bytes-mark.stats.bytes,
             curl_requests=context.curl_requests-mark.curl_requests,
             "S3 preparation stage; cgroup CPU requires isolated requests; unavailable CPU=-1");
         mark.cpu=Some(source_cpu_counters());
     }
+    crate::tile_diagnostics::source(stage, ms, io, curl, cpu_ms);
     mark.started=Instant::now();mark.stats=context.stats.clone();mark.curl_requests=context.curl_requests;
 }
 

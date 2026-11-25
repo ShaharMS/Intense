@@ -1,7 +1,7 @@
 //! Tile-engine boundary for River's raster-only gateway.
 //!
 //! An engine owns the source-specific work needed to turn an exact JPEG 2000
-//! window into decoded raster tiles. The HTTP/WebSocket layer deliberately
+//! window into decoded raster tiles. The HTTP layer deliberately
 //! knows nothing about local paths, object-store range reads, or JPIP. That
 //! lets a future JPIP engine coexist with the direct tiled-JP2 engine without
 //! changing the browser protocol.
@@ -24,12 +24,10 @@ use crate::decoder::{DecodedTile, Jpeg2000Source};
 
 #[derive(Clone, Debug)]
 pub struct TileDecodeRequest {
-    pub progressive_final_reduction: Option<u8>,
     pub output_geometry:Option<crate::edges::OutputGeometry>,
     pub edge_mode: crate::edges::Mode,
     pub source_id: String,
     pub webp_method: u8,
-    pub capture_pixels: bool,
     pub whole_view: bool,
     pub source: Jpeg2000Source,
     pub tiles: Vec<(u32, u32)>,
@@ -72,6 +70,7 @@ impl TileEngine for RemoteTileEngine {
             request.work_ticket=Some(crate::decoder::thread_budget::request_ticket());
         }
         let Some(remote) = request.source.remote.take() else { return Ok(request); };
+        request.source.stable_source = Some(remote.clone());
         let file_ranges=remote.local_path.is_some();
         let pcrl_lowest_revision=remote.header.progression==3 && remote.header.layers==1 && !remote.header.is_ht
             && request.reduction.saturating_add(1)==remote.header.levels
@@ -83,8 +82,49 @@ impl TileEngine for RemoteTileEngine {
         let original_path = request.source.path.clone();
         let original_tiles = request.tiles.clone();
         let mut context = crate::remote_source::ReadContext::new(request.cancellation.clone());
+        context.allow_codeblock_roi = !file_ranges && matches!(self.engine.name(), "direct-jpeg2000" | "jp2grok");
+        if context.allow_codeblock_roi { context.planning_driver_grok = Some(self.engine.name() == "jp2grok"); }
+        if !request.source.display_rgb_only && (self.engine.name() == "direct-jpeg2000"
+            || (self.engine.name() == "jp2grok" && self.engine.accepts_memory_source()
+                && std::env::var("GRK_MERCURY").as_deref() != Ok("0"))) {
+            context.tier1_threads = request.decoder_threads;
+        }
         if matches!(self.engine.name(), "direct-jpeg2000" | "jp2grok") && request.whole_view {
-            context.progressive_final_reduction = request.progressive_final_reduction;
+        }
+        // If ingestion already warmed the entire object in a single range
+        // block, the original grid costs at most one block to service.
+        let original_requested = std::env::var("RIVER_S3_ORIGINAL_RANGES").is_ok_and(|v| v == "1" || v == "true");
+        if !file_ranges && !pcrl_lowest_revision && (remote.fits_original_block() || original_requested)
+            && matches!(self.engine.name(), "direct-jpeg2000" | "jp2grok")
+            && self.engine.accepts_memory_source()
+            && (self.engine.name() == "direct-jpeg2000" || remote.fits_original_block() || {
+                #[cfg(feature="grok")] { crate::decoder::grok::has_original_reader() && !request.source.display_rgb_only && remote.header.components <= 3 }
+                #[cfg(not(feature="grok"))] { false }
+            })
+        {
+            let direct = self.engine.name() == "direct-jpeg2000";
+            if !direct && remote.fits_original_block() {
+                // Native Grok borrows the contiguous original for the decode.
+                let mut bytes = vec![0; remote.meta.size as usize];
+                anyhow::ensure!(remote.read_at(0, &mut bytes, &mut context)? == bytes.len(), "incomplete original image");
+                request.source.memory = Some(bytes.into());
+            }
+            request.source.prepared = Some(std::sync::Arc::new(crate::decoder::PreparedIo {
+                file_ranges, view_reduction:0, pcrl_lowest_revision, technical_origin:None,
+                predecoded:None, overlapped_decode_ms:0.0, predecoded_origin:(0,0),
+                original_path, original_tiles, tile_offset_x:0, tile_offset_y:0,
+                route:"s3-original-ranges", stats:context.stats.clone(),
+                elapsed_ms:crate::decoder::elapsed_ms(started), _file:None,
+            }));
+            #[cfg(feature="grok")]
+            let seekable = direct || crate::decoder::grok::has_original_reader();
+            #[cfg(not(feature="grok"))]
+            let seekable = direct;
+            if seekable {
+                request.source.original_read = Some(std::sync::Arc::new(
+                    crate::remote_source::original_reader::OriginalRead(std::sync::Mutex::new(context))));
+            }
+            return Ok(request);
         }
         if let Some(file) = if pcrl_lowest_revision || file_ranges {None}else{remote.cached_compatibility_file(&mut context)} {
             request.ensure_active()?;
@@ -115,14 +155,23 @@ impl TileEngine for RemoteTileEngine {
                     request.source.prepared=None;
                     return Ok(request);
                 }
-                tracing::warn!(source = %remote.id, reason = %error, "selective read unavailable; using disk-backed compatibility decode");
-                let file = remote.compatibility_file(&mut context).with_context(||format!("Selective S3 preparation failed ({error:#}); disk-backed fallback is unavailable"))?;
-                request.source.path = file.path().to_path_buf();
+                let memory_input = !crate::storage_mode::disk_cache_enabled() && self.engine.accepts_memory_source();
+                tracing::warn!(source = %remote.id, reason = %error, memory_input, "using compatibility decode");
+                let file = if memory_input {
+                    request.source.memory = Some(remote.compatibility_memory(&mut context)
+                        .with_context(|| format!("Selective S3 preparation failed ({error:#}); RAM fallback is unavailable"))?);
+                    None
+                } else {
+                    let file = remote.compatibility_file(&mut context)
+                        .with_context(|| format!("Selective S3 preparation failed ({error:#}); file fallback is unavailable"))?;
+                    request.source.path = file.path().to_path_buf();
+                    Some(file)
+                };
                 request.source.prepared = Some(std::sync::Arc::new(crate::decoder::PreparedIo {file_ranges,
                 view_reduction:0,pcrl_lowest_revision,technical_origin:None,predecoded:None,overlapped_decode_ms:0.0,predecoded_origin:(0,0),
                     original_path, original_tiles, tile_offset_x: 0, tile_offset_y: 0,
                     route: if crate::storage_mode::disk_cache_enabled() { "s3-disk-compatibility" } else { "s3-ram-compatibility" }, stats: context.stats,
-                    elapsed_ms: crate::decoder::elapsed_ms(started), _file: Some(file),
+                    elapsed_ms: crate::decoder::elapsed_ms(started), _file: file,
                 }));
                 return Ok(request);
             }
@@ -140,7 +189,7 @@ impl TileEngine for RemoteTileEngine {
         request.source.native_tile_layout = Some(prepared.layout);
         for (x, y) in &mut request.tiles { *x -= tile_offset_x; *y -= tile_offset_y; }
         let file = if self.engine.accepts_memory_source() {
-            request.source.memory = Some(std::sync::Arc::from(prepared.bytes));
+            request.source.memory = Some(prepared.bytes.into());
             None
         } else {
             let file = prepared.materialize()?;
@@ -158,11 +207,14 @@ impl TileEngine for RemoteTileEngine {
     fn decode(&self, request: TileDecodeRequest) -> Result<Vec<DecodedTile>> {
         let request = self.prepare(request)?;
         let info = request.source.prepared.clone();
+        let original = request.source.original_read.clone();
         let mut tiles = self.engine.decode(request)?;
         let Some(info) = info else { return Ok(tiles); };
+        let stats = original.map(|s| s.0.lock().unwrap_or_else(|e| e.into_inner()).stats.clone());
+        let stats = stats.as_ref().unwrap_or(&info.stats);
         for tile in &mut tiles {
             tile.tile_x += info.tile_offset_x; tile.tile_y += info.tile_offset_y;
-            tile.raster.decoder_route = if matches!(tile.raster.decoder_route,"openjpeg-multispectral-fallback"|"openjpeg-declared-alpha-fallback"|"jp2grok-native-multispectral-rgb"|"openht-worker-failure-grok"|"openht-worker-failure-grok-cli") {tile.raster.decoder_route} else if tile.raster.decoder_route=="openjpeg-gpu-large-grid-fallback" {"openjpeg-gpu-large-grid-fallback"} else if tile.raster.decoder_route=="openjpeg-parallel-reduced" {"openjpeg-parallel-reduced-resolution-view"} else if tile.raster.decoder_route=="openht-pipeline" {"openht-pipeline-ranges"} else if tile.raster.decoder_route=="openht-packed" {"openht-packed-ranges"} else if tile.raster.decoder_route=="openjpeg-pcrl-lowest-compatibility" {
+            tile.raster.decoder_route = if matches!(tile.raster.decoder_route,"openjpeg-multispectral-fallback"|"openjpeg-declared-alpha-fallback"|"openjpeg-two-band-display"|"jp2grok-native-multispectral-rgb"|"openht-worker-failure-grok"|"openht-worker-failure-grok-cli") {tile.raster.decoder_route} else if tile.raster.decoder_route=="openjpeg-gpu-large-grid-fallback" {"openjpeg-gpu-large-grid-fallback"} else if tile.raster.decoder_route=="openjpeg-parallel-reduced" {"openjpeg-parallel-reduced-resolution-view"} else if tile.raster.decoder_route=="openht-pipeline" {"openht-pipeline-ranges"} else if tile.raster.decoder_route=="openht-packed" {"openht-packed-ranges"} else if tile.raster.decoder_route=="openjpeg-pcrl-lowest-compatibility" {
                 match info.route {"s3-packet-ranges"=>"openjpeg-pcrl-lowest-s3-packet-ranges","s3-disk-compatibility"=>"openjpeg-pcrl-lowest-s3-disk-compatibility",_=>"openjpeg-pcrl-lowest-s3-tile-part-ranges"}
             } else if tile.raster.decoder_route=="openht-fallback-jp2grok" {
                 match info.route {
@@ -184,12 +236,12 @@ impl TileEngine for RemoteTileEngine {
                 };
             }
             tile.raster.source_cache_status = if info.file_ranges {
-                if info.stats.bytes==0 {"file-range-hit"}else{"file-range-miss"}
-            } else if info.stats.bytes == 0 { "s3-range-hit" } else { "s3-range-miss" };
+                if stats.bytes==0 {"file-range-hit"}else{"file-range-miss"}
+            } else if stats.bytes == 0 { "s3-range-hit" } else { "s3-range-miss" };
             tile.raster.source_cache_ms = info.elapsed_ms;
-            tile.raster.source_read_bytes = info.stats.bytes;
-            tile.raster.source_range_requests = info.stats.requests;
-            tile.raster.source_cache_hit_bytes = info.stats.cache_bytes;
+            tile.raster.source_read_bytes = stats.bytes;
+            tile.raster.source_range_requests = stats.requests;
+            tile.raster.source_cache_hit_bytes = stats.cache_bytes;
         }
         Ok(tiles)
     }
@@ -206,7 +258,7 @@ fn compatibility_error(error: &anyhow::Error) -> bool {
 /// The stable server-side extension boundary. Every implementation returns
 /// River's canonical decoded raster, never a browser-visible codestream.
 pub trait TileEngine: Send + Sync {
-    fn flight(&self, _request: &TileDecodeRequest) -> Option<std::sync::Arc<tokio::sync::Mutex<()>>> { None }
+    fn flight(&self, _request: &TileDecodeRequest) -> Option<std::sync::Arc<crate::raster_cache::Flight>> { None }
     fn name(&self) -> &'static str;
     fn accepts_memory_source(&self) -> bool { false }
     fn requires_complete_tile_grid(&self) -> bool { false }
@@ -214,14 +266,13 @@ pub trait TileEngine: Send + Sync {
     fn prepare(&self, request: TileDecodeRequest) -> Result<TileDecodeRequest> { Ok(request) }
     fn probe_shared(&self, request: TileDecodeRequest) -> TileDecodeRequest { request }
     fn prepare_after_shared(&self, request: TileDecodeRequest) -> Result<TileDecodeRequest> { self.prepare(request) }
-    fn cache_encoded(&self,_request:&TileDecodeRequest,_tiles:&[DecodedTile]) {}
     fn decode(&self, request: TileDecodeRequest) -> Result<Vec<DecodedTile>>;
 }
 
-pub fn prepare_admitted(engine: &dyn TileEngine, request: TileDecodeRequest,
+pub fn prepare_admitted<G>(engine: &dyn TileEngine, request: TileDecodeRequest,
     permit: crate::adaptation::Permit,
-    flight: Option<tokio::sync::OwnedMutexGuard<()>>,
-    shared_checked: bool) -> Result<(TileDecodeRequest, crate::adaptation::Permit, Option<tokio::sync::OwnedMutexGuard<()>>)> {
+    flight: Option<G>,
+    shared_checked: bool) -> Result<(TileDecodeRequest, crate::adaptation::Permit, Option<G>)> {
     // Keep admission alive inside blocking preparation even if its async
     // caller disappears. Successful buffers retain it until CPU admission.
     request.ensure_active()?;
@@ -250,18 +301,19 @@ impl RasterCachedEngine {
 
     fn prepare_inner(&self, request: TileDecodeRequest, probe: bool) -> Result<TileDecodeRequest> {
         request.ensure_active()?;
+        anyhow::ensure!(!self.engine.requires_complete_tile_grid() || !request.source.components.is_some_and(|n|n>=4),
+            "multiband channel mapping requires OpenJPEG or JP2Grok");
         anyhow::ensure!(!self.engine.requires_complete_tile_grid() || request.source.reference_origin == (0,0),
             "non-zero image reference origins require OpenJPEG or JP2Grok");
-        let request = self.retain_cached(request);
-        let request = if probe { self.probe_shared(request) } else { request };
+        let request = crate::tile_diagnostics::measure("prepare_cache_lookup", || self.retain_cached(request));
+        let request = if probe { crate::tile_diagnostics::measure("prepare_shared_lookup", || self.probe_shared(request)) } else { request };
         if request.tiles.is_empty() { return Ok(request); }
-        let _memory=crate::resources::admit(&request)?;
+        let _memory=crate::tile_diagnostics::measure("prepare_memory_admission", || crate::resources::admit(&request))?;
         self.engine.prepare(request)
     }
 }
 impl TileEngine for RasterCachedEngine {
-    fn flight(&self, request: &TileDecodeRequest) -> Option<std::sync::Arc<tokio::sync::Mutex<()>>> { self.cache.flight(self.name(), request) }
-    fn cache_encoded(&self,request:&TileDecodeRequest,tiles:&[DecodedTile]) {self.cache.put(self.name(),request,tiles);}
+    fn flight(&self, request: &TileDecodeRequest) -> Option<std::sync::Arc<crate::raster_cache::Flight>> { self.cache.flight(self.name(), request) }
     fn name(&self) -> &'static str { self.engine.name() }
     fn accepts_memory_source(&self) -> bool { self.engine.accepts_memory_source() }
     fn cached(&self, request: &TileDecodeRequest) -> Option<Vec<DecodedTile>> {
@@ -299,9 +351,10 @@ impl TileEngine for RasterCachedEngine {
     }
     fn decode(&self, request: TileDecodeRequest) -> Result<Vec<DecodedTile>> {
         let _encoding = crate::encoding_settings::Scope::new(request.webp_method);
-        let _capture = crate::decoder::PixelCapture::new(request.capture_pixels);
         let _edges=crate::edges::Scope::with_output(request.edge_mode,request.source_tile,request.reduction,request.output_geometry);
         request.ensure_active()?;
+        anyhow::ensure!(!self.engine.requires_complete_tile_grid() || !request.source.components.is_some_and(|n|n>=4),
+            "multiband channel mapping requires OpenJPEG or JP2Grok");
         anyhow::ensure!(!self.engine.requires_complete_tile_grid() || request.source.reference_origin == (0,0),
             "non-zero image reference origins require OpenJPEG or JP2Grok");
         if let Some(tiles) = self.cached(&request) {
@@ -309,7 +362,7 @@ impl TileEngine for RasterCachedEngine {
         }
         let request = self.retain_cached(request);
         if request.tiles.is_empty() { return Ok(request.cached_tiles); }
-        let _memory=crate::resources::admit(&request)?;
+        let _memory=crate::tile_diagnostics::measure("render_memory_admission", || crate::resources::admit(&request))?;
         let key_request = request.clone();
         let cached_tiles = request.cached_tiles.clone();
         let nominal_edge=request.source_tile.div_ceil(1u32.checked_shl(u32::from(request.reduction)).unwrap_or(u32::MAX));
@@ -317,7 +370,7 @@ impl TileEngine for RasterCachedEngine {
         let mut tiles = self.engine.decode(request)?;
         if let Some(g)=key_request.output_geometry {
             for tile in &mut tiles {tile.raster.width=if padded {g.edge}else{g.width};tile.raster.height=if padded {g.edge}else{g.height};}
-            self.cache.put(self.name(),&key_request,&tiles);
+            crate::tile_diagnostics::measure("render_cache_store", || self.cache.put(self.name(),&key_request,&tiles));
         } else if padded {
             let mut full=Vec::new();let mut edges=Vec::new();
             for tile in &mut tiles {
@@ -325,10 +378,10 @@ impl TileEngine for RasterCachedEngine {
                     && crate::raster_cache::full_tile(&key_request,(tile.tile_x,tile.tile_y)) {full.push(tile.clone());}
                 else {tile.raster.width=nominal_edge;tile.raster.height=nominal_edge;edges.push(tile.clone());}
             }
-            self.cache.put(self.name(),&key_request,&edges);
+            crate::tile_diagnostics::measure("render_cache_store", || self.cache.put(self.name(),&key_request,&edges));
             let mut natural=key_request;natural.edge_mode=crate::edges::Mode::Crop;
-            self.cache.put(self.name(),&natural,&full);
-        } else {self.cache.put(self.name(), &key_request, &tiles);}
+            crate::tile_diagnostics::measure("render_cache_store", || self.cache.put(self.name(),&natural,&full));
+        } else {crate::tile_diagnostics::measure("render_cache_store", || self.cache.put(self.name(), &key_request, &tiles));}
         tiles.extend(cached_tiles);
         tiles.sort_unstable_by_key(|tile| (tile.tile_y,tile.tile_x));
         Ok(tiles)
@@ -414,7 +467,7 @@ pub struct GrokJpeg2000TileEngine {pub openht:bool}
 
 #[cfg(feature = "grok")]
 impl TileEngine for GrokJpeg2000TileEngine {
-    fn accepts_memory_source(&self) -> bool { self.openht || crate::decoder::grok::native_enabled() }
+    fn accepts_memory_source(&self) -> bool { self.openht || crate::decoder::grok::native_enabled() || (cfg!(target_os="linux") && !crate::storage_mode::disk_cache_enabled()) }
     fn name(&self) -> &'static str {
         if self.openht {"openhtj2k-hybrid"} else {"jp2grok"}
     }
@@ -582,8 +635,8 @@ fn compact_gpu_request(mut request:TileDecodeRequest)->Result<TileDecodeRequest>
             original_tiles:vec![(0,0)],tile_offset_x:0,tile_offset_y:0,route:"s3-single-resolution-prefix",
             stats:Default::default(),elapsed_ms:0.0,_file:None,
         }));
-        TileDecodeRequest {progressive_final_reduction:None, output_geometry:None,edge_mode:crate::edges::Mode::Crop,source_id:"compact-test".into(),
-            webp_method:0,capture_pixels:false,whole_view:true,source,tiles:vec![(0,0)],cached_tiles:vec![],work_ticket:None,
+        TileDecodeRequest {output_geometry:None,edge_mode:crate::edges::Mode::Crop,source_id:"compact-test".into(),
+            webp_method:0,whole_view:true,source,tiles:vec![(0,0)],cached_tiles:vec![],work_ticket:None,
             source_tile:262144,reduction:6,layers:0,format:RasterFormat::Png,decoder_threads:1,max_native_tiles:4,cancellation:None}
     }
     #[test] fn compact_preview_uses_encoded_geometry_and_preserves_output_coordinates() {
@@ -777,10 +830,10 @@ impl TileEngine for NvJpeg2000TileEngine {
                 tile.height,
                 request.format,
             )?;
-            output.push(DecodedTile { rgba:crate::decoder::take_pixel_capture(),
+            output.push(DecodedTile {
                 tile_x: tile.tile_x,
                 tile_y: tile.tile_y,
-                raster: crate::decoder::DecodedRaster {
+                raster: crate::decoder::DecodedRaster { block_counts: None, grok_stages: None,
                     width: tile.width,
                     height: tile.height,
                     bytes: bytes.into_boxed_slice().into(),
@@ -985,7 +1038,8 @@ impl TileEngine for DirectJpeg2000TileEngine {
         let decoder_threads=thread_budget.threads();
         tracing::Span::current().record("decoder_threads",decoder_threads);
         let native_memory = std::env::var("RIVER_S3_NATIVE_TILES").is_ok_and(|value| value == "1" || value == "true");
-        if request.source.memory.is_none() || native_memory { if let Some(tiles) = request.source.decode_native_tiled_tiles(
+        let spatial_subset = request.source.prepared.as_ref().is_some_and(|p| p.route == "s3-codeblock-ranges");
+        if request.source.band_fallback.is_none() && request.source.original_read.is_none() && !spatial_subset && (request.source.memory.is_none() || native_memory) { if let Some(tiles) = request.source.decode_native_tiled_tiles(
             &request.tiles,
             request.source_tile,
             request.reduction,
@@ -1025,12 +1079,12 @@ mod tests {
             }
             fn decode(&self, _: TileDecodeRequest) -> Result<Vec<DecodedTile>> { unreachable!() }
         }
-        let slots = Arc::new(tokio::sync::Semaphore::new(1));
+        let slots = Arc::new(crate::adaptation::Admission::new(1, "RIVER_SOURCE_IO_CONCURRENCY"));
         let permit = slots.clone().acquire_owned().await.unwrap();
         let (entered_tx, entered_rx) = std::sync::mpsc::channel();
         let (release_tx, release_rx) = std::sync::mpsc::channel();
         let engine = HeldPreparation(entered_tx, std::sync::Mutex::new(release_rx));
-        let request = TileDecodeRequest { progressive_final_reduction:None, output_geometry:None, edge_mode:crate::edges::Mode::Crop, capture_pixels:false, webp_method: crate::encoding_settings::snapshot(), source_id: "cancelled".into(), whole_view: false,
+        let request = TileDecodeRequest { output_geometry:None, edge_mode:crate::edges::Mode::Crop, webp_method: crate::encoding_settings::snapshot(), source_id: "cancelled".into(), whole_view: false,
             source: Jpeg2000Source::from_path("cancelled.jp2", 512, 512), tiles: vec![(0, 0)], source_tile: 512,
             reduction: 0, layers: 1, format: RasterFormat::Png, decoder_threads: 1, max_native_tiles: 4, cached_tiles: vec![], work_ticket:None, cancellation: None };
         let gate = Arc::new(tokio::sync::Mutex::new(()));
@@ -1038,10 +1092,10 @@ mod tests {
         let worker = tokio::task::spawn_blocking(move || prepare_admitted(&engine, request, permit, Some(flight), false));
         entered_rx.recv_timeout(std::time::Duration::from_secs(2)).unwrap();
         worker.abort(); drop(worker);
-        assert!(slots.clone().try_acquire_owned().is_err());
+        assert!(tokio::time::timeout(std::time::Duration::from_millis(20), slots.clone().acquire_owned()).await.is_err());
         assert!(gate.try_lock().is_err(), "abandoned worker allowed duplicate preparation");
         release_tx.send(()).unwrap();
-        let released = tokio::time::timeout(std::time::Duration::from_secs(2), slots.acquire()).await.unwrap().unwrap();
+        let released = tokio::time::timeout(std::time::Duration::from_secs(2), slots.clone().acquire_owned()).await.unwrap().unwrap();
         drop(released);
         let unlocked = tokio::time::timeout(std::time::Duration::from_secs(2), gate.lock()).await.unwrap();
         drop(unlocked);
@@ -1053,7 +1107,7 @@ mod tests {
         fn decode(&self, request: TileDecodeRequest) -> Result<Vec<DecodedTile>> {
             self.0.fetch_add(request.tiles.len(), Ordering::SeqCst);
             std::thread::sleep(std::time::Duration::from_millis(40));
-            Ok(request.tiles.iter().map(|&(tile_x,tile_y)| DecodedTile { rgba:None, tile_x, tile_y, raster: crate::decoder::DecodedRaster {
+            Ok(request.tiles.iter().map(|&(tile_x,tile_y)| DecodedTile { tile_x, tile_y, raster: crate::decoder::DecodedRaster { block_counts: None, grok_stages: None,
                 width: 1, height: 1, bytes: vec![request.layers as u8; 16].into(), content_type: "image/png", decoder_backend: "nvjpeg2000", decoder_route: "counted",
                 decode_ms: 40.0, encode_ms: 0.0, source_cache_status: "bypass", source_cache_ms: 0.0,
                 compressed_resolution_view: false, source_read_bytes: 0, source_range_requests: 0, source_cache_hit_bytes: 0 } }).collect())
@@ -1068,7 +1122,7 @@ mod tests {
     fn mixed_batches_prepare_and_decode_only_missing_tiles() {
         let count = Arc::new(AtomicUsize::new(0));
         let engine = RasterCachedEngine { engine: Arc::new(CountedEngine(count.clone())), cache: crate::raster_cache::RasterCache::from_env() };
-        let mut request = TileDecodeRequest { progressive_final_reduction:None, output_geometry:None, edge_mode:crate::edges::Mode::Crop, capture_pixels:false, webp_method: crate::encoding_settings::snapshot(), source_id: "partial-batch-snapshot".into(), whole_view: true,
+        let mut request = TileDecodeRequest { output_geometry:None, edge_mode:crate::edges::Mode::Crop, webp_method: crate::encoding_settings::snapshot(), source_id: format!("partial-batch-{}",uuid::Uuid::new_v4()), whole_view: true,
             source: Jpeg2000Source::from_path("partial.jp2",1536,512), tiles: vec![(0,0)], cached_tiles: vec![], work_ticket:None,
             source_tile: 512, reduction: 0, layers: 0, format: RasterFormat::Png, decoder_threads: 1, max_native_tiles: 4, cancellation: None };
         let initial = engine.decode(request.clone()).unwrap();
@@ -1089,7 +1143,7 @@ mod tests {
         let count = Arc::new(AtomicUsize::new(0));
         let engine: Arc<dyn TileEngine> = Arc::new(RasterCachedEngine {
             engine: Arc::new(CountedEngine(count.clone())), cache: crate::raster_cache::RasterCache::from_env() });
-        let request = TileDecodeRequest { progressive_final_reduction:None, output_geometry:None, edge_mode:crate::edges::Mode::Crop, capture_pixels:false, webp_method: crate::encoding_settings::snapshot(), source_id: "singleflight-snapshot".into(), whole_view: false,
+        let request = TileDecodeRequest { output_geometry:None, edge_mode:crate::edges::Mode::Crop, webp_method: crate::encoding_settings::snapshot(), source_id: format!("singleflight-{}",uuid::Uuid::new_v4()), whole_view: false,
             source: Jpeg2000Source::from_path("singleflight.jp2", 512, 512), tiles: vec![(0, 0)], source_tile: 512,
             reduction: 0, layers: 1, format: RasterFormat::Png, decoder_threads: 1, max_native_tiles: 4, cached_tiles: vec![], work_ticket:None, cancellation: None };
         let (one, two) = tokio::join!(render(engine.clone(), request.clone()), render(engine.clone(), request.clone()));
@@ -1123,7 +1177,7 @@ mod tests {
         }
         let count=Arc::new(AtomicUsize::new(0));
         let engine=RasterCachedEngine {engine:Arc::new(Full(count.clone())),cache:crate::raster_cache::RasterCache::from_env()};
-        let mut request=TileDecodeRequest { progressive_final_reduction:None, output_geometry:None,edge_mode:crate::edges::Mode::Black,capture_pixels:false,webp_method:crate::encoding_settings::snapshot(),source_id:uuid::Uuid::new_v4().to_string(),whole_view:false,
+        let mut request=TileDecodeRequest { output_geometry:None,edge_mode:crate::edges::Mode::Black,webp_method:crate::encoding_settings::snapshot(),source_id:uuid::Uuid::new_v4().to_string(),whole_view:false,
             source:Jpeg2000Source::from_path("full-edge-fixture.jp2",512,512),tiles:vec![(0,0)],source_tile:512,reduction:0,layers:1,format:RasterFormat::Png,decoder_threads:1,max_native_tiles:4,cached_tiles:vec![],work_ticket:None,cancellation:None};
         let first=engine.decode(request.clone()).unwrap();
         for mode in [crate::edges::Mode::Crop,crate::edges::Mode::Transparent] {

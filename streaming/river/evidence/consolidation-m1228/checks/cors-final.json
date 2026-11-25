@@ -1,0 +1,661 @@
+{
+  "passed": true,
+  "api": "http://127.0.0.1:18080",
+  "checks": [
+    {
+      "name": "preflight",
+      "origin": "https://crystal.hosted.example",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "name": "preflight",
+      "origin": "https://crystal.hosted.example",
+      "method": "HEAD",
+      "status": 200
+    },
+    {
+      "name": "preflight",
+      "origin": "https://crystal.hosted.example",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "name": "preflight",
+      "origin": "https://crystal.hosted.example",
+      "method": "PUT",
+      "status": 200
+    },
+    {
+      "name": "preflight",
+      "origin": "https://crystal.hosted.example",
+      "method": "DELETE",
+      "status": 200
+    },
+    {
+      "name": "preflight",
+      "origin": "https://crystal.hosted.example",
+      "method": "PATCH",
+      "status": 200
+    },
+    {
+      "name": "preflight",
+      "origin": "https://crystal.hosted.example",
+      "method": "OPTIONS",
+      "status": 200
+    },
+    {
+      "name": "response",
+      "origin": "https://crystal.hosted.example",
+      "path": "/health",
+      "method": "GET",
+      "status": 200,
+      "exposed": [
+        "content-type"
+      ]
+    },
+    {
+      "name": "response",
+      "origin": "https://crystal.hosted.example",
+      "path": "/health",
+      "method": "HEAD",
+      "status": 200,
+      "exposed": [
+        "content-type"
+      ]
+    },
+    {
+      "name": "response",
+      "origin": "https://crystal.hosted.example",
+      "path": "/openapi.json",
+      "method": "GET",
+      "status": 200,
+      "exposed": [
+        "content-type"
+      ]
+    },
+    {
+      "name": "response",
+      "origin": "https://crystal.hosted.example",
+      "path": "/api/settings/read-policy",
+      "method": "GET",
+      "status": 200,
+      "exposed": [
+        "cache-control",
+        "content-type"
+      ]
+    },
+    {
+      "name": "response",
+      "origin": "https://crystal.hosted.example",
+      "path": "/health",
+      "method": "PATCH",
+      "status": 405,
+      "exposed": [
+        "cache-control",
+        "content-type",
+        "x-river-request-id"
+      ]
+    },
+    {
+      "name": "response",
+      "origin": "https://crystal.hosted.example",
+      "path": "/api/assets/not-a-real-asset/manifest",
+      "method": "GET",
+      "status": 404,
+      "exposed": [
+        "cache-control",
+        "content-type",
+        "x-river-request-id"
+      ]
+    },
+    {
+      "name": "response",
+      "origin": "https://crystal.hosted.example",
+      "path": "/api/tiles/https%3A%2F%2Funconnected.invalid%2Ftest.jp2",
+      "method": "GET",
+      "status": 400,
+      "exposed": [
+        "cache-control",
+        "content-type",
+        "x-river-request-id"
+      ]
+    },
+    {
+      "name": "response",
+      "origin": "https://crystal.hosted.example",
+      "path": "/streamer/v1/0/0/0/tile.png?image=https%3A%2F%2Funconnected.invalid%2Ftest.jp2",
+      "method": "GET",
+      "status": 400,
+      "exposed": [
+        "cache-control",
+        "content-type",
+        "x-river-request-id"
+      ]
+    },
+    {
+      "name": "preflight",
+      "origin": "http://localhost:19074",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "name": "preflight",
+      "origin": "http://localhost:19074",
+      "method": "HEAD",
+      "status": 200
+    },
+    {
+      "name": "preflight",
+      "origin": "http://localhost:19074",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "name": "preflight",
+      "origin": "http://localhost:19074",
+      "method": "PUT",
+      "status": 200
+    },
+    {
+      "name": "preflight",
+      "origin": "http://localhost:19074",
+      "method": "DELETE",
+      "status": 200
+    },
+    {
+      "name": "preflight",
+      "origin": "http://localhost:19074",
+      "method": "PATCH",
+      "status": 200
+    },
+    {
+      "name": "preflight",
+      "origin": "http://localhost:19074",
+      "method": "OPTIONS",
+      "status": 200
+    },
+    {
+      "name": "response",
+      "origin": "http://localhost:19074",
+      "path": "/health",
+      "method": "GET",
+      "status": 200,
+      "exposed": [
+        "content-type"
+      ]
+    },
+    {
+      "name": "response",
+      "origin": "http://localhost:19074",
+      "path": "/health",
+      "method": "HEAD",
+      "status": 200,
+      "exposed": [
+        "content-type"
+      ]
+    },
+    {
+      "name": "response",
+      "origin": "http://localhost:19074",
+      "path": "/openapi.json",
+      "method": "GET",
+      "status": 200,
+      "exposed": [
+        "content-type"
+      ]
+    },
+    {
+      "name": "response",
+      "origin": "http://localhost:19074",
+      "path": "/api/settings/read-policy",
+      "method": "GET",
+      "status": 200,
+      "exposed": [
+        "cache-control",
+        "content-type"
+      ]
+    },
+    {
+      "name": "response",
+      "origin": "http://localhost:19074",
+      "path": "/health",
+      "method": "PATCH",
+      "status": 405,
+      "exposed": [
+        "cache-control",
+        "content-type",
+        "x-river-request-id"
+      ]
+    },
+    {
+      "name": "response",
+      "origin": "http://localhost:19074",
+      "path": "/api/assets/not-a-real-asset/manifest",
+      "method": "GET",
+      "status": 404,
+      "exposed": [
+        "cache-control",
+        "content-type",
+        "x-river-request-id"
+      ]
+    },
+    {
+      "name": "response",
+      "origin": "http://localhost:19074",
+      "path": "/api/tiles/https%3A%2F%2Funconnected.invalid%2Ftest.jp2",
+      "method": "GET",
+      "status": 400,
+      "exposed": [
+        "cache-control",
+        "content-type",
+        "x-river-request-id"
+      ]
+    },
+    {
+      "name": "response",
+      "origin": "http://localhost:19074",
+      "path": "/streamer/v1/0/0/0/tile.png?image=https%3A%2F%2Funconnected.invalid%2Ftest.jp2",
+      "method": "GET",
+      "status": 400,
+      "exposed": [
+        "cache-control",
+        "content-type",
+        "x-river-request-id"
+      ]
+    },
+    {
+      "name": "preflight",
+      "origin": "http://127.0.0.1:18765",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "name": "preflight",
+      "origin": "http://127.0.0.1:18765",
+      "method": "HEAD",
+      "status": 200
+    },
+    {
+      "name": "preflight",
+      "origin": "http://127.0.0.1:18765",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "name": "preflight",
+      "origin": "http://127.0.0.1:18765",
+      "method": "PUT",
+      "status": 200
+    },
+    {
+      "name": "preflight",
+      "origin": "http://127.0.0.1:18765",
+      "method": "DELETE",
+      "status": 200
+    },
+    {
+      "name": "preflight",
+      "origin": "http://127.0.0.1:18765",
+      "method": "PATCH",
+      "status": 200
+    },
+    {
+      "name": "preflight",
+      "origin": "http://127.0.0.1:18765",
+      "method": "OPTIONS",
+      "status": 200
+    },
+    {
+      "name": "response",
+      "origin": "http://127.0.0.1:18765",
+      "path": "/health",
+      "method": "GET",
+      "status": 200,
+      "exposed": [
+        "content-type"
+      ]
+    },
+    {
+      "name": "response",
+      "origin": "http://127.0.0.1:18765",
+      "path": "/health",
+      "method": "HEAD",
+      "status": 200,
+      "exposed": [
+        "content-type"
+      ]
+    },
+    {
+      "name": "response",
+      "origin": "http://127.0.0.1:18765",
+      "path": "/openapi.json",
+      "method": "GET",
+      "status": 200,
+      "exposed": [
+        "content-type"
+      ]
+    },
+    {
+      "name": "response",
+      "origin": "http://127.0.0.1:18765",
+      "path": "/api/settings/read-policy",
+      "method": "GET",
+      "status": 200,
+      "exposed": [
+        "cache-control",
+        "content-type"
+      ]
+    },
+    {
+      "name": "response",
+      "origin": "http://127.0.0.1:18765",
+      "path": "/health",
+      "method": "PATCH",
+      "status": 405,
+      "exposed": [
+        "cache-control",
+        "content-type",
+        "x-river-request-id"
+      ]
+    },
+    {
+      "name": "response",
+      "origin": "http://127.0.0.1:18765",
+      "path": "/api/assets/not-a-real-asset/manifest",
+      "method": "GET",
+      "status": 404,
+      "exposed": [
+        "cache-control",
+        "content-type",
+        "x-river-request-id"
+      ]
+    },
+    {
+      "name": "response",
+      "origin": "http://127.0.0.1:18765",
+      "path": "/api/tiles/https%3A%2F%2Funconnected.invalid%2Ftest.jp2",
+      "method": "GET",
+      "status": 400,
+      "exposed": [
+        "cache-control",
+        "content-type",
+        "x-river-request-id"
+      ]
+    },
+    {
+      "name": "response",
+      "origin": "http://127.0.0.1:18765",
+      "path": "/streamer/v1/0/0/0/tile.png?image=https%3A%2F%2Funconnected.invalid%2Ftest.jp2",
+      "method": "GET",
+      "status": 400,
+      "exposed": [
+        "cache-control",
+        "content-type",
+        "x-river-request-id"
+      ]
+    },
+    {
+      "name": "preflight",
+      "origin": "https://other-host.example:8443",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "name": "preflight",
+      "origin": "https://other-host.example:8443",
+      "method": "HEAD",
+      "status": 200
+    },
+    {
+      "name": "preflight",
+      "origin": "https://other-host.example:8443",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "name": "preflight",
+      "origin": "https://other-host.example:8443",
+      "method": "PUT",
+      "status": 200
+    },
+    {
+      "name": "preflight",
+      "origin": "https://other-host.example:8443",
+      "method": "DELETE",
+      "status": 200
+    },
+    {
+      "name": "preflight",
+      "origin": "https://other-host.example:8443",
+      "method": "PATCH",
+      "status": 200
+    },
+    {
+      "name": "preflight",
+      "origin": "https://other-host.example:8443",
+      "method": "OPTIONS",
+      "status": 200
+    },
+    {
+      "name": "response",
+      "origin": "https://other-host.example:8443",
+      "path": "/health",
+      "method": "GET",
+      "status": 200,
+      "exposed": [
+        "content-type"
+      ]
+    },
+    {
+      "name": "response",
+      "origin": "https://other-host.example:8443",
+      "path": "/health",
+      "method": "HEAD",
+      "status": 200,
+      "exposed": [
+        "content-type"
+      ]
+    },
+    {
+      "name": "response",
+      "origin": "https://other-host.example:8443",
+      "path": "/openapi.json",
+      "method": "GET",
+      "status": 200,
+      "exposed": [
+        "content-type"
+      ]
+    },
+    {
+      "name": "response",
+      "origin": "https://other-host.example:8443",
+      "path": "/api/settings/read-policy",
+      "method": "GET",
+      "status": 200,
+      "exposed": [
+        "cache-control",
+        "content-type"
+      ]
+    },
+    {
+      "name": "response",
+      "origin": "https://other-host.example:8443",
+      "path": "/health",
+      "method": "PATCH",
+      "status": 405,
+      "exposed": [
+        "cache-control",
+        "content-type",
+        "x-river-request-id"
+      ]
+    },
+    {
+      "name": "response",
+      "origin": "https://other-host.example:8443",
+      "path": "/api/assets/not-a-real-asset/manifest",
+      "method": "GET",
+      "status": 404,
+      "exposed": [
+        "cache-control",
+        "content-type",
+        "x-river-request-id"
+      ]
+    },
+    {
+      "name": "response",
+      "origin": "https://other-host.example:8443",
+      "path": "/api/tiles/https%3A%2F%2Funconnected.invalid%2Ftest.jp2",
+      "method": "GET",
+      "status": 400,
+      "exposed": [
+        "cache-control",
+        "content-type",
+        "x-river-request-id"
+      ]
+    },
+    {
+      "name": "response",
+      "origin": "https://other-host.example:8443",
+      "path": "/streamer/v1/0/0/0/tile.png?image=https%3A%2F%2Funconnected.invalid%2Ftest.jp2",
+      "method": "GET",
+      "status": 400,
+      "exposed": [
+        "cache-control",
+        "content-type",
+        "x-river-request-id"
+      ]
+    },
+    {
+      "name": "preflight",
+      "origin": "null",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "name": "preflight",
+      "origin": "null",
+      "method": "HEAD",
+      "status": 200
+    },
+    {
+      "name": "preflight",
+      "origin": "null",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "name": "preflight",
+      "origin": "null",
+      "method": "PUT",
+      "status": 200
+    },
+    {
+      "name": "preflight",
+      "origin": "null",
+      "method": "DELETE",
+      "status": 200
+    },
+    {
+      "name": "preflight",
+      "origin": "null",
+      "method": "PATCH",
+      "status": 200
+    },
+    {
+      "name": "preflight",
+      "origin": "null",
+      "method": "OPTIONS",
+      "status": 200
+    },
+    {
+      "name": "response",
+      "origin": "null",
+      "path": "/health",
+      "method": "GET",
+      "status": 200,
+      "exposed": [
+        "content-type"
+      ]
+    },
+    {
+      "name": "response",
+      "origin": "null",
+      "path": "/health",
+      "method": "HEAD",
+      "status": 200,
+      "exposed": [
+        "content-type"
+      ]
+    },
+    {
+      "name": "response",
+      "origin": "null",
+      "path": "/openapi.json",
+      "method": "GET",
+      "status": 200,
+      "exposed": [
+        "content-type"
+      ]
+    },
+    {
+      "name": "response",
+      "origin": "null",
+      "path": "/api/settings/read-policy",
+      "method": "GET",
+      "status": 200,
+      "exposed": [
+        "cache-control",
+        "content-type"
+      ]
+    },
+    {
+      "name": "response",
+      "origin": "null",
+      "path": "/health",
+      "method": "PATCH",
+      "status": 405,
+      "exposed": [
+        "cache-control",
+        "content-type",
+        "x-river-request-id"
+      ]
+    },
+    {
+      "name": "response",
+      "origin": "null",
+      "path": "/api/assets/not-a-real-asset/manifest",
+      "method": "GET",
+      "status": 404,
+      "exposed": [
+        "cache-control",
+        "content-type",
+        "x-river-request-id"
+      ]
+    },
+    {
+      "name": "response",
+      "origin": "null",
+      "path": "/api/tiles/https%3A%2F%2Funconnected.invalid%2Ftest.jp2",
+      "method": "GET",
+      "status": 400,
+      "exposed": [
+        "cache-control",
+        "content-type",
+        "x-river-request-id"
+      ]
+    },
+    {
+      "name": "response",
+      "origin": "null",
+      "path": "/streamer/v1/0/0/0/tile.png?image=https%3A%2F%2Funconnected.invalid%2Ftest.jp2",
+      "method": "GET",
+      "status": 400,
+      "exposed": [
+        "cache-control",
+        "content-type",
+        "x-river-request-id"
+      ]
+    }
+  ]
+}

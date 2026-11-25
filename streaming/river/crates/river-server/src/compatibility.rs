@@ -4,7 +4,23 @@ use super::*;
 #[derive(serde::Deserialize)]
 pub(super) struct TileQuery { image:String, #[serde(default)] driver:String, layers:Option<u32>, #[serde(rename="tileSize")] tile_size:Option<u32>, #[serde(rename="maxZoom")] max_zoom:Option<u8>, #[serde(rename="minZoom")] min_zoom:Option<u8>, #[serde(rename="tilePixelRatio")] pixel_ratio:Option<f64>, #[serde(default,alias="EDGE")] edge:Option<String> }
 
+impl TileQuery {
+    pub(super) fn map_tile(key: &str, tile_size: u32, min_zoom: u8, max_zoom: u8) -> Self {
+        Self {
+            image: format!("local:{key}"),
+            driver: String::new(),
+            layers: None,
+            tile_size: Some(tile_size),
+            max_zoom: Some(max_zoom),
+            min_zoom: Some(min_zoom),
+            pixel_ratio: None,
+            edge: Some("transparent".into()),
+        }
+    }
+}
+
 pub(super) async fn tile(State(state):State<AppState>,Path((z,x,y,file)):Path<(u8,u32,u32,String)>,Query(query):Query<TileQuery>)->Response {
+    let mut timing = TileTiming::new();
     let geometry=match Geometry::parse(query.tile_size,query.max_zoom,query.min_zoom,query.pixel_ratio,z) {Ok(g)=>g,Err(e)=>return errors::reply(StatusCode::BAD_REQUEST,"invalid_tile_geometry",e.to_string(),serde_json::json!({"zoom":z}))};
     let mode=match edges::Mode::parse(query.edge.as_deref().unwrap_or("black")) {Ok(mode)=>mode,Err(error)=>return errors::reply(StatusCode::BAD_REQUEST,"invalid_edge_mode",error.to_string(),serde_json::json!({"allowed":["crop","black","transparent"]}))};
     let format=match file.strip_prefix("tile.").map(str::to_ascii_lowercase).as_deref() {
@@ -20,16 +36,17 @@ pub(super) async fn tile(State(state):State<AppState>,Path((z,x,y,file)):Path<(u
         },
     };
     let id=asset.manifest.asset_id.0;
+    timing.finish("locate_image");
     render_wmts(state,WmtsQuery {service:"WMTS".into(),request:"GetTile".into(),version:"1.0.0".into(),
-        edge:mode.as_str().into(),layer:id.clone(),limit:None,cursor:None,style:"default".into(),format:format.into(),driver:query.driver,layers:query.layers,
-        matrix_set:format!("RiverPixel-{id}"),matrix:z.to_string(),row:y.to_string(),col:x.to_string()},Some(geometry)).await
+        edge:mode.as_str().into(),layer:id.clone(),style:"default".into(),format:format.into(),driver:query.driver,layers:query.layers,
+        matrix_set:format!("RiverPixel-{id}"),matrix:z.to_string(),row:y.to_string(),col:x.to_string()},Some(geometry),timing).await
 }
 
 pub(super) async fn tile_info(State(state):State<AppState>,Path(image):Path<String>)->Response {
     let asset=match resolve_image(&state,&image).await {Ok(asset)=>asset,Err(response)=>return response};
     let (width,height)=(asset.manifest.width,asset.manifest.height);
     match default_max_zoom(width,height) {
-        Ok(maxzoom)=>Json(serde_json::json!({"bounds":[0,height,width,0],"minzoom":0,"maxzoom":maxzoom})).into_response(),
+        Ok(maxzoom)=>Json(serde_json::json!({"assetId":asset.manifest.asset_id.0,"width":width,"height":height,"components":asset.manifest.components,"resolutionLevels":asset.manifest.resolution_levels,"bounds":[0,height,width,0],"minzoom":0,"maxzoom":maxzoom})).into_response(),
         Err(error)=>errors::reply(StatusCode::UNPROCESSABLE_ENTITY,"unsupported_pixel_pyramid",error.to_string(),serde_json::json!({"width":width,"height":height})),
     }
 }
@@ -45,7 +62,12 @@ fn default_max_zoom(width:u32,height:u32)->anyhow::Result<u8> {
     Ok(max)
 }
 
-async fn resolve_image(state:&AppState,image:&str)->std::result::Result<RegisteredAsset,Response> {
+async fn resolve_image(state:&AppState,image:&str)->std::result::Result<ImageState,Response> {
+    if let Some(key) = image.strip_prefix("local:") {
+        return resolve_local(state, key).await.map_err(|error| errors::reply(
+            StatusCode::UNPROCESSABLE_ENTITY, "local_image_unavailable",
+            format!("Cannot open the requested corpus image: {error:#}"), serde_json::json!({})));
+    }
     let mut id=image.to_owned();
     if !state.assets.read().await.contains_key(&AssetId(id.clone())) && remote_asset_key(&id).is_none() {
         let sources=state.s3_sources.read().await;
@@ -59,13 +81,65 @@ async fn resolve_image(state:&AppState,image:&str)->std::result::Result<Register
         id=remote_asset_id(&matches[0].0,&matches[0].1);
     }
     if let Some((source_id,key))=remote_asset_key(&id) {
-        let response=load_s3_asset(State(state.clone()),Path(source_id),Json(S3AssetInput {key,width:None,height:None,bit_depth:None})).await;
+        let response=prepare_s3_image(State(state.clone()),Path(source_id),Json(S3AssetInput {key,width:None,height:None,bit_depth:None})).await;
         if !response.status().is_success() {return Err(response);}
     }
     match resolved_asset(state,&AssetId(id)).await {
         Ok(Some(asset))=>Ok(asset),Ok(None)=>Err(errors::reply(StatusCode::NOT_FOUND,"asset_not_found","The requested image is unavailable.",serde_json::json!({}))),
         Err(error)=>Err(errors::reply(StatusCode::UNPROCESSABLE_ENTITY,"image_header_failed",format!("Cannot read image header: {error:#}"),serde_json::json!({}))),
     }
+}
+
+/// Explicit local key lookup. Never enumerate the corpus or accept host paths.
+pub(super) async fn resolve_local(state: &AppState, key: &str) -> anyhow::Result<ImageState> {
+    anyhow::ensure!(!key.is_empty() && !std::path::Path::new(key).is_absolute()
+        && std::path::Path::new(key).components().all(|c| matches!(c, std::path::Component::Normal(_))),
+        "Use local:<relative image key> without parent-directory components");
+    let root = PathBuf::from(std::env::var_os("RIVER_CORPUS_ROOT").unwrap_or_else(|| "corpus".into()));
+    let locator_key = key.to_owned();
+    let key = key.to_owned();
+    let (path, id) = tokio::task::spawn_blocking(move || -> anyhow::Result<_> {
+        let root = root.canonicalize()?;
+        let path = root.join(key).canonicalize()?;
+        anyhow::ensure!(path.starts_with(&root) && path.is_file(), "Image must be a file inside RIVER_CORPUS_ROOT");
+        let id = AssetId(file_version_id(&path)?);
+        Ok((path, id))
+    }).await??;
+    if let Some(asset) = state.assets.read().await.get(&id).cloned() { return Ok(asset); }
+    let gate = {
+        let mut gates = state.s3_object_loads.lock().await;
+        gates.retain(|_, gate| gate.strong_count() > 0);
+        if let Some(gate) = gates.get(&id.0).and_then(std::sync::Weak::upgrade) { gate }
+        else { let gate = Arc::new(Mutex::new(())); gates.insert(id.0.clone(), Arc::downgrade(&gate)); gate }
+    };
+    let _open = gate.lock().await;
+    if let Some(asset) = state.assets.read().await.get(&id).cloned() { return Ok(asset); }
+    let _permit = state.source_io_slots.clone().acquire_owned().await?;
+    let runtime = tokio::runtime::Handle::current();
+    let cache = state.s3_range_cache.clone();
+    let (reader, _) = tokio::task::spawn_blocking(move || remote_source::RemoteSource::open_file(&path, runtime, cache)).await??;
+    let header = &reader.header;
+    let mut source = Jpeg2000Source::from_header_layout(reader.local_path.clone().unwrap(), header.width, header.height, Some(header.layout));
+    source.reference_origin = header.image_origin;
+    source.components = Some(header.components);
+    source.display_rgb_only = header.display_rgb_only;
+    source.band_fallback=header.band_fallback;
+    source.remote = Some(reader.clone());
+    let asset = ImageState {
+        local_header: Arc::new(tokio::sync::OnceCell::new()), local_reader: Arc::new(tokio::sync::OnceCell::new()),
+        manifest: AssetManifest {
+            asset_id: id.clone(), width: header.width, height: header.height, components: header.components,
+            bit_depth: header.bit_depth, resolution_levels: header.levels,
+            quality: QualityModel { cumulative_layer_bytes: vec![reader.meta.size; usize::from(header.layers)] },
+            color: ColorPolicy { output: "sRGB/RGBA 8-bit".into(), source_profile: SourceColorProfile::Embedded, assumption_recorded: true },
+            capability: Capability::FastPath,
+        }, source: Some(source),
+    };
+    let locator_id = id.0.clone();
+    let saved = tokio::task::spawn_blocking(move || image_state::remember_locator(&locator_id,"",&locator_key)).await?;
+    if let Err(error) = saved { tracing::warn!(%error,"Could not retain local image locator; reopen the original local key after metadata eviction"); }
+    state.assets.write().await.insert(id, asset.clone());
+    Ok(asset)
 }
 
 fn source_key(image:&str,bucket:&str,region:&str,endpoint:Option<&str>)->Option<String> {

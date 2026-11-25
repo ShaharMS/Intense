@@ -1,11 +1,11 @@
 //! Exact RGBA8 conversion directly from decoded unsigned RGB planes.
 use jpeg2k::{ColorSpace,Image};
 pub(super) fn rgb8(image:&Image)->Option<(u32,u32,Vec<u8>)> {
- if !matches!(image.color_space(),ColorSpace::Unknown|ColorSpace::Unspecified|ColorSpace::SRGB|ColorSpace::Gray) {return None;}
+ if !matches!(image.color_space(),ColorSpace::Unknown|ColorSpace::Unspecified|ColorSpace::SRGB) {return None;}
  let [r,g,b]=image.components() else{return None;};
  let (width,height)=(r.width(),r.height());
  let precision=r.precision();
- if !matches!(precision,8|12|16) || [r,g,b].iter().any(|c|c.precision()!=precision || c.is_signed() || c.is_alpha() || (c.width(),c.height())!=(width,height)) {return None;}
+ if !matches!(precision,8|12|16) || [r,g,b].iter().any(|c|c.precision()!=precision || c.is_signed() || c.channel_type()!=0 || (c.width(),c.height())!=(width,height)) {return None;}
  let pixels=usize::try_from(width).ok()?.checked_mul(usize::try_from(height).ok()?)?;
  let rgba=match precision {16=>interleave16(r.data(),g.data(),b.data(),pixels)?,12=>interleave12(r.data(),g.data(),b.data(),pixels)?,_=>interleave(r.data(),g.data(),b.data(),pixels)?};
  Some((width,height,rgba))
@@ -35,7 +35,66 @@ fn interleave(r:&[i32],g:&[i32],b:&[i32],pixels:usize)->Option<Vec<u8>> {
  Some(r.iter().zip(g).zip(b).flat_map(|((&r,&g),&b)|[r as u8,g as u8,b as u8,255]).collect())
 }
 #[cfg(test)] mod tests {
- use super::{interleave,interleave12,interleave16};
+ use super::{interleave,interleave12,interleave16,Image};
+ #[test]
+ fn two_band_display_respects_declared_opacity() {
+  // Lossless planes: gray=x+2*y, auxiliary=200-2*x. Only the JP2 declares alpha.
+  for (bytes,alpha) in [
+   (&include_bytes!("../../tests/fixtures/two-band/two.j2k")[..],false),
+   (&include_bytes!("../../tests/fixtures/two-band/alpha.jp2")[..],true),
+  ] {
+   let img=Image::from_bytes(bytes).unwrap();
+   let (w,h,rgba)=super::super::rgba8(img.get_pixels(None).unwrap()).unwrap();
+   assert_eq!((w,h),(96,64));
+   for (index,p) in rgba.chunks_exact(4).enumerate() {
+    let x=(index%96) as u8;
+    let gray=x+2*(index/96) as u8;
+    assert_eq!(p,[gray,gray,gray,if alpha {200-2*x} else {255}]);
+   }
+  }
+ }
+ #[test]
+ fn explicit_auxiliary_and_associated_gray_have_exact_display_pixels() {
+  for (bytes,expected) in [
+    (include_bytes!("../../tests/fixtures/two-band/aux.jp2").as_slice(),[[10,10,10,255],[40,40,40,255],[80,80,80,255],[120,120,120,255]]),
+    (include_bytes!("../../tests/fixtures/two-band/associated.jp2").as_slice(),[[0,0,0,0],[120,120,120,85],[120,120,120,170],[120,120,120,255]]),
+  ] {
+   let image=jpeg2k::Image::from_bytes(bytes).unwrap();
+   let (w,h,rgba)=super::super::rgba8(image.get_pixels(None).unwrap()).unwrap();
+   assert_eq!((w,h),(96,64));
+   for (i,pixel) in rgba.chunks_exact(4).enumerate() {assert_eq!(pixel,expected[i%4]);}
+  }
+ }
+ #[test]
+ fn channel_definitions_select_display_planes() {
+  for (bytes,expected) in [
+   (include_bytes!("../../tests/fixtures/color-layout/bgr_aux.jp2").as_slice(),[191,87,29,255]),
+   (include_bytes!("../../tests/fixtures/color-layout/bgr_partial.jp2").as_slice(),[191,87,29,255]),
+   (include_bytes!("../../tests/fixtures/color-layout/argb.jp2").as_slice(),[191,87,29,133]),
+   (include_bytes!("../../tests/fixtures/color-layout/gray_3aux.jp2").as_slice(),[71,71,71,255]),
+   (include_bytes!("../../tests/fixtures/color-layout/gray_aux_alpha.jp2").as_slice(),[71,71,71,133]),
+  ] {
+   let image=Image::from_bytes(bytes).unwrap();
+   let (w,h,rgba)=super::super::rgba8(image.get_pixels(None).unwrap()).unwrap();
+   assert_eq!((w,h),(96,64));
+   assert_eq!(rgba,expected.repeat(96*64));
+  }
+ }
+ #[test]
+ fn omitted_aux_requires_three_distinct_rgb_associations() {
+  let mut bytes=include_bytes!("../../tests/fixtures/color-layout/bgr_partial.jp2").to_vec();
+  let cdef=bytes.windows(4).position(|kind|kind==b"cdef").unwrap();
+  bytes[cdef+11]=2; // Duplicate the green association in place of blue.
+  assert!(Image::from_bytes(&bytes).unwrap_err().to_string().contains("Incomplete channel definitions"));
+ }
+ #[test]
+ fn malformed_tile_keeps_openjpeg_native_error() {
+  let mut bytes=include_bytes!("../../tests/fixtures/two-band/two.j2k").to_vec();
+  let sod=bytes.windows(2).position(|marker|marker==[255,147]).unwrap();
+  bytes[sod+1]=0x40;
+  let msg=Image::from_bytes(&bytes).unwrap_err().to_string();
+  assert!(msg.contains("opj_decode failed:") && msg.contains("marker"),"{msg}");
+ }
  #[test] fn rgb12_matches_legacy_normalization_for_every_value_and_wrapping_edges() {
   let r=(0..=4095).chain([i32::MIN,-1,4096,65535,65536,i32::MAX]).collect::<Vec<i32>>();
   let g=r.iter().rev().copied().collect::<Vec<_>>();let b=r.iter().map(|v|v.wrapping_mul(7919)).collect::<Vec<_>>();

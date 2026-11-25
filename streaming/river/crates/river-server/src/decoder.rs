@@ -1,5 +1,5 @@
 use std::{
-    path::{Path, PathBuf},
+    path::PathBuf,
     time::Instant,
 };
 
@@ -14,6 +14,8 @@ pub(crate) mod grok;
 pub(crate) mod openht_policy;
 mod native;
 mod pixels;
+pub(crate) mod block_reuse;
+pub(crate) mod tier1_resume;
 #[cfg(test)]
 mod empty_precinct_tests;
 mod reduced_tiles;
@@ -22,10 +24,12 @@ pub(crate) mod thread_budget;
 #[derive(Clone, Debug)]
 pub struct Jpeg2000Source {
     pub path: PathBuf,
+    pub original_read: Option<std::sync::Arc<crate::remote_source::original_reader::OriginalRead>>,
+    pub stable_source: Option<std::sync::Arc<crate::remote_source::RemoteSource>>,
     pub remote: Option<std::sync::Arc<crate::remote_source::RemoteSource>>,
-    pub memory: Option<std::sync::Arc<[u8]>>,
+    pub memory: Option<axum::body::Bytes>,
     pub components:Option<u8>,
-    pub display_rgb_only:bool,
+    pub display_rgb_only:bool, pub band_fallback:Option<jpeg2k::BandFallback>,
     pub prepared: Option<std::sync::Arc<PreparedIo>>,
     pub width: u32,
     pub height: u32,
@@ -66,8 +70,13 @@ pub struct NativeTileLayoutHint {
     pub rows: u32,
 }
 
+#[derive(Clone, Copy, Debug)]
+pub struct GrokStages { pub block_counts: Option<(usize,usize)>, pub native_ms: f64, pub decompress_ms: Option<f64>, pub conversion_ms: f64 }
+
 #[derive(Clone, Debug)]
 pub struct DecodedRaster {
+    pub block_counts: Option<(usize,usize)>,
+    pub grok_stages: Option<GrokStages>,
     pub width: u32,
     pub height: u32,
     pub bytes: axum::body::Bytes,
@@ -90,7 +99,6 @@ pub struct DecodedTile {
     pub tile_x: u32,
     pub tile_y: u32,
     pub raster: DecodedRaster,
-    pub rgba: Option<axum::body::Bytes>,
 }
 
 impl Jpeg2000Source {
@@ -102,9 +110,9 @@ impl Jpeg2000Source {
     pub fn from_path(path: impl Into<PathBuf>, width: u32, height: u32) -> Self {
         Self {
             path: path.into(),
-            remote: None,
+            remote: None, stable_source: None, original_read: None,
             memory: None,
-            components:None,display_rgb_only:false,
+            components:None,display_rgb_only:false,band_fallback:None,
             prepared: None,
             width,
             height,
@@ -114,11 +122,11 @@ impl Jpeg2000Source {
     }
 
     #[instrument(
-        name = "river.source.local.from_catalog",
+        name = "river.source.local.from_header_layout",
         skip(path),
         fields(width, height, native_layout = layout.is_some())
     )]
-    pub fn from_catalog(
+    pub fn from_header_layout(
         path: impl Into<PathBuf>,
         width: u32,
         height: u32,
@@ -126,9 +134,9 @@ impl Jpeg2000Source {
     ) -> Self {
         Self {
             path: path.into(),
-            remote: None,
+            remote: None, stable_source: None, original_read: None,
             memory: None,
-            components:None,display_rgb_only:false,
+            components:None,display_rgb_only:false,band_fallback:None,
             prepared: None,
             width,
             height,
@@ -165,7 +173,7 @@ impl Jpeg2000Source {
     }
 
     pub fn decode_tiles_with_threads(&self,tiles:&[(u32,u32)],source_tile:u32,reduce:u8,layers:u32,format:RasterFormat,decoder_threads:usize)->Result<Vec<DecodedTile>> {
-        if reduced_tiles::eligible(self) {
+        if self.band_fallback.is_none() && self.original_read.is_none() && reduced_tiles::eligible(self) {
             if let Some(tiles)=reduced_tiles::render(self,tiles,source_tile,reduce,layers,format,decoder_threads)? {return Ok(tiles);}
         }
         self.decode_tiles_standard(tiles,source_tile,reduce,layers,format,decoder_threads)
@@ -210,17 +218,26 @@ impl Jpeg2000Source {
             end_y
         )
         .entered();
-        let image = if let Some(bytes) = &self.memory {
-            Image::from_bytes_with(bytes, parameters)
-        } else { Image::from_file_with(&self.path, parameters) }
-            .with_context(|| format!("OpenJPEG failed to decode {}", self.path.display()))?;
+        let (image, block_counts) = block_reuse::decode(self, layers, || if let (Some(session), Some(original)) = (&self.original_read, &self.stable_source) {
+            let mut context = session.0.lock().unwrap_or_else(|e| e.into_inner());
+            let mut cursor = original.cursor(&mut context);
+            let image = Image::from_reader_with(&mut cursor, original.meta.size, parameters);
+            if let Some(error) = cursor.error { anyhow::bail!(error); }
+            Ok(image?)
+        } else if let Some(bytes) = &self.memory {
+            Ok::<_, anyhow::Error>(Image::from_bytes_with(bytes, parameters)?)
+        } else { Ok(Image::from_file_with(&self.path, parameters)?) });
+        let image = image.with_context(|| format!("OpenJPEG area ({reference_x0},{reference_y0})..({reference_x1},{reference_y1}), reduction {reduce}, layers {layers}"))?;
         let codec_ms=elapsed_ms(decode_started);
         let conversion_started=Instant::now();
-        let direct=pixels::rgb8(&image);
+        let direct=self.band_fallback.is_none().then(||pixels::rgb8(&image)).flatten();
         let used_direct=direct.is_some();
         let (image_width,image_height,rgba)=if let Some(direct)=direct {direct}else {
-            let pixels=image.get_pixels(None)
-                .context("decoded JPEG 2000 components cannot be converted to 8-bit sRGB/RGBA")?;
+            let pixels=image.get_display_pixels(None,self.band_fallback)
+                .with_context(|| {
+                    let planes=image.components().iter().take(16).map(|c|format!("{}x{} {}-bit {}{}",c.width(),c.height(),c.precision(),if c.is_signed() {"signed"} else {"unsigned"},if c.is_alpha() {" alpha"} else {""})).collect::<Vec<_>>();
+                    format!("display conversion of {:?}, {} components ({}): cannot form an 8-bit display tile",image.color_space(),image.num_components(),planes.join(", "))
+                })?;
             rgba8(pixels)?
         };
         if std::env::var_os("RIVER_PROFILE_SOURCE").is_some() {
@@ -262,10 +279,10 @@ impl Jpeg2000Source {
                     height,
                     format,
                 )?;
-                Ok(DecodedTile { rgba:take_pixel_capture(),
+                Ok(DecodedTile {
                     tile_x,
                     tile_y,
-                    raster: DecodedRaster {
+                    raster: DecodedRaster { block_counts, grok_stages: None,
                         width,
                         height,
                         bytes: bytes.into_boxed_slice().into(),
@@ -430,22 +447,6 @@ fn u16_to_u8(value: u16) -> u8 {
     ((u32::from(value) * 255 + 32_767) / 65_535) as u8
 }
 
-thread_local! {
-    static CAPTURE_PIXELS:std::cell::Cell<bool>=const {std::cell::Cell::new(false)};
-    static CAPTURED_PIXELS:std::cell::RefCell<Option<axum::body::Bytes>>=const {std::cell::RefCell::new(None)};
-}
-pub(crate) struct PixelCapture(bool);
-impl PixelCapture {
-    pub fn new(enabled:bool)->Self {
-        CAPTURED_PIXELS.with(|slot|slot.borrow_mut().take());
-        Self(CAPTURE_PIXELS.with(|slot|slot.replace(enabled)))
-    }
-}
-impl Drop for PixelCapture {
-    fn drop(&mut self) {CAPTURE_PIXELS.with(|slot|slot.set(self.0));CAPTURED_PIXELS.with(|slot|slot.borrow_mut().take());}
-}
-pub(crate) fn take_pixel_capture()->Option<axum::body::Bytes> {CAPTURED_PIXELS.with(|slot|slot.borrow_mut().take())}
-
 #[instrument(
     name = "river.codec.raster.encode_crop",
     skip(rgba),
@@ -462,7 +463,7 @@ pub(crate) fn encode_crop_rgba(
 ) -> Result<Vec<u8>> {
     let crop = crop_rgba(rgba,image_width,offset_x,offset_y,width,height)?;
     let (crop,width,height)=crate::edges::pad(crop,width,height)?;
-    let result=match format {
+    match format {
         RasterFormat::Webp => {
             let mut config = webp::WebPConfig::new().map_err(|_| anyhow::anyhow!("unable to configure WebP encoder"))?;
             config.quality = 82.0;
@@ -495,11 +496,7 @@ pub(crate) fn encode_crop_rgba(
             Ok(bytes)
         }
         RasterFormat::Jxl => encode_jxl_rgba(&crop, width, height),
-    };
-    if result.is_ok() && CAPTURE_PIXELS.with(|slot|slot.get()) {
-        CAPTURED_PIXELS.with(|slot|*slot.borrow_mut()=Some(axum::body::Bytes::copy_from_slice(&crop)));
     }
-    result
 }
 
 fn crop_rgba(rgba: &[u8], image_width: u32, offset_x: u32, offset_y: u32,
@@ -617,10 +614,6 @@ fn encode_jxl_rgba(rgba: &[u8], width: u32, height: u32) -> Result<Vec<u8>> {
 #[cfg(not(feature = "jxl"))]
 fn encode_jxl_rgba(_rgba: &[u8], _width: u32, _height: u32) -> Result<Vec<u8>> {
     bail!("JPEG XL output is unavailable because this River build omits libjxl")
-}
-
-pub fn sample_path(corpus_root: &Path) -> PathBuf {
-    corpus_root.join("Bretagne2.j2k")
 }
 
 #[cfg(test)]

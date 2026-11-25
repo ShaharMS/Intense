@@ -21,7 +21,7 @@ impl RemoteSource {
         // lanes, wider seeds avoid long dependent gaps between large parts.
         // Both layouts retain the same probe-byte ceiling. Explicit overrides
         // and partial views keep their existing behavior.
-        let frontier=env_limit("RIVER_S3_RANGE_CONCURRENCY",16).clamp(1,16)
+        let frontier=env_limit("RIVER_S3_RANGE_CONCURRENCY",self.read_profile.dispatch(32,32*self.block_size)).max(1)
             .min(crate::read_policy::settings().effective_source_requests());
         let automatic=if native>1024 && whole_view && latency<2000 {(2*16*1024*1024/average.max(64*1024)).clamp(4,32) as usize}
             else if whole_view && latency>=2000 && frontier<=4 {16} else {4};
@@ -339,7 +339,7 @@ fn stop_requested(part:&TilePart,requested:Option<&HashSet<u16>>,primary:bool,fo
 
 impl RemoteSource {
  fn advance_deep(&self,lanes:&mut Vec<Lane>,cursor:u64,probe:u64,depth:usize,stop_tiles:Option<HashSet<u16>>,context:&mut ReadContext)->Result<()> {
-  context.check()?;let _fetch=self.fetch_admission(context)?;
+  context.check()?;
   let cod_end=self.header.codestream_end;let end=cod_end.saturating_sub(2);let native=u64::from(self.header.layout.columns)*u64::from(self.header.layout.rows);
   let stop_tiles=stop_tiles.map(Arc::new);
   let batch_selected=!std::env::var("RIVER_S3_INDEX_BATCH_SELECTED").is_ok_and(|v|v=="false" || v=="0");
@@ -354,7 +354,7 @@ impl RemoteSource {
   }
   let stopped=Arc::new(AtomicBool::new(false));let budget=Arc::new(Mutex::new(ReadStats::default()));let before=context.stats.clone();let bytes_limit=context.limit;let request_limit=context.requests_limit;
   let client=self.range_client(context);let cache=self.cache.clone();let key=self.cache_key.clone();let block=self.block_size;let size=self.meta.size;let deadline=context.deadline;let cancel=context.cancel.clone();
-  let concurrency=env_limit("RIVER_S3_RANGE_CONCURRENCY",16).clamp(1,16);
+  let concurrency=env_limit("RIVER_S3_RANGE_CONCURRENCY",self.read_profile.dispatch(jobs.len(),jobs.len() as u64*probe)).max(1).min(jobs.len());
   let result=self.runtime.block_on(async {
    let mut pending=jobs.into_iter();let mut tasks=tokio::task::JoinSet::new();
    let launch=|tasks:&mut tokio::task::JoinSet<Result<(Option<usize>,Lane)>>,(id,start,limit,steps):(Option<usize>,u64,u64,usize)| {

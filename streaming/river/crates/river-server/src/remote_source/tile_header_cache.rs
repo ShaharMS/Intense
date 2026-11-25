@@ -1,7 +1,7 @@
 //! Bounded, version-keyed immutable parsed headers. No source bytes are written.
 use super::{ParsedTileHeader,TilePart};
 use std::{collections::{HashMap,BTreeMap},sync::{Mutex,OnceLock}};
-struct Entry {part:TilePart,header:ParsedTileHeader,bytes:usize,touched:u64}
+struct Entry {part:TilePart,header:ParsedTileHeader,bytes:usize,touched:u64,work_ns:u64}
 #[derive(Default)]struct State {entries:HashMap<(String,u64),Entry>,lru:BTreeMap<u64,(String,u64)>,bytes:usize,clock:u64}
 pub(super) struct Cache {limit:usize,state:Mutex<State>}
 impl Cache {
@@ -12,8 +12,8 @@ impl Cache {
   if crate::resources::effective("parsed_headers",self.limit)==0 {return None;}
   let mut s=self.state.lock().unwrap_or_else(|e|e.into_inner());
   if s.clock==u64::MAX {*s=State::default();}s.clock+=1;let now=s.clock;
-  let key=(id.to_owned(),part.offset);let Some(entry)=s.entries.get_mut(&key)else{crate::resources::miss("parsed_headers");return None;};crate::resources::hit("parsed_headers",entry.bytes);
-  if entry.part!=*part {return None;}
+  let key=(id.to_owned(),part.offset);let Some(entry)=s.entries.get_mut(&key)else{crate::resources::miss("parsed_headers");return None;};if entry.part!=*part {crate::resources::miss("parsed_headers");return None;}
+  crate::resources::hit("parsed_headers",entry.bytes);crate::resources::reused_cost("parsed_headers",entry.work_ns);
   let old=entry.touched;entry.touched=now;let header=entry.header.clone();
   s.lru.remove(&old);s.lru.insert(now,key);Some(header)
  }
@@ -23,11 +23,12 @@ impl Cache {
   if crate::resources::effective("parsed_headers",self.limit)==0 {return None;}
   let mut s=self.state.lock().unwrap_or_else(|e|e.into_inner());
   if s.clock==u64::MAX {*s=State::default();}s.clock+=1;let now=s.clock;
-  let key=(id.to_owned(),offset);let Some(entry)=s.entries.get_mut(&key)else{crate::resources::miss("parsed_headers");return None;};crate::resources::hit("parsed_headers",entry.bytes);
+  let key=(id.to_owned(),offset);let Some(entry)=s.entries.get_mut(&key)else{crate::resources::miss("parsed_headers");return None;};crate::resources::hit("parsed_headers",entry.bytes);crate::resources::reused_cost("parsed_headers",entry.work_ns);
   let old=entry.touched;entry.touched=now;let result=(entry.part.clone(),entry.header.1);
   s.lru.remove(&old);s.lru.insert(now,key);Some(result)
  }
- pub fn put(&self,id:&str,part:&TilePart,header:&ParsedTileHeader) {
+ pub fn put(&self,id:&str,part:&TilePart,header:&ParsedTileHeader) {self.put_measured(id,part,header,0)}
+ pub fn put_measured(&self,id:&str,part:&TilePart,header:&ParsedTileHeader,work_ns:u64) {
   let bytes=id.len()*2+header.0.capacity()+header.2.as_ref().map_or(0,|v|v.capacity()*8)+384;
   if bytes>crate::resources::effective("parsed_headers",self.limit) || bytes>4*1024*1024 {return;}
   let mut s=self.state.lock().unwrap_or_else(|e|e.into_inner());let key=(id.to_owned(),part.offset);
@@ -37,7 +38,7 @@ impl Cache {
    let Some((_,key))=s.lru.pop_first() else{break;};
    s.bytes-=s.entries.remove(&key).unwrap().bytes;
   }
-  s.clock+=1;let now=s.clock;s.lru.insert(now,key.clone());s.entries.insert(key,Entry {part:part.clone(),header:header.clone(),bytes,touched:now});s.bytes+=bytes;
+  s.clock+=1;let now=s.clock;s.lru.insert(now,key.clone());s.entries.insert(key,Entry {part:part.clone(),header:header.clone(),bytes,touched:now,work_ns});s.bytes+=bytes;
  }
 }
 #[cfg(test)]mod tests {
